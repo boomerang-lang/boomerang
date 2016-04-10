@@ -1,0 +1,49 @@
+# OASIS_START
+# DO NOT EDIT (digest: 3c98fed9b29cf454db23729cdffc850d)
+# Ignore VCS directories, you can use the same kind of rule outside
+# OASIS_START/STOP if you want to exclude directories that contains
+# useless stuff for the build process
+true: annot, bin_annot
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Library ubase
+"ubase/ubase.cmxs": use_ubase
+# Library hbase
+"hbase/hbase.cmxs": use_hbase
+# Library boomerang
+"lib/boomerang.cmxs": use_boomerang
+<lib/*.ml{,i,y}>: package(str)
+<lib/*.ml{,i,y}>: package(threads)
+<lib/*.ml{,i,y}>: package(unix)
+<lib/*.ml{,i,y}>: use_hbase
+<lib/*.ml{,i,y}>: use_ubase
+# Executable boomerang
+"boomerang/boomerang.native": package(str)
+"boomerang/boomerang.native": package(threads)
+"boomerang/boomerang.native": package(unix)
+"boomerang/boomerang.native": use_boomerang
+"boomerang/boomerang.native": use_hbase
+"boomerang/boomerang.native": use_ubase
+<boomerang/*.ml{,i,y}>: package(str)
+<boomerang/*.ml{,i,y}>: package(threads)
+<boomerang/*.ml{,i,y}>: package(unix)
+<boomerang/*.ml{,i,y}>: use_boomerang
+<boomerang/*.ml{,i,y}>: use_hbase
+<boomerang/*.ml{,i,y}>: use_ubase
+# Executable baker
+"hbase/baker.native": package(unix)
+"hbase/baker.native": use_hbase
+"hbase/baker.native": use_ubase
+<hbase/*.ml{,i,y}>: package(unix)
+<hbase/*.ml{,i,y}>: use_hbase
+<hbase/*.ml{,i,y}>: use_ubase
+# OASIS_STOP
+true: thread

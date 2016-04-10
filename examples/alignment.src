@@ -1,0 +1,302 @@
+module Alignment = 
+
+#{@}
+
+\chapter{Alignment}
+\label{sec:alignment}
+
+When updating a source, usually we want the lens to be able to match up
+pieces of the updated view with the corresponding pieces of the old
+view, to restore the hidden information. We already saw this problem
+in the composers lens of the Quick Start, when swapping the order
+of composers the year data is not swapped by the PUT function. We
+solved this using a dictionary and a key functions defined in
+@Core.boom@.
+
+In this section we explain in more details how this works.
+
+\section{Tags}
+
+Tag is a type defined in @Core.boom@. It is a quadruple with a
+\emph{specie}, a \emph{predicate}, a default \emph{key annotation} and a
+string. The first one define which method Boomerang will use to align
+the chunks. The second is a way for the programmer to forbid a match
+between two chunks, and for the moment, it comes in only one flavor: a
+threshold. The third one is explained in the following section. Finally,
+the last one is a identifier\footnote{this is actually what was called
+``tag'' in the old versions of Boomerang}.
+
+The identifier is used to specify groups of chunks that are aligned
+independently (Boomerang will match only chunks with the same
+identifier). During one alignment, chunks with the same identifier
+should also agree on the tag, i.e., the specie and the predicate should
+be the same.
+
+Briefly, the species are
+\begin{description}
+ \item[Positional] Chunks are aligned positionally.
+ \item[Diffy] Non crossing alignment minimizing the cost.
+ \item[Greedy] A greedy algorithm to find an alignment with a low
+	    cost. In each step it match the first pair of chunks with
+	    the smallest cost.
+ \item[Setlike] An alignment minimizing the total cost.
+\end{description}
+where cost is the sum of string distances between the matched keys (plus
+the cost of nested alignment, if any). We will see them in more details
+as we show some examples.
+
+A threshold @x@ forbid any match between chunks that does not conserve
+at least $x\%$ of the key\SHOWCOMMENT{should we put a footnote here with
+the real computation using string distance?}. For example, a threshold
+of 0 allows all alignments and a threshold of 100 allows only chunks
+with exactly the same key to be matched.
+
+\section{Keys}
+
+Key annotations are used to indicate which part of the chunk is relevant
+and should be used for the alignment. The parts of the chunk annotated
+with key are used for the alignment and the parts annotated with nokey
+are not used. These annotations can be placed using the functions @key@
+and @nokey@, and these functions does not override previous definitions
+(a @key@ inside a @nokey@ will be used for the alignment). We give two
+more functions, @force_key@ and @force_nokey@ to override previous
+definitions.
+
+When we have nested chunks, the keys in a nested chunk are not used for
+the alignment of an enclosing chunk. The functions to set key
+annotations does not go inside other chunks.
+
+If a part of a chunk does not have a key annotation, it will use the
+default value given by the chunk (defined with the tag).
+
+\section{Learning with examples}
+
+We will use the same composers example from the Quick Start:
+
+#* let ALPHA : regexp = [A-Za-z ]+
+#* let YEARS : regexp = [0-9]{4} . "-" . [0-9]{4}
+#* let comp : lens = 
+#*            key ALPHA . ", "
+#*          . del YEARS . del ", "
+#*          . nokey ALPHA
+#*
+#* let create_comps (chunk:lens) : lens = "" | chunk . (newline . chunk)* 
+
+\subsection{Dictionary}
+
+Dictionary lenses can be written using the \emph{greedy} alignment (see
+next section), for this, we only need to use the function @dictionary@
+that generates a @Tag@. Using dictionary, Boomerang only matches two
+chunks when the key is exactly the same.
+
+#* let comps : lens = create_comps <dictionary "":comp>
+
+#* test comps.put 
+#* <<
+#*   Benjamin Briten, English
+#*   Benjamin Britten, Yankee
+#*   Aron Copland, American
+#* >>
+#* into
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Aaron Copland, 1910-1990, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* =
+#* <<
+#*   Benjamin Briten, 0000-0000, English
+#*   Benjamin Britten, 1913-1976, Yankee
+#*   Aron Copland, 0000-0000, American
+#* >>
+
+If more then one chunk has the same key, the dictionary will match then
+consecutively in the same order as they are in the view and in the
+source. For example:
+
+#* test comps.put 
+#* <<
+#*   Repeated Key, English
+#*   Repeated Key, American
+#*   Repeated Key, Finnish
+#* >>
+#* into
+#* <<
+#*   Repeated Key, 1111-1111, Finnish
+#*   Repeated Key, 2222-2222, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* =
+#* <<
+#*   Repeated Key, 1111-1111, English
+#*   Repeated Key, 2222-2222, American
+#*   Repeated Key, 0000-0000, Finnish
+#* >>
+
+It starts matching the first entry in the view (@Repeated Key, English@)
+with the first entry in the source with the same key 
+(@Repeated Key, 1111-1111, Finnish@), and go on\footnote{the real
+algorithm (greedy alignment) is different, but has the same result}. For
+the last entry in the view, there is no more unmatched key @Repeated Key@
+in the source, so a create is used.
+
+\subsection{Greedy}
+
+The greedy constructs the alignment iteratively, adding at each step the
+first put with the smallest cost, i.e., choosing at each step the best
+pair. 
+
+#* let comps : lens = create_comps <greedy 0 "":comp>
+
+#* test comps.put 
+#* <<
+#*   Benjamin Briten, English
+#*   Benjamin Brtten, Yankee
+#*   Aron Copland, American
+#* >>
+#* into
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Aaron Copland, 1910-1990, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* =
+#* <<
+#*   Benjamin Briten, 1913-1976, English
+#*   Benjamin Brtten, 1865-1957, Yankee
+#*   Aron Copland, 1910-1990, American
+#* >>
+
+in this example, the string distance between the first two key in the
+updated view and the old key of Benjamin Britten are the same, so the
+algorithm chose the first one for the put. At the end, even if Benjamin
+Brtten and Jean Sibelius are very different, it will chose this pair for
+a put (because they are the only remaining chunks). The function of the
+threshold is to forbidden this kind of behavior.
+
+#* test comps.put 
+#* <<
+#*   Benjamin, English
+#* >>
+#* into
+#* <<
+#*   Benjamin Britten, 1913-1976, English
+#*   Benjamin Cooke, 1734-1793, English
+#* >>
+#* =
+#* <<
+#*   Benjamin, 1734-1793, English
+#* >>
+
+However, introducing thresholds we have:
+
+#* let comps : lens = create_comps <greedy 50 "":comp>
+
+#* test comps.put 
+#* <<
+#*   Ben, English
+#*   Sibelius, Finnish
+#* >>
+#* into
+#* <<
+#*   Benjamin Britten, 1913-1976, English
+#*   Benjamin Cooke, 1734-1793, English
+#*   Jean Sibelius, 1865-1957, Finnish
+#* >>
+#* =
+#* <<
+#*   Ben, 0000-0000, English
+#*   Sibelius, 1865-1957, Finnish
+#* >>
+
+
+\subsection{Setlike}
+
+The greedy tries to minimize the alignment in a very naive way.  On the
+other hand, the setlike really minimizes the total cost of the
+alignment. However the algorithm is more complex and slower. Even if it
+is deterministic, it is not predictable which will be the answer when
+more then one answer is correct.
+
+#* let comps : lens = create_comps <setlike 50 "":comp>
+
+#* test comps.put 
+#* <<
+#*   Benjamin Briten, English
+#*   Benjamin Brtten, Yankee
+#*   Aron Copland, American
+#* >>
+#* into
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Aaron Copland, 1910-1990, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* =
+#* <<
+#*   Benjamin Briten, 0000-0000, English
+#*   Benjamin Brtten, 1913-1976, Yankee
+#*   Aron Copland, 1910-1990, American
+#* >>
+in the previous example, another answer were possible:
+## let _ =
+#* <<
+#*   Benjamin Briten, 1913-1967, English
+#*   Benjamin Brtten, 0000-0000, Yankee
+#*   Aron Copland, 1910-1990, American
+#* >>
+
+Let's see the difference between greedy and setlike with an example:
+% try to find a more ``visible'' example.
+#* let comps : lens = create_comps <greedy 0 "":comp>
+
+#* test comps.put 
+#* <<
+#*   abd, first
+#*   acdefg, second
+#* >>
+#* into
+#* <<
+#*   xyzabd, 1111-1111, something
+#*   acd, 2222-2222, something
+#* >>
+#* =
+#* <<
+#*   abd, 2222-2222, first
+#*   acdefg, 1111-1111, second
+#* >>
+while the setlike really minimizes the alignment:
+#* let comps : lens = create_comps <setlike 0 "":comp>
+
+#* test comps.put 
+#* <<
+#*   abd, first
+#*   acdefg, second
+#* >>
+#* into
+#* <<
+#*   xyzabd, 1111-1111, something
+#*   acd, 2222-2222, something
+#* >>
+#* =
+#* <<
+#*   abd, 1111-1111, first
+#*   acdefg, 2222-2222, second
+#* >>
+
+
+\subsection{Positional}
+
+The positional just align the chunks sequentially. It is almost the same
+as does not have chunks, but it allows some advanced techniques that are
+not possible without chunks.  For example, it is possible to pass an
+information across an union:
+
+#* let notacross_union =
+#*   "L" . del [a-z]* | "R" . copy [a-z]*
+#* test notacross_union.put "L" into "Rfromr" = "L"
+
+#* let across_union =
+#*   "L" . <positional "":del [a-z]*> | "R" . <positional "":copy [a-z]*>
+#* test across_union.put "L" into "Rfromr" = "Lfromr"
+

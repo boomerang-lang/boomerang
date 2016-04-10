@@ -1,0 +1,12 @@
+module Test_cex =
+
+let l1 = copy (EPSILON | "A")
+let l2 = copy ("A" | "AA")
+
+test l1.l2 = error
+
+test l2* = error
+
+test (l1 | l2) = error
+
+test (l1 || l2) = error

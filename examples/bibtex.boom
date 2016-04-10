@@ -1,0 +1,702 @@
+#{*}
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2007 J. Nathan Foster and Benjamin C. Pierce                 *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /examples/bibtex.boom                                                      *)
+(* BiBTeX <-> RIS lens                                                        *)
+(* $Id$ *)
+(******************************************************************************)
+
+module Bibtex = 
+
+(* ABBREVIATIONS *)
+let mk_cn : lens -> canonizer = canonizer_of_lens 
+
+(* GLOBALS *)
+let CHAR : regexp = [a-zA-Z. ]
+let ALPHA : regexp = [a-zA-Z.]
+let NL : string = "\n"
+let EPSILON : string = ""
+let tag (s:string) : string = s . "  - "
+let special : regexp = [@{}""]
+let not_special : regexp = ANYCHAR - special
+
+let ANY_TAG : regexp = [A-Z] . [A-Z0-9] . "  - "
+
+let no_tags (r:regexp) : regexp = 
+  r - (containing ANY_TAG)
+
+let ty_tag : string = tag "TY"
+let au_tag : string = tag "AU"
+
+(* AUTHORS *)
+let author : lens = 
+  let ANY_AND : regexp = containing (WS . "and" . WSP) in
+  let string_no_ws : lens = copy (ALPHA+) in
+  let string_ws : lens = copy ((ALPHA . CHAR* . ALPHA) - ANY_AND) in
+  ins au_tag .
+  ( (string_no_ws . copy ", " . string_ws)
+  || ((string_ws . del " ") ~ (string_no_ws . ins ", ")) )
+
+(* process a list of authors *)
+let wsp_and : regexp = WSP . "and" . WSP
+let authors : lens = author . ( default (wsp_and <-> "\n") " and " . author)*
+
+(* unit tests *)
+test author.get "Pierce, Benjamin C." = "AU  - Pierce, Benjamin C."
+test author.get "Foster, J. Nathan" = "AU  - Foster, J. Nathan"
+test author.get "J. Nathan Foster" = "AU  - Foster, J. Nathan"
+test author.put "AU  - Foster, J. Nathan" into "Foster, John" = "Foster, J. Nathan"
+test author.put "AU  - Foster, J. Nathan" into "J. Nathan Foster" = "J. Nathan Foster"
+test authors.get
+  "Aaron Bohannon and J. Nathan Foster and Benjamin C. Pierce" =
+  "AU  - Bohannon, Aaron
+  |AU  - Foster, J. Nathan
+  |AU  - Pierce, Benjamin C."
+
+test authors.get
+  "Bohannon, Aaron and Foster, J. Nathan and Pierce, Benjamin C." = 
+  "AU  - Bohannon, Aaron
+  |AU  - Foster, J. Nathan
+  |AU  - Pierce, Benjamin C."
+
+test authors.get 
+  "Bohannon, Aaron and Foster, J. Nathan and Benjamin C. Pierce" = 
+  "AU  - Bohannon, Aaron
+  |AU  - Foster, J. Nathan
+  |AU  - Pierce, Benjamin C."
+
+test authors.create 
+  "AU  - Bohannon, Aaron
+  |AU  - Foster, J. Nathan
+  |AU  - Pierce, Benjamin C." = 
+  "Bohannon, Aaron and Foster, J. Nathan and Pierce, Benjamin C."
+
+test authors.get
+    <<
+        J. Nathan Foster 
+               and Benjamin C. Pierce 
+               and Alan Schmitt
+    >> = 
+    <<
+        AU  - Foster, J. Nathan
+        AU  - Pierce, Benjamin C.
+        AU  - Schmitt, Alan
+    >>
+
+(* HELPER FUNCTIONS *)
+let upper : regexp = UALPHACHAR
+let lower : regexp = not_special - upper
+let lower_no_ws = lower - WSCHAR
+
+let to_lower : (lens in not_special <-> lower) = 
+  ( default ([aA] <-> "a") "a"
+  | default ([bB] <-> "b") "b" 
+  | default ([cC] <-> "c") "c" 
+  | default ([dD] <-> "d") "d" 
+  | default ([eE] <-> "e") "e" 
+  | default ([fF] <-> "f") "f" 
+  | default ([gG] <-> "g") "g" 
+  | default ([hH] <-> "h") "h" 
+  | default ([iI] <-> "i") "i" 
+  | default ([jJ] <-> "j") "j"    
+  | default ([kK] <-> "k") "k" 
+  | default ([lL] <-> "l") "l" 
+  | default ([mM] <-> "m") "m" 
+  | default ([nN] <-> "n") "n" 
+  | default ([oO] <-> "o") "o" 
+  | default ([pP] <-> "p") "p" 
+  | default ([qQ] <-> "q") "q" 
+  | default ([rR] <-> "r") "r" 
+  | default ([sS] <-> "s") "s" 
+  | default ([tT] <-> "t") "t" 
+  | default ([uU] <-> "u") "u" 
+  | default ([vV] <-> "v") "v" 
+  | default ([wW] <-> "w") "w" 
+  | default ([xX] <-> "x") "x" 
+  | default ([yY] <-> "y") "y" 
+  | default ([zZ] <-> "z") "z" 
+  | copy [^a-zA-Z@{}""] ) 
+
+let braces : (lens in ("{" . not_special+ . "}") <-> (("{" . [A-Z] . "}") | lower)+ ) = 
+  del "{" . 
+    (ins "{" . copy upper . ins "}" | 
+     copy lower)+ . 
+  del "}"
+
+test braces.get "{HeLlO}" = "{H}e{L}l{O}"
+test braces.create "{F}oo" = "{Foo}"
+test braces.create "ho{W}{D}{Y}" = "{hoWDY}"
+
+(* how do we write precise types for canonizers? *)
+let empty_cn : canonizer = mk_cn (copy "")
+
+let first_cn : canonizer = mk_cn ((ins "{" . copy upper . ins "}" || braces) || copy lower )
+
+test canonize first_cn "H" = "{H}"
+test canonize first_cn "f" = "f"
+test canonize first_cn "{HeLlO}" = "{H}e{L}l{O}"
+
+(* NOTE: must be lazy star / dot *)
+let rest_cn  : canonizer = (mk_cn (to_lower || braces))*
+let title_can : canonizer = empty_cn | (first_cn . rest_cn)
+
+test choose title_can "{L}{O}{O}{J}: {W}eaving {L}{O}{O}{M} into {J}ava" = 
+                      "L{O}{O}{J}: {W}eaving {L}{O}{O}{M} into {J}ava"
+
+let canonize_title 
+  : (lens in (not_special | ("{" . not_special+ . "}"))* <-> 
+             (((" "? . (not_special - WSCHAR)) | " " . upper)* . " "?)) 
+  = let l : lens = 
+      ((copy lower_no_ws 
+       | del "{" . copy upper . del "}"
+       | (WSP <-> " ") . copy lower_no_ws
+       | (WSP <-> " ") . del "{" . copy upper . del "}")* )
+	. (copy "" | (WSP <-> " ")) in 
+    left_quot title_can l
+
+test canonize_title.get "LOOJ: {W}eaving {LOOM} into {Java}" = 
+"Looj: Weaving LOOM into Java"
+
+test canonize_title.get "Looj: {W}eaving {LOOM} into {Java}" = 
+"Looj: Weaving LOOM into Java"
+
+test canonize_title.put "LOOJ: Weaving LOOM into Java" into "{LOOJ}: {Weaving LOOM into Java}" = 
+"L{O}{O}{J}: {W}eaving {L}{O}{O}{M} into {J}ava"
+
+test canonize_title.get 
+  "A {L}ogic {Y}our {T}ypechecker {C}an {C}ount {O}n: {U}nordered {T}ree {T}ypes in {P}ractice" =
+  "A Logic Your Typechecker Can Count On: Unordered Tree Types in Practice"
+
+(* VALUES *)
+let esc (s:string) = regexp_of_string ("\\" . s)
+let bare_value = [A-Za-z0-9]+
+let braced_value = no_tags ([^@{}\\] | esc "{" | esc "}")*
+let quoted_value = no_tags ([^@""\\] | esc "\"")*
+
+(* FIELDS *)
+let start_field (lb:string) : regexp = WS . "=" . WS . lb
+let end_field (rb:string) : regexp = rb . [ ]* . "," . [ ]* . "\n"
+
+let mk_template 
+  (lb:string) 
+  (l:lens where lens_splittable (del (start_field lb)) l)
+  (rb:string where lens_splittable (del (start_field lb) . l) (del (end_field rb))) 
+  : (lens  in ((start_field lb) . (stype l) . (end_field rb)) <-> (vtype l))
+  = del (start_field lb) . l . del (end_field rb)
+
+(* I lifted this out to avoid re-calculating the NFAs for the
+   preamble. I don't know if this saves us much because we still have
+   to copy the (huge) Array.ts each time this function is invoked, but
+   it can't hurt *)
+let quoted_preamble = mk_template "\"" (copy quoted_value) "\""
+let braced_preamble = mk_template "{" (copy braced_value) "}"
+let bare_preamble = mk_template "" (copy bare_value) ""
+let any_preamble = quoted_preamble || braced_preamble || bare_preamble 
+
+let std_field_bibtex (o:regexp) = WS . o . (stype any_preamble)
+let std_field_ris (r:string) (c:string) = r . (vtype any_preamble) . c
+
+(* str concatenations in vtype of return are fine; we only need the check on o *)
+let do_std_field (r:string) (O:regexp where lens_splittable (del O) any_preamble) (c:string) 
+  : (lens in std_field_bibtex O <-> std_field_ris r c)
+  = (WS <-> r) . del O . any_preamble . ins c
+      
+let mk_do_field 
+  (r:string) 
+  (lo:regexp -> lens) 
+  (O:regexp) 
+  (lb:string) 
+  (l:lens) 
+  (rb:string where lens_splittable (lo O) (mk_template lb l rb))
+  (c:string) 
+  : (lens in
+    (WS . (stype (lo O . mk_template lb l rb))) <-> 
+    (r . (vtype (lo O . mk_template lb l rb)) . c))
+  = 
+  (WS <-> r) . lo O . mk_template lb l rb . ins c
+
+let field_bibtex (loo:lens) (l1:lens) (l2:lens) (l3:lens) : regexp =
+  let tmpl1 = mk_template "{" l1 "}" in
+  let tmpl2 = mk_template "\"" l2 "\"" in
+  let tmpl3 = mk_template "" l3 "" in
+  let templates = tmpl1 || tmpl2 || tmpl3 in
+  WS . (stype loo) . (stype templates)
+
+let field_ris (r:string) (loo:lens) (l1:lens) (l2:lens) (l3:lens) (c:string) : regexp =
+  let tmpl1 = mk_template "{" l1 "}" in
+  let tmpl2 = mk_template "\"" l2 "\"" in
+  let tmpl3 = mk_template "" l3 "" in
+  let templates = tmpl1 || tmpl2 || tmpl3 in
+  r . (vtype loo) . (vtype templates) . c
+
+let uniform_field_bibtex (loo:lens) (l:lens) : regexp = field_bibtex loo l l l
+let uniform_field_ris (r:string) (loo:lens) (l:lens) (c:string) : regexp =
+  field_ris r loo l l l c
+
+let do_field 
+  (r:string) 
+  (lo:regexp -> lens) 
+  (O:regexp) 
+  (l1:lens where lens_splittable (lo O) (mk_template "{" l1 "}"))
+  (l2:lens where lens_splittable (lo O) (mk_template "\"" l2 "\""))
+  (l3:lens where lens_splittable (lo O) (mk_template "" l3 ""))
+  (c:string) 
+  : (lens in field_bibtex (lo O) l1 l2 l3 <-> field_ris r (lo O) l1 l2 l3 c) =
+     mk_do_field r lo O "{" l1 "}" c
+  || mk_do_field r lo O "\"" l2 "\"" c
+  || mk_do_field r lo O "" l3 "" c
+
+(* special processors for fields *)
+let digits : regexp = DIGIT+
+
+let page_value 
+  : (lens in (digits . "-"+ . digits) <-> ("SP  - " . digits . "\nEP  - " . digits))
+  = ins (tag "SP") . copy digits . ins "\n" .
+    del [\-]+ . 
+    ins (tag "EP") . copy digits 
+
+let month_data : lens = 
+    ("January" | "jan") <-> "01"
+  | ("February" | "feb") <-> "02"
+  | ("March" | "mar") <-> "03"
+  | ("April" | "apr") <-> "04"
+  | ("May" | "may") <-> "05"
+  | ("June" | "jun") <-> "06"
+  | ("July" | "jul") <-> "07"
+  | ("August" | "aug") <-> "08"
+  | ("September" | "sep") <-> "09"
+  | ("October" | "oct") <-> "10"
+  | ("November" | "nov") <-> "11"
+  | ("December" | "dec") <-> "12"
+
+let month_str : regexp = stype month_data
+let month_num : regexp = vtype month_data
+
+let dates_bibtex : regexp = 
+  std_field_bibtex "year" . (uniform_field_bibtex (del "month") month_data)?
+let dates_ris : regexp = 
+  std_field_ris (tag "PY") "/" . (uniform_field_ris "" (del "month") month_data "")? . "//\n"
+
+let do_dates : (lens in dates_bibtex <-> dates_ris) = 
+  let do_year : lens = do_std_field (tag "PY") "year" "/" in
+  let do_month : lens = do_field "" del "month" month_data month_data month_data "" in 
+    (do_year . do_month?)
+    . ins "//" 
+    . ins "\n"
+
+let title_bibtex : regexp = 
+  field_bibtex (del "title") canonize_title canonize_title (copy bare_value)
+
+let title_ris : regexp =
+  field_ris (tag "T1") (del "title") 
+            canonize_title canonize_title (copy bare_value)
+            "\n"
+    
+let author_bibtex : regexp = 
+  field_bibtex (del "author") authors authors (copy EMPTY)  
+let author_ris : regexp = 
+  field_ris "" (del "author") authors authors (copy EMPTY) NL
+
+let do_author : (lens in author_bibtex <-> author_ris) = 
+  do_field EPSILON del "author" authors authors (copy EMPTY) NL
+
+let do_title : (lens in title_bibtex <-> title_ris) = 
+  do_field (tag "T1") del "title" 
+           canonize_title canonize_title (copy bare_value) "\n"
+
+let pages_bibtex : regexp =
+  field_bibtex (del "pages") page_value page_value (copy EMPTY)
+
+let pages_ris : regexp =
+  field_ris "" (del "pages") page_value page_value (copy EMPTY) "\n"
+
+let do_pages : (lens in pages_bibtex <-> pages_ris) = 
+  do_field "" del "pages" page_value page_value (copy EMPTY) "\n"
+
+
+let non_field = ([a-zA-Z]+ - 
+                  ("author" | "title" | "booktitle" | "journal" | "volume" | 
+                   "number" | "note" | "pages" | "year" | "month" | "address" |
+                   "url" | "pdf" | "issn" | "publisher" | "abstract" |
+                   "series"))
+
+let noteize (R:regexp) : (lens in R <-> (R . ": ")) = 
+  copy R . ins ": "
+
+let field_to_note_bibtex : regexp = 
+  field_bibtex (noteize non_field)
+    (copy braced_value) (copy quoted_value) (copy bare_value)
+
+let field_to_note_ris : regexp =
+  field_ris (tag "M1") (noteize non_field)
+            (copy braced_value) (copy quoted_value) (copy bare_value)
+            "\n"
+
+let do_field_to_note : (lens in field_to_note_bibtex <-> field_to_note_ris) = 
+    do_field (tag "M1") noteize non_field 
+             (copy braced_value) (copy quoted_value) (copy bare_value)
+             "\n"
+  
+let field_ris_tnl (R:string) : regexp = std_field_ris (tag R) "\n"
+
+let std_fields_bibtex : regexp = 
+  ( author_bibtex 
+  | title_bibtex 
+  | dates_bibtex 
+  | pages_bibtex
+  | std_field_bibtex "booktitle" | std_field_bibtex "journal"
+  | std_field_bibtex "volume"    | std_field_bibtex "number"
+  | std_field_bibtex "note"      | std_field_bibtex "address"
+  | std_field_bibtex "url"       | std_field_bibtex "pdf"
+  | std_field_bibtex "issn"      | std_field_bibtex "publisher"
+  | std_field_bibtex "abstract"  | std_field_bibtex "series") 
+
+let std_fields_ris : regexp = 
+  ( author_ris
+  . title_ris       
+  . (field_ris_tnl "T2")?  
+  . (field_ris_tnl "JO")?  
+  . (field_ris_tnl "VL")?  
+  . (field_ris_tnl "IS")?
+  . (field_ris_tnl "N1")?  
+  . pages_ris?
+  . dates_ris?
+  . (field_ris_tnl "AD")?  
+  . (field_ris_tnl "UR")?  
+  . (field_ris_tnl "L1")?  
+  . (field_ris_tnl "SN")?   
+  . (field_ris_tnl "PB")?  
+  . (field_ris_tnl "N2")?  
+  . (field_ris_tnl "T3")? )
+
+let fields_bibtex : regexp = (std_fields_bibtex | field_to_note_bibtex)*
+let fields_ris : regexp = std_fields_ris . field_to_note_ris*
+
+let fields : (lens in fields_bibtex <-> fields_ris) = 
+  Sort.partition_sort_concat 
+  #{lens}[
+      do_author
+    ; do_title
+    ; (do_std_field (tag "T2") "booktitle" NL)?
+    ; (do_std_field (tag "JO") "journal" NL)?
+    ; (do_std_field (tag "VL") "volume" NL)?
+    ; (do_std_field (tag "IS") "number" NL)?
+    ; (do_std_field (tag "N1") "note" NL)?
+    ; do_pages?
+    ; do_dates?
+    ; (do_std_field (tag "AD") "address" NL)?
+    ; (do_std_field (tag "UR") "url" NL)?
+    ; (do_std_field (tag "L1") "pdf" NL)?
+    ; (do_std_field (tag "SN") "issn" NL)?
+    ; (do_std_field (tag "PB") "publisher" NL)?
+    ; (do_std_field (tag "N2") "abstract" NL)?
+    ; (do_std_field (tag "T3") "series" NL)? ]
+  do_field_to_note 
+
+let key_re : regexp = (not_special - [, \n])+
+
+let key_bibtex : regexp = key_re . "," . [ ]* . "\n"
+let key_ris : regexp = tag "ID" . key_re
+
+let do_key : (lens in key_bibtex <-> key_ris)
+  = ins (tag "ID") . key [^@{}"",\n ]+ . (("," . [ ]* . "\n") <-> "")
+
+test do_key.get "dtts,\n" = "ID  - dtts"
+
+let type_bibtex (b:string) : regexp = "@" . b . WS . "{"
+let type_ris (r:string) : regexp = "TY  - " . r
+
+(* trivially splittable -- everything is constant strings*)
+let do_type (b:string) (r:string) : (lens in type_bibtex b <-> type_ris r) = 
+  ("@" . b . WS . "{") <-> ("TY  - " . r)
+
+let chunk_bibtex =
+  (type_bibtex "article"       | type_bibtex "inproceedings" |
+   type_bibtex "misc"          | type_bibtex "incollection" |
+   type_bibtex "mastersthesis" | type_bibtex "manual" |
+   type_bibtex "phdthesis") .  (* includes the open { *)
+   key_bibtex . fields_bibtex . WS . "}"
+
+let chunk_ris =
+  (type_ris "JOUR" | type_ris "CONF" | type_ris "UNPB" |
+   type_ris "CHAP" | type_ris "THES" | type_ris "COMP") . NL .
+   key_ris . NL . fields_ris . "ER  -\n\n"
+
+let chunk : (lens in chunk_bibtex <-> chunk_ris) = 
+  ( do_type "article" "JOUR" 
+  | do_type "inproceedings" "CONF"
+  | do_type "misc" "UNPB"
+  | do_type "incollection" "CHAP"
+  | (do_type "mastersthesis" "THES" || do_type "phdthesis" "THES")
+  | do_type "manual" "COMP" )
+  . ins NL . 
+  do_key . ins NL . 
+  fields . 
+  ((WS . "}") <-> "ER  -\n\n")
+
+let non_entry : regexp = 
+  ANY - (containing
+          ("@" . ("article"       | "inproceedings" | "misc" | "incollection" |
+                 "mastersthesis" | "manual"        | "phdthesis")))
+
+let del_non_entry : lens = 
+  del non_entry
+
+let full_chunk = del_non_entry . <greedy 0 "k":chunk>    
+
+let ris : (lens in ((non_entry . chunk_bibtex)* . non_entry) <-> chunk_ris* ) = 
+  (full_chunk . full_chunk* )? . del_non_entry
+
+test ris.get 
+<<
+
+  @inproceedings{dtts,
+     author = {J. Nathan Foster 
+               and Benjamin C. Pierce 
+               and Alan Schmitt},
+     title =  {A {L}ogic {Y}our {T}ypechecker {C}an {C}ount {O}n: {U}nordered {T}ree {T}ypes in {P}ractice},
+     booktitle = planx07,
+     year =   2007,
+     month = jan,
+     pages = {80--90},
+     conf=    {http://www.cis.upenn.edu/~jnfoster/papers/dtts.pdf},
+     slides = {http://www.cis.upenn.edu/~jnfoster/papers/dtts-slides.pdf},
+     jnf =    "yes",
+   }
+>> = 
+<<
+TY  - CONF
+ID  - dtts
+AU  - Foster, J. Nathan
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - A Logic Your Typechecker Can Count On: Unordered Tree Types in Practice
+T2  - planx07
+SP  - 80
+EP  - 90
+PY  - 2007/01//
+M1  - conf: http://www.cis.upenn.edu/~jnfoster/papers/dtts.pdf
+M1  - slides: http://www.cis.upenn.edu/~jnfoster/papers/dtts-slides.pdf
+M1  - jnf: yes
+ER  -
+
+
+>>
+
+test ris.get 
+"@article{Lenses-TOPLAS05,
+| author = {J. Nathan Foster and Michael B. Greenwald and Jonathan T. Moore and Benjamin C. Pierce and Alan Schmitt},
+| title = {Combinators for Bidirectional Tree Transformations: 
+|          {A} Linguistic Approach to the View Update Problem},
+| journal = {Transactions on Programming Languages and Systems (TOPLAS)},
+| year = {2007},
+| month = may,
+| pages = {233--246},
+| address = {New York, NY, USA},
+|} 
+|
+|@inproceedings{SchemaSync-DBPL05,
+|  author    = {Foster, J. Nathan and Greenwald, Michael B. and Kirkegaard, Christian and Pierce, Benjamin C. and Schmitt, Alan},
+|  title     = {Exploiting Schemas in Data Synchronization},
+|  booktitle = {Database Programming Languages (DBPL), Trondheim, Norway},
+|  year      = {2005},
+|  month     = {August}, 
+|  pages     = {42--57},
+|}
+|" = 
+<<
+TY  - JOUR
+ID  - Lenses-TOPLAS05
+AU  - Foster, J. Nathan
+AU  - Greenwald, Michael B.
+AU  - Moore, Jonathan T.
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - Combinators for bidirectional tree transformations: A linguistic approach to the view update problem
+JO  - Transactions on Programming Languages and Systems (TOPLAS)
+SP  - 233
+EP  - 246
+PY  - 2007/05//
+AD  - New York, NY, USA
+ER  -
+
+TY  - CONF
+ID  - SchemaSync-DBPL05
+AU  - Foster, J. Nathan
+AU  - Greenwald, Michael B.
+AU  - Kirkegaard, Christian
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - Exploiting schemas in data synchronization
+T2  - Database Programming Languages (DBPL), Trondheim, Norway
+SP  - 42
+EP  - 57
+PY  - 2005/08//
+ER  -
+
+
+>>
+ 
+test ris.get
+<<
+@article{schema-sync-jcss,
+  author = {J. Nathan Foster 
+            and Michael B. Greenwald 
+            and Christian Kirkegaard 
+            and Benjamin C. Pierce 
+            and Alan Schmitt},
+  title =  {Exploiting {S}chemas in {D}ata {S}ynchronization},
+  journal = {Journal of Computer and System Sciences},
+  publisher= {Elsevier},
+  volume = 73,
+  number = 4,
+  year = 2007,
+  month = {June},
+  note = {Short version in DBPL '05.},
+  full = { http://dx.doi.org/10.1016/j.jcss.2006.10.024 },
+  jnf = "yes",
+  plclub = "yes",
+}
+
+>> = 
+<<
+TY  - JOUR
+ID  - schema-sync-jcss
+AU  - Foster, J. Nathan
+AU  - Greenwald, Michael B.
+AU  - Kirkegaard, Christian
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - Exploiting Schemas in Data Synchronization
+JO  - Journal of Computer and System Sciences
+VL  - 73
+IS  - 4
+N1  - Short version in DBPL '05.
+PY  - 2007/06//
+PB  - Elsevier
+M1  - full:  http://dx.doi.org/10.1016/j.jcss.2006.10.024 
+M1  - jnf: yes
+M1  - plclub: yes
+ER  -
+
+
+>>
+
+test ris.put <<
+TY  - JOUR
+ID  - schema-sync-jcss
+AU  - Foster, J. Nathan
+AU  - Greenwald, Michael B.
+AU  - Kirkegaard, Christian
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - Exploiting Schemas in Data Synchronization
+JO  - Journal of Computer and System Sciences
+VL  - 73
+IS  - 4
+N1  - Short version in DBPL '05.
+PY  - 2007/06//
+PB  - Elsevier
+M1  - full:  http://dx.doi.org/10.1016/j.jcss.2006.10.024 
+M1  - jnf: yes
+M1  - plclub: yes
+ER  -
+
+TY  - CONF
+ID  - SchemaSync-DBPL05
+AU  - Foster, J. Nathan
+AU  - Greenwald, Michael B.
+AU  - Kirkegaard, Christian
+AU  - Pierce, Benjamin C.
+AU  - Schmitt, Alan
+T1  - Exploiting schemas in data synchronization
+T2  - Database Programming Languages (DBPL), Trondheim, Norway
+M1  - plclub: yes
+ER  -
+
+
+>> into <<
+@article{Lenses-TOPLAS05,
+ author = {J. Nathan Foster and Michael B. Greenwald and Jonathan T. Moore and Benjamin C. Pierce and Alan Schmitt},
+ title = {Combinators for Bidirectional Tree Transformations: 
+          {A} Linguistic Approach to the View Update Problem},
+ journal = {Transactions on Programming Languages and Systems (TOPLAS)},
+ year = {2007},
+ month = may,
+ pages = {233--246},
+ address = {New York, NY, USA},
+} 
+
+@inproceedings{SchemaSync-DBPL05,
+  author    = {Foster, J. Nathan and Greenwald, Michael B. and Kirkegaard, Christian and Pierce, Benjamin C. and Schmitt, Alan},
+  title     = {Exploiting Schemas in Data Synchronization},
+  booktitle = {Database Programming Languages (DBPL), Trondheim, Norway},
+  year      = {2005},
+  month     = {August}, 
+  pages     = {42--57},
+}
+>> = <<
+@article{schema-sync-jcss,
+ author = {J. Nathan Foster and Michael B. Greenwald and Christian Kirkegaard and Benjamin C. Pierce and Alan Schmitt},
+ title = {Exploiting {S}chemas in {D}ata {S}ynchronization},
+ journal = {Journal of Computer and System Sciences},
+volume="73",
+number="4",
+note="Short version in DBPL '05.",
+ year = {2007},
+ month = jun,
+publisher="Elsevier",
+full={ http://dx.doi.org/10.1016/j.jcss.2006.10.024 },
+jnf={yes},
+plclub={yes},
+} 
+
+@inproceedings{SchemaSync-DBPL05,
+  author    = {Foster, J. Nathan and Greenwald, Michael B. and Kirkegaard, Christian and Pierce, Benjamin C. and Schmitt, Alan},
+  title     = {Exploiting schemas in data synchronization},
+  booktitle = {Database Programming Languages (DBPL), Trondheim, Norway},
+plclub={yes},
+}
+>>
+
+
+
+let main () =
+  let usage (code:int) =
+    let prog = Prefs.get_prog_name () in
+    let _ = Sys.put_str (
+      "Usage: " . prog . " {get|put} args\n" .
+	"  ".prog." get <source>\n" .
+	"  ".prog." put <view> <old source>\n" )
+    in
+    code
+  in
+  let cget (source:string) =
+    match String.file_ext source with
+      | Some "bib" -> (let _ = Sys.put_str (get ris (Sys.read source)) in 0)
+      | _ -> usage 1
+  in
+  let cput (view:string) (source:string) =
+    match String.file_ext view, String.file_ext source with
+      | Some "ris", Some "bib" -> (let _ = Sys.put_str (put ris (Sys.read view) (Sys.read source)) in 0)
+      | _ -> usage 1
+  in
+  match Prefs.read_string_list (Prefs.extern_rest ()) with
+    | "get"::source::[] -> cget source
+    | "put"::view::source::[] -> cput view source
+    | _ -> usage 1
+

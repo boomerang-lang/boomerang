@@ -1,0 +1,39 @@
+module MkXml = 
+let attr (name:string) (value:lens) : lens = 
+  qins WSP " " . 
+  ins name . 
+  ins "=\"" . 
+  value . 
+  ins "\""
+let elt (ws:string) (tag:string) (body:lens) : lens =
+  qins WS ws .
+  ins ("<" . tag . ">") .
+  body .
+  qins WS ws .
+  ins ("</" . tag . ">")
+let simple_elt (ws:string) (tag:string) (body:lens) : lens =
+  qins WS ws .
+  ins ("<" . tag . ">") .
+  body .
+  ins ("</" . tag . ">")
+let attr1_elt (ws:string) (tag:string) (name:string) (value:lens) (body:lens) : lens =
+  qins WS ws .
+  ins ("<" . tag)  . qins " "* " " . 
+  ins (name . "=\"") . 
+  value .   
+  ins "\">" . 
+  body . 
+  qins WS ws . 
+  ins ("</" . tag . ">")
+let simple_attr2 (ws:string) (tag:string) (name1:string) (value1:lens) (name2:string) (value2:lens) : lens = 
+  let ls = #{lens}[(attr name1 value1);(attr name2 value2)] in
+  qins WS ws . 
+  ins ("<" . tag) . 
+  right_quot (concat_lenses ls) (canonizer_of_lens (Sort.perm_sort (vtypes ls))) . 
+  ins "/>" 
+let outer_elt (ws:string) (tag:string) (body:lens) : lens =
+  ins ("<" . tag . ">") .
+  body .
+  qins WS ws .
+  ins ("</" . tag . ">") . 
+  qins WS ""

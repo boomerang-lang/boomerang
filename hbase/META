@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: 34902bc6fe212f9dd66ace124bcf77c8)
+version = "1.0.0"
+description = "The Boomerang Language"
+requires = "ubase unix"
+archive(byte) = "hbase.cma"
+archive(byte, plugin) = "hbase.cma"
+archive(native) = "hbase.cmxa"
+archive(native, plugin) = "hbase.cmxs"
+exists_if = "hbase.cma"
+# OASIS_STOP
+

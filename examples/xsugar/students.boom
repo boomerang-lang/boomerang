@@ -1,0 +1,45 @@
+module Students = 
+  let Name : regexp = [a-zA-Z]+ . ([ ] . [a-zA-Z]+)*
+  let Email :regexp = [a-zA-Z._]+ . [@] . [a-zA-Z._]+
+  let Id : regexp  = [0-9]{8}
+  let Nl : regexp = "\r\n" | [\r\n]
+
+  let person : lens = 
+    Xml.attr1_elt_swap NL1 "student" "sid" (copy Id)
+      begin
+        Xml.simple_elt NL2 "name" (copy Name) .
+        qins SP " " .
+        Xml.simple_elt NL2 "email" (ins "(" . copy Email . ins ")") .
+        qins SP " "
+      end
+
+  let persons : lens =
+      copy ""
+    | person . ( qins Nl "\n" . person )*
+
+  let file : lens =
+    Xml.elt NL0 "students" persons
+
+  let file_xml : string = 
+<<
+ <students>
+  <student sid="19701234">
+   <name>John Doe</name>
+   <email>john_doe@notmail.org</email>
+  </student>
+  <student sid="19785678">
+   <name>Jane Dow</name>
+   <email>dow@bmail.org</email>
+  </student>
+ </students>
+>>
+
+  let file_ascii : string = 
+<<
+  John Doe (john_doe@notmail.org) 19701234
+  Jane Dow (dow@bmail.org) 19785678
+>>
+
+test file.get file_xml = file_ascii 
+
+test file.create file_ascii = (NL0 . file_xml)

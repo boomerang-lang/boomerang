@@ -1,0 +1,188 @@
+module Greedy =
+
+let sep_list (a:lens) (b:lens) = (a . (b . a)* )
+
+let g (name:string) = Tag (Greedy, Threshold 0, Key, name)
+
+let main =
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <g "w":word> " " in
+  let file = sep_list <g "l":line> "\n" in
+  file
+
+test get main "aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>>
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+test put main "a b c" "bB cC aA" = "aA bB cC"
+test put main "a b c" "cC aA bB" = "aA bB cC"
+
+test put main "a b c d f" "aA cC dD eE fF" = "aA bE cC dD fF"
+
+test put main "a b c" "aX aY aZ" = "aX bY cZ"
+test put main "a a a" "bB aA cC" = "aA aB aC"
+
+test put main "b c" "aA bB cC" = "bB cC"
+test put main "a c" "aA bB cC" = "aA cC"
+test put main "a b" "aA bB cC" = "aA bB"
+
+test put main "a" "aA aAA" = "aA"
+test put main "a a" "aA" = "aA a"
+
+test put main "b a" "aA bB" = "bB aA"
+
+test put main "b c a y" "aA bB cC dD" = "bB cC aA yD"
+test put main "x y z" "aA bB cC" = "xA yB zC"
+
+test put main "xxx yy z" "aA bBbBB cCcCCcCCC" = "xCxCCxCCC yByBB zA"
+
+test put main <<
+  a a a a a
+  z
+  b c a y
+>> <<
+  aA bB cC dD
+  aAAA aAA aA
+  xXXX
+>> = <<
+  aAAA aAA aA a a
+  zXXX
+  bB cC aA yD
+>>
+
+test put main <<
+  ooo ooo o
+  nn nnn
+  aaa a aa
+  uu u
+  ddd dd d
+>> <<
+  oooOOoO oOOooO oO
+  aaAAa aAaa aAA aAAa
+  eeEeEE eE
+  uUUuuU uuUU
+>> = <<
+  oOOooO oooOO oO
+  nEn nnEnEE
+  aaAAa aAA aAAa
+  uuUU uUU
+  ddd dd d
+>>
+
+test put main "ooo o" "oOoOoOO oOOoO oO" = "oOoOoOO oO"
+
+test put main "o a o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO aA oOO aAA oOOO aAAA oOOOO aAAAA"
+
+test put main "o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO aA oOO aAA oOOO aAAA"
+
+test put main "o o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO oOO oOOO oOOOO oOOOOO"
+
+test put main "o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO oOO oOOO oOOOO"
+
+test put main "aa a" "aUUUUUaaUUU aaUU" = "aaUU aUUUUU"
+
+let main =
+  let word = ([a-m] . del [A-Z]* | [n-z] . del [A-Z]* )+ in
+  sep_list ("+" . <g "w":word> | "-" . <g "w":word>) " "
+
+test get main "+aA -bB" = "+a -b"
+test put main "+a -b +c -d" "+aA -bB +cC -dD" = "+aA -bB +cC -dD"
+test put main "-a +b -c +d" "+aA -bB +cC -dD" = "-aA +bB -cC +dD"
+test put main "+c -d +a -b" "+aA -bB +cC -dD" = "+cC -dD +aA -bB"
+test put main "-c -d +a +b" "+aA -bB +cC -dD" = "-cC -dD +aA +bB"
+
+test put main "+a +c -d" "+aA -bB +cC" = "+aA +cC -dB"
+test put main "-a +m +d -e" "+aA -bB +cC -dD" = "-aA +mB +dD -eC"
+test put main "-a +n +d -e" "+aA -bB +cC -dD" = "-aA +n +dD -eC"
+
+(* compose *)
+
+let main =
+  let word1 = ([a-z] . [A-Z]* . del [0-9]* )+ in
+  let line1 = sep_list <g "w":word1> " " in
+  let file1 = sep_list <g "l":line1> "\n" in
+  let word2 = ([a-z] . del [A-Z]* )+ in
+  let line2 = sep_list <g "w":word2> " " in
+  let file2 = sep_list <g "l":line2> "\n" in
+  file1 ; file2
+
+test get main "aA0 bB1 cC2" = "a b c"
+test create main "a b c" = "a b c"
+test put main "a b c" "aA0 bB1 cC2" = "aA0 bB1 cC2"
+test put main "a c d" "aA0 bB1 cC2" = "aA0 cC2 dB1"
+
+let main =
+  let word = ([a-z] . [A-Z]* . del [0-9]* )+ ; ([a-z] . del [A-Z]* )+ in
+  let line = sep_list <g "w":word> " " in
+  let file = sep_list <g "l":line> "\n" in
+  file
+
+test get main "aA0 bB1 cC2" = "a b c"
+test create main "a b c" = "a b c"
+test put main "a b c" "aA0 bB1 cC2" = "aA0 bB1 cC2"
+test put main "a c d" "aA0 bB1 cC2" = "aA0 cC2 dB1"
+
+let a = copy "a" . copy "b"*
+let a2 = copy ("a" . "b"* )
+let b = copy "a" . del "b"*
+
+let main =
+  let sep_iter (a:lens) (b:lens) (n:int) = a . lens_iter (b . a) n n in
+  let cn = [a-z] . [A-Z]* in
+  let wn = <g "c":cn>+ in
+  let wnc = <g "w":wn> in
+  let c = [a-z] . del [A-Z]* in
+  let w = <g "c":c>+ in
+  let wc = <g "w":w> in
+  ( sep_iter   wnc " " 3 . '1' <-> '2'
+  ; sep_iter   wnc " " 3 . '2' <-> '3')
+  ; ( sep_iter wnc " " 3 . '3' <-> '4'
+    ; sep_iter wc " " 3 . '4' <-> '5')
+
+test get main "aAbB cCdD eE fF1" = "ab cd e f5"
+test create main "a b c e5" = "a b c e1"
+test put main "b de ge h5" "aAbB cC dDeE fFgG1" = "bB dDeE gGeF hC1"
+
+(* invert *)
+
+let main =
+  let l = invert (copy [a-z] . del "B") . del [ 0-9]
+  in <g "g":l>*
+
+test get main "a1b2" = "aBbB"
+test create main "aBbB" = "a b "
+test put main "aBbBcBeB" "a1c3d4e5" = "a1b4c3e5"
+
+let l = copy [a-z] . del "B"
+
+test (invert <l>) = error (* chunks in invert *)
+

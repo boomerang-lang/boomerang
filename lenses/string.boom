@@ -1,0 +1,139 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2009                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/string.boom                                                        *)
+(* string related functions                                                   *)
+(* $Id: exception.boom 4632 2009-08-20 16:16:52Z cretin $ *)
+(******************************************************************************)
+
+module String =
+
+#{@}
+
+\subsection{Strings}
+
+\LENSSECTION{@sub@} The @sub@ function behaves like the OCaml
+String.sub function.  It returns a string of length @len@, containing
+the substring of @s@ that starts at position @start@ and has length
+@len@.
+
+#* let sub (start:int where bgeq start 0)
+#*         (len:int)
+#*         (s:string where (bleq (plus len start) (length s)))
+#*   : string
+## = Native.Prelude.string_sub s start len
+
+\LENSSECTION{@index_from@} The @index_from@ and @rindex_from@
+functions behave like the OCaml @String.index_from@ and
+@String.rindex_from@ functions. It returns the character number of the
+first occurrence of character @c@ in string @s@ after position @i@. If
+the character was not found, they return @None@.
+
+#* let index_from (s:string)
+#*                (i:int where land (bgeq i 0) (bgeq (length s) i))
+#*                (c:char)
+#*   : int option
+## = Native.Prelude.string_index_from s i c
+
+#* let index (s:string) (c:char) = index_from s 0 c
+
+#* let rindex_from (s:string)
+#*                 (i:int where land (bgeq (plus i 1) 0) (bgeq (length s) (plus i 1)))
+#*                 (c:char)
+#*   : int option
+## = Native.Prelude.string_rindex_from s i c
+
+#* let rindex (s:string) (c:char) = rindex_from s (length s - 1) c
+
+\LENSSECTION{@star_split@} The @star_split@ function splits the string
+@s@ according to the iteration of the regular expression @r@. It
+returns the list of the substrings.
+
+#* let star_split : (r:regexp ->
+#*                  (s:string where land (iterable_cex r)
+#*                                       (matches_cex (regexp_iter r 0 (minus 0 1)) s)) ->
+#*                  string List.t)
+## = Native.Prelude.star_split
+
+\LENSSECTION{@bad_index@} The @bad_index@ function returns the index
+of the character in @s@ making it not match the regular expression
+@r@.
+
+#* let bad_index : regexp -> string -> int
+## = Native.Prelude.bad_prefix_position
+
+\LENSSECTION{@explode@} The @explode@ function explodes a string into
+characters, returning a list of strings.
+
+#* let explode (s:string) : (l:string List.t where List.length{string} l = length s)
+#* = star_split ANYCHAR s
+
+#* test explode "" = #{string}[]
+#* test explode "lorem" = #{string}["l";"o";"r";"e";"m"]
+
+\LENSSECTION{@implode@} The @implode@ function implodes a list of
+char into a string.
+
+#* let implode (l:string List.t) : string
+#* = List.fold_left{string}{string} (fun (s:string) (s':string) -> s . s') "" l
+
+#* test implode #{string}[] = ""
+#* test implode #{string}["a";"b";"c"] = "abc"
+#* test implode #{string}["abc";"def";"ghi"] = "abcdefghi"
+#* test implode (explode "testing") = "testing"
+
+\LENSSECTION{@file_ext@} The @file_ext@ returns the extension of a
+filename. More precisely, it returns the substring after the last @.@
+in the string. If there is no @.@ in the string, it returns @None@.
+
+#* let file_ext (file:string) : string option =
+#*   let l = minus (length file) 1 in
+#*   match rindex_from file l '.' with
+#*     | Some n -> Some{string} (sub (plus n 1) (minus l n) file)
+#*     | None -> None{string}
+
+\LENSSECTION{@length@} The @length@ function computes the length of a
+string.
+
+#* let length : string -> int
+## = Native.Prelude.length
+
+#* let drop (n:int) (s:string where n leq (length s)) =
+#*   sub n (length s - n) s
+
+#* let rdrop (n:int) (s:string where n leq (length s)) =
+#*   sub 0 (length s - n) s
+
+#* let take (n:int) (s:string where n leq (length s)) =
+#*   sub 0 n s
+
+#* let rtake (n:int) (s:string where n leq (length s)) =
+#*   sub (length s - n) n s
+
+#* let end_with (s:string) (e:string) =
+#*   let ns = length s in
+#*   let ne = length e in
+#*   match ns geq ne with
+#*   | true -> (rtake ne s = e)
+#*   | false -> false
+#*   :bool
+
+#* let compare : string -> string -> int
+## = Native.Prelude.string_compare
+
+#* test List.sort{string} compare #{string}["c";"d";"a";"b";"e"]
+#*                              = #{string}["a";"b";"c";"d";"e"]

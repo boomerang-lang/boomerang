@@ -1,0 +1,75 @@
+module Test_patsubst =
+
+let id (a : string) : (b : string where a = b) = a
+
+let test_pair (p : string * string) =
+  let (x,y) = p in
+  id x
+
+let test_list (l : string List.t) =
+  let (List.Cons(s,l)) = l in
+  id s
+
+let l = #{int}[1;2;3]
+
+let (a::_) = l
+test a = 1
+let (_::b) = l
+test b = List.tl{int} l
+let (a::b::c) = l
+test a = 1
+test b = 2
+test c = #{int}[3]
+
+let a,b = 1,2
+test a = 1
+test b = 2
+test (a,b) = (1,2)
+
+let l2 = #{int}[4;5;6]
+let (a::_,_::b) = l, l2
+let (a::_),(_::b) = l, l2
+test a = 1
+test b = #{int}[5;6]
+
+test (match l with
+	  a::b -> (a, b)
+	| _ -> (0, #{int}[])) = (1,List.tl{int} l)
+
+test (match l,l2 with
+	  a::_, c::_ -> (a, c)
+	| _ -> (0, 0)) = (1,4)
+
+test (match l,l2 with
+	  _::b, _::d -> List.append{int} b d
+	| _ -> #{int}[]) = #{int}[2;3;5;6]
+
+test (match #{int}[100;200] with
+	| a::b::c::d -> 0
+	| a::[] -> 1
+	| a::_::c -> a
+	| _::b -> 2
+	| _ -> 3) = 100
+
+test (match #{int}[100] with
+	| a::[] -> a
+	| _ -> 0) = 100
+
+test (match #{int}[100;200] with
+	| 100::[] -> 1
+	| 100::200::[] -> 100
+	| _ -> 0) = 100
+
+test (match #{int}[100;200] with
+	| 100::[] -> 1
+	| 100::200::[] -> 100
+	| _ -> 0) = 100
+
+test (match Some{int} 2, None{int}, #{int}[100] with
+	| None, _, _ -> 1
+	| _, Some _, _ -> 2
+	| _, None, a::b::c -> 3
+	| _, _, 101::_ -> 4
+	| Some 1, _, _ -> 5
+	| Some 2, _, a::_ -> a
+	| _ -> 100) = 100

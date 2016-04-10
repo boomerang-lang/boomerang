@@ -1,0 +1,308 @@
+module Itunes =
+
+open Plist
+
+let SAFE = ANY - (containing ("<" | ">" | ";;;" | "===")) - (ANY . Xml.WSP)
+
+let track (spaces:string in Xml.WS) = 
+  let spaces' = "\n" . indent spaces in
+  let field (l:lens) = ins "===" . l . ins ";;;\n" in
+  let required (l:lens) (name:string) = false,name,field l in
+  let optional (l:lens) (name:string) = true,name,field l in
+  let pint  = pinteger spaces' INTEGER in
+  let pstr  = pstring spaces' SAFE in
+  let pdate = pdate spaces' ISO8601_DATE in
+  let pbool = pbool spaces' "1" "0" in
+  podictopt spaces
+    #{bool*regexp*lens}[
+      required pint  "Track ID";
+      required pstr  "Name";
+      optional pstr  "Artist";
+      optional pstr  "Album Artist";
+      optional pstr  "Composer";
+      optional pstr  "Album";
+      optional pstr  "Grouping";
+      optional pstr  "Genre";
+      required pstr  "Kind";
+      optional pint  "Size";
+      optional pint  "Total Time";
+      optional pint  "Disc Number";
+      optional pint  "Disc Count";
+      optional pint  "Track Number";
+      optional pint  "Track Count";
+      optional pint  "Year";
+      optional pint  "BPM";
+      optional pdate "Date Modified";
+      required pdate "Date Added";
+      optional pint  "Bit Rate";
+      optional pint  "Sample Rate";
+      optional pbool "Part Of Gapless Album";
+      optional pstr  "Comments";
+      optional pint  "Play Count";
+      optional pint  "Play Date";
+      optional pdate "Play Date UTC";
+      optional pint  "Skip Count";
+      optional pdate "Skip Date";
+      optional pdate "Release Date";
+      optional pint  "Rating";
+      optional pbool "Rating Computed";        (* ?? *)
+      optional pint  "Album Rating";
+      optional pbool "Album Rating Computed";  (* ?? *)
+      optional pbool "Compilation";
+      optional pint  "Artwork Count";
+      optional pstr  "Series";
+      optional pint  "Season";
+      optional pstr  "Episode";
+      optional pint  "Episode Order";
+      optional pstr  "Sort Album";        (* may not be in the EXACT right order... *)
+      optional pstr  "Sort Album Artist";
+      optional pstr  "Sort Composer";
+      optional pstr  "Sort Artist";
+      optional pstr  "Sort Name";
+      optional pstr  "Sort Series";
+      required pstr  "Persistent ID";
+      optional pbool "Clean";
+      optional pbool "Disabled";
+      required pstr  "Track Type";
+      optional pbool "Protected";
+      optional pbool "Purchased";
+      optional pbool "Has Video";
+      optional pbool "HD";
+      optional pint  "Video Width";
+      optional pint  "Video Height";
+      optional pbool "Movie";
+      optional pbool "TV Show";
+      optional pbool "Podcast";
+      optional pbool "Unplayed";
+      optional pint  "File Type";
+      required pstr  "Location"; (* this has per-OS structure... *)
+      optional pint  "File Folder Count";
+      optional pint  "Library Folder Count"
+    ]
+
+let tracks (spaces:string in Xml.WS) = 
+  phdict spaces "tracks" INTEGER (track (indent spaces))
+
+let input =
+  <<
+  <dict>
+    <key>Track ID</key><integer>37</integer>
+    <key>Name</key><string>Thinking Of You</string>
+    <key>Artist</key><string>Lenny Kravitz</string>
+    <key>Composer</key><string>Lenny Kravitz/Lysa Trenier</string>
+    <key>Album</key><string>5</string>
+    <key>Genre</key><string>Pop/Funk</string>
+    <key>Kind</key><string>MPEG audio file</string>
+    <key>Size</key><integer>6141310</integer>
+    <key>Total Time</key><integer>383764</integer>
+    <key>Track Number</key><integer>32</integer>
+    <key>Year</key><integer>1998</integer>
+    <key>Date Modified</key><date>2005-06-08T20:04:06Z</date>
+    <key>Date Added</key><date>2004-05-06T04:29:57Z</date>
+    <key>Bit Rate</key><integer>128</integer>
+    <key>Sample Rate</key><integer>44100</integer>
+    <key>Comments</key><string>By ScazzI</string>
+    <key>Play Count</key><integer>6</integer>
+    <key>Play Date</key><integer>-1088231274</integer>
+    <key>Play Date UTC</key><date>2005-08-13T05:00:22Z</date>
+    <key>Persistent ID</key><string>FAKE</string>
+    <key>Track Type</key><string>File</string>
+    <key>Location</key><string>file://localhost/C:/
+    Documents%20and%20Settings/Test%20Name/My%20Documents/
+    My%20Music/Masheed/Lenny%20Kravitz%20-%20Thinking%20Of%20You.mp3/
+    </string>
+    <key>File Folder Count</key><integer>-1</integer>
+    <key>Library Folder Count</key><integer>-1</integer>
+  </dict>
+  >>
+
+let output =
+  <<
+  Track ID===37;;;
+  Name===Thinking Of You;;;
+  Artist===Lenny Kravitz;;;
+  Composer===Lenny Kravitz/Lysa Trenier;;;
+  Album===5;;;
+  Genre===Pop/Funk;;;
+  Kind===MPEG audio file;;;
+  Size===6141310;;;
+  Total Time===383764;;;
+  Track Number===32;;;
+  Year===1998;;;
+  Date Modified===2005-06-08T20:04:06Z;;;
+  Date Added===2004-05-06T04:29:57Z;;;
+  Bit Rate===128;;;
+  Sample Rate===44100;;;
+  Comments===By ScazzI;;;
+  Play Count===6;;;
+  Play Date===-1088231274;;;
+  Play Date UTC===2005-08-13T05:00:22Z;;;
+  Persistent ID===FAKE;;;
+  Track Type===File;;;
+  Location===file://localhost/C:/
+    Documents%20and%20Settings/Test%20Name/My%20Documents/
+    My%20Music/Masheed/Lenny%20Kravitz%20-%20Thinking%20Of%20You.mp3/;;;
+  File Folder Count===-1;;;
+  Library Folder Count===-1;;;
+  
+  >>
+
+test (track (indent "")).get input = output
+
+let items (spaces:string in Xml.WS) =
+  parray spaces "playlist_items" 
+    (podict (indent spaces)
+       #{regexp*lens}["Track ID",ins "===" . pinteger "" INTEGER . ins ";;;\n"])
+
+let playlist (spaces:string in Xml.WS) =
+  let spaces' = "\n" . indent spaces in
+  let field (l:lens) = ins "===" . l . ins ";;;\n" in
+  let required (l:lens) (name:regexp) = false,name,field l in
+  let optional (l:lens) (name:regexp) = true,name,field l in
+  let pint  = pinteger spaces' INTEGER in
+  let pstr  = pstring spaces' SAFE in
+  let pdate = pdate spaces' ISO8601_DATE in
+  let pbool = pbool spaces' "1" "0" in
+  let pdata = pdata spaces' (padded BASE64) in
+  podictopt spaces
+    #{bool*regexp*lens}[
+      required pstr  "Name";
+      optional pbool "Master";
+      required pint  "Playlist ID";
+      required pstr  "Playlist Persistent ID";
+      optional pstr  "Parent Persistent ID";
+      optional pint  "Distinguished Kind";
+      optional pbool ("Music"|
+                      "Movies"|
+                      "TV Shows"|
+                      "Podcasts"|
+                      "Audiobooks"|
+                      "Purchased Music"|
+                      "Party Shuffle");      
+      optional pbool "Visible";
+      optional pbool "All Items";
+      optional pbool "Folder";
+      optional pdata "Smart Info";
+      optional pdata "Smart Criteria";
+      optional (items (indent spaces)) "Playlist Items"]
+
+let input =
+  <<
+   <dict>
+     <key>Name</key><string>iTunes DJ</string>
+     <key>Playlist ID</key><integer>10630</integer>
+     <key>Playlist Persistent ID</key><string>2B9E87A28E9A7788</string>
+     <key>Distinguished Kind</key><integer>22</integer>
+     <key>Party Shuffle</key><true/>
+     <key>All Items</key><true/>
+     <key>Playlist Items</key>
+     <array>
+       <dict>
+         <key>Track ID</key><integer>1871</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>3203</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>3301</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>2075</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1189</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1425</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1321</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>2713</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1717</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>2603</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1661</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>3001</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>3177</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>1943</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>2939</integer>
+       </dict>
+       <dict>
+         <key>Track ID</key><integer>2053</integer>
+       </dict>
+     </array>
+   </dict>
+  >>
+
+let output =
+  <<
+   Name===iTunes DJ;;;
+   Playlist ID===10630;;;
+   Playlist Persistent ID===2B9E87A28E9A7788;;;
+   Distinguished Kind===22;;;
+   Party Shuffle===1;;;
+   All Items===1;;;
+   Playlist Items===Track ID===1871;;;
+   Track ID===3203;;;
+   Track ID===3301;;;
+   Track ID===2075;;;
+   Track ID===1189;;;
+   Track ID===1425;;;
+   Track ID===1321;;;
+   Track ID===2713;;;
+   Track ID===1717;;;
+   Track ID===2603;;;
+   Track ID===1661;;;
+   Track ID===3001;;;
+   Track ID===3177;;;
+   Track ID===1943;;;
+   Track ID===2939;;;
+   Track ID===2053;;;
+   ;;;
+
+  >>
+
+test (playlist "\n").get input = output
+
+let playlists (spaces:string in Xml.WS) = 
+  parray spaces "playlists" (playlist (indent spaces))
+
+let iTML =
+  let spaces = indent (indent "\n") in
+  let pint  = pinteger spaces INTEGER in
+  let pstr  = pstring spaces SAFE in
+  let pdate = pdate spaces ISO8601_DATE in
+  let pbool = pbool spaces "1" "0" in
+  let field (l:lens) (name:string) = name, ins "===" . l . ins ";;;\n" in
+  (plist (podict (indent "\n")
+            #{regexp*lens}[
+              field pint  "Major Version";
+              field pint  "Minor Version";
+              field pstr  "Application Version";
+              field pint  "Features";
+              field pbool "Show Content Ratings";
+              field pstr  "Music Folder";
+              field pstr  "Library Persistent ID";
+              "Tracks", tracks (indent spaces);
+              "Playlists",playlists (indent spaces)])) . qdel Xml.WS ""
+
+(*
+let lib = Sys.read "iTML.xml"
+
+test matches_cex (stype iTML) lib = ?
+*)

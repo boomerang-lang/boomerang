@@ -1,0 +1,568 @@
+(**********************************************************************)
+(* The Harmony Project                                                *)
+(* harmony@lists.seas.upenn.edu                                       *)
+(**********************************************************************)
+(* Copyright (C) 2009 J. Nathan Foster and Benjamin C. Pierce         *)
+(*                                                                    *)
+(* This library is free software; you can redistribute it and/or      *)
+(* modify it under the terms of the GNU Lesser General Public         *)
+(* License as published by the Free Software Foundation; either       *)
+(* version 2.1 of the License, or (at your option) any later version. *)
+(*                                                                    *)
+(* This library is distributed in the hope that it will be useful,    *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of     *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *)
+(* Lesser General Public License for more details.                    *)
+(**********************************************************************)
+(* /examples/ffactor.boom                                             *)
+(* management tool for multiple versions of the same file             *)
+(* $Id:: ffactor.boom 4901 2010-05-13 21:14:49Z cretin              $ *)
+(**********************************************************************)
+module Ffactor =
+
+(* ---------------------------------------------------------------- *)
+(*                               TODO                               *)
+(*
+
+- do the check prefs in main
+- use 'zmodload zsh/stat' and 'zstat +mtime file'
+  if activated with '-x' stringlist
+- Arg module
+  - add a usage function
+  - rewrite it using Prefs.get_args
+    create_... : ... -> Arg.t -> Arg.t
+- write a --documentation
+
+ *)
+
+(* ---------------------------------------------------------------- *)
+(*                           definitions                            *)
+
+let if 'a (b:bool) (t:'a) (f:'a) =
+  match b with
+  | true -> t
+  | false -> f
+  :'a
+let id 'a (x:'a) = x
+let format_list (prefix:string) (separator:string) (suffix:string)
+    'a (f:'a -> string) (l:'a List.t) =
+  prefix . fst{string}{bool} (
+    List.fold_left{'a}{string * bool} (
+      fun (sb:string * bool) (x:'a) ->
+        match sb with
+        | s, b -> (s . if{string} b separator "" . f x, true)
+            :string * bool
+    ) ("", false) l
+  ) . suffix
+let show_list 'a (l:'a List.t) =
+  (format_list "[" ";" "]"){'a} show{'a} l
+let if_none 'a (x:'a) (yo:'a option) =
+  match yo with
+  | None -> x
+  | Some y -> y
+  :'a
+
+(* lens utilities *)
+let ambiguous_lens_concat_contract (a:lens) (b:lens) =
+  is_basic a && is_basic b && splittable_cex (stype a) (stype b)
+let ambiguous_lens_concat
+    (a:lens)
+    (b:lens where ambiguous_lens_concat_contract a b) =
+  Native.Prelude.lens_concat a b
+let ambiguous_lens_partition_one_contract (a:lens) (b:lens) =
+  lens_star_contract b && lens_swap_contract b* a
+  && ambiguous_lens_concat_contract (lens_swap b* a) b*
+let ambiguous_lens_partition_one
+    (a:lens)
+    (b:lens where ambiguous_lens_partition_one_contract a b) =
+  ambiguous_lens_concat (lens_swap b* a) b*
+let is_lens (l:lens) = rel_is_id (sequiv l) && rel_is_id (vequiv l)
+
+(* exceptions *)
+type errno = ENOENT of string
+let show_errno (e:errno) =
+  match e with
+  | ENOENT f -> f . ": No such file or directory."
+type exception =
+    Failure of string
+  | Invalid_argument of string
+  | Exit of int
+  | ErrNo of errno
+let bind = Exception.generic_bind{exception}
+let okfailwith 'a = (),
+  Exception.generic_try{exception}{'a},
+  Exception.generic_raise{exception}{'a},
+  (fun (message:string) ->
+     Exception.generic_raise{exception}{'a} (Failure message)),
+  Exception.generic_ok{exception}{'a}
+let main_end (convert:exception -> int) (x:(exception, int) Exception.t) =
+  Exception.generic_convert{exception}{int} x convert
+
+(* other *)
+let write (file:string) (data:string) =
+  let _ = Sys.write file data in 0
+let put_str_ln (x:string) = Sys.put_str (x . newline)
+let list_to_option 'a (xs:'a List.t) =
+  let _, raise, _, ok = okfailwith{'a option} in
+  match xs with
+  | [] -> ok None{'a}
+  | x::[] -> ok (Some{'a} x)
+  | _ -> raise (Invalid_argument "list_to_option")
+let safe_read (file:string) =
+  let _, raise, _, ok = okfailwith{string} in
+  match Sys.file_exists file with
+  | true -> ok (Sys.read file)
+  | false -> raise (ErrNo $ ENOENT file)
+
+(* instantiation *)
+let id's = id{string}
+let if_none's = if_none{string}
+let show'r = show{regexp}
+let show's = show{string}
+let list_to_option's = list_to_option{string}
+let bind'bi = bind{bool}{int}
+let bind'si = bind{string}{int}
+let bind'sLi = bind{string List.t}{int}
+let bind'sOi = bind{string option}{int}
+let bind'sOs = bind{string option}{string}
+let bind'ss = bind{string}{string}
+let bind'ui = bind{unit}{int}
+let okfailwith'b = okfailwith{bool}
+let okfailwith'i = okfailwith{int}
+let okfailwith's = okfailwith{string}
+let okfailwith'sL = okfailwith{string List.t}
+let okfailwith'sO = okfailwith{string option}
+let okfailwith'u = okfailwith{unit}
+
+(* ---------------------------------------------------------------- *)
+(*                            Arg module                            *)
+
+module Arg =
+  type t =
+      Bool of bool_prefs
+    | StringList of string_list_prefs
+  let make_alias (t:t) (alias:string) =
+    match t with
+    | Bool p -> Prefs.alias_bool p alias
+    | StringList p -> Prefs.alias_string_list p alias
+  let create_bool (name:string) (doc:string) =
+    let p = Prefs.create_bool ("-" . name) false doc in
+    let read () =
+      let _, ok = okfailwith'b in
+      ok $ Prefs.read_bool p
+    in
+    Bool p, read
+  let create_bool_alias (name:string) (alias:string) (doc:string) =
+    let p, read = create_bool name doc in
+    let _ = make_alias p alias in
+    read
+  let create_string_option (name:string) (doc:string) =
+    let p = Prefs.create_string_list ("-" . name) doc in
+    let read () =
+      let value = Prefs.read_string_list p in
+      let _, try, raise, failwith, _ = okfailwith'sO in
+      try (list_to_option's value) $ fun (exn:exception) ->
+      match exn with
+      | Invalid_argument _ ->
+          failwith ("You can't define more than one " . name . ".")
+      | x -> raise x
+    in
+    StringList p, read
+  let create_string_option_alias
+      (name:string) (alias:string) (doc:string) =
+    let p, read = create_string_option name doc in
+    let _ = make_alias p alias in
+    read
+  let create_string (name:string) (default:string) (doc:string) =
+    let p, read =
+      create_string_option
+        name (doc . " (default: " . show's default . ")")
+    in
+    let read () =
+      bind'sOs (read ()) $ fun (value:string option) ->
+      let _, ok = okfailwith's in
+      ok $ if_none's default value
+    in
+    p, read
+  let create_string_alias
+      (name:string) (alias:string) (default:string) (doc:string) =
+    let p, read = create_string name default doc in
+    let _ = make_alias p alias in
+    read
+  let create_string_mandatory (name:string) (doc:string) =
+    let p, read = create_string_option name $ "mandatory: " . doc in
+    let read () =
+      bind'sOs (read ()) $ fun (value:string option) ->
+      let _, failwith, ok = okfailwith's in
+      match value with
+      | Some v -> ok v
+      | None -> (failwith $ show's name . " is mandatory.")
+    in
+    p, read
+  let create_string_mandatory_alias
+      (name:string) (alias:string) (doc:string) =
+    let p, read = create_string_mandatory name doc in
+    let _ = make_alias p alias in
+    read
+  let create_string_list (name:string) (doc:string) =
+    let p = Prefs.create_string_list ("-" . name) doc in
+    let read () =
+      let _, ok = okfailwith'sL in
+      ok $ Prefs.read_string_list p
+    in
+    StringList p, read
+  let create_string_list_alias (name:string) (alias:string) (doc:string) =
+    let p, read = create_string_list name doc in
+    let _ = make_alias p alias in
+    read
+  let create_rest () =
+    let p = Prefs.extern_rest () in
+    let read () =
+      let _, ok = okfailwith'sL in
+      ok $ Prefs.read_string_list p
+    in
+    StringList p, read
+  let get_prog_name = Prefs.get_prog_name
+  let print_usage = Prefs.print_usage
+end
+
+(* ---------------------------------------------------------------- *)
+(*                         File_pref module                         *)
+
+module File_pref =
+  type value = Value of regexp
+  type separator = Separator of string
+  type comment = Comment of  string * string
+  type command = Command of string * string
+  type hide = Hide of string * string
+  type view = View of string * string
+  type t = T of value * separator * comment * command * hide * view
+  let default_value = Value ([a-zA-Z] . [,$~{} ./a-zA-Z0-9_\-@]* )
+  let default_separator = Separator ";"
+  let default_comment = Comment ("#", "\n")
+  let default_command = Command ("@", "")
+  let default_hide = Hide ("(", ")")
+  let default_view = View ("view:", "")
+  let default_t = T (
+    default_value,
+    default_separator,
+    default_comment,
+    default_command,
+    default_hide,
+    default_view)
+  let set_value (value:regexp) (t:t) =
+    match t with T (_, separator, comment, command, hide, view)
+      -> T (Value value, separator, comment, command, hide, view)
+  let set_separator (separator:string) (t:t) =
+    match t with T (value, _, comment, command, hide, view)
+      -> T (value, Separator separator, comment, command, hide, view)
+  let set_comment (comment:string * string) (t:t) =
+    match t with T (value, separator, _, command, hide, view)
+      -> T (value, separator, Comment comment, command, hide, view)
+  let get_value (t:t) =
+    match t with T (Value value, _, _, _, _, _) -> value
+  let get_separator (t:t) =
+    match t with T (_, Separator separator, _, _, _, _) -> separator
+  let get_comment (t:t) =
+    match t with T (_, _, Comment comment, _, _, _) -> comment
+  let get_command (t:t) =
+    match t with T (_, _, _, Command command, _, _) -> command
+  let get_hide (t:t) =
+    match t with T (_, _, _, _, Hide hide, _) -> hide
+  let get_view (t:t) =
+    match t with T (_, _, _, _, _, View view) -> view
+  let shell_like = default_t
+  let c_like = set_comment ("//", "\n") default_t
+  let cpp_like = set_comment ("/*", "*/") default_t
+  let ocaml_like = set_comment ("(*", "*)") default_t
+  let debug_like = T (
+    Value [a-z],
+    Separator "",
+    Comment ("(", ")"),
+    Command ("", ""),
+    Hide ("!", ""),
+    View ("", ""))
+  let comment_signs (t:t) =
+    let prefix, suffix = get_comment t in
+    prefix | suffix
+  let c_prefix (t:t) =
+    let comment, _ = get_comment t in
+    let command, _ = get_command t in
+    comment . command
+  let c_suffix (t:t) =
+    let _, comment = get_comment t in
+    let _, command = get_command t in
+    command . comment
+  let no_comments (t:t) = not_containing $ comment_signs t
+  let commands (t:t) = c_prefix t . no_comments t . c_suffix t
+  let data (t:t) = not_containing $ commands t
+  let make_view (t:t) (values:string List.t) =
+    let prefix, suffix = get_view t in
+    let separator = get_separator t in
+    (format_list prefix separator suffix){string} id's values
+  let c_string (t:t) (value:string) = c_prefix t . value . c_suffix t
+  let cv_string (t:t) (values:string List.t) =
+    c_string t $ make_view t values
+  let c_regexp (t:t) (r:regexp) = c_prefix t . r . c_suffix t
+  let c_lens (t:t) (l:lens) = c_prefix t . l . c_suffix t
+  let ch_other (t:t) (r:regexp) =
+    let prefix, suffix = get_hide t in
+    c_lens t $ ins prefix . diff (get_value t) r . ins suffix
+  let c_all (t:t) = c_prefix t . get_value t . c_suffix t
+  let c_stop (t:t) = c_string t ""
+  let check (t:t) (value_list:string List.t) =
+    let subset (a:regexp) (b:regexp) = is_empty $ diff a b in
+    let sl (a:regexp) (b:regexp) = a . (b . a)* in
+    let v = get_value t in
+    let sep = get_separator t in
+    let tp, ts = get_comment t in
+    let dp, ds = get_command t in
+    let hp, hs = get_hide t in
+    let vp, vs = get_view t in
+    let checks =
+      #{bool * string}[
+        iterable (sep . v),
+         "the values and the separator are ambiguous";
+        subset (vp . sl v sep . vs) (no_comments t),
+         "the view prefix contains comments";
+        subset v? (no_comments t),
+        "the values may contain comments";
+        subset (hp . v . hs) (no_comments t),
+        "the hide pre/su-ffixes contain comments";
+        not (matches v ""),
+        "your values should not contain the empty string";
+        List.for_all{string} (matches v) value_list,
+        "the values do not match " . show'r v]
+    in
+    let bind =
+      Exception.generic_bind{unit}{string option}{string option}
+    in
+    let ok = Exception.generic_ok{unit}{string option} in
+    let convert (x:(unit, string option) Exception.t) =
+      Exception.generic_convert{unit}{string option} x $ fun () ->
+      None{string}
+    in
+    convert $
+    List.fold_left{bool * string}{(unit, string option) Exception.t}
+      (fun (x:(unit, string option) Exception.t) (bs:bool * string) ->
+         bind x $ fun (u:string option) ->
+         match bs with
+         | true, _ -> ok None{string}
+         | false, s -> ok (Some{string} s))
+      (ok None{string}) checks
+  let good (t:t) (vs:string List.t) = check t vs = None{string}
+end
+let bind'pi = bind{File_pref.t}{int}
+let bind'pp = bind{File_pref.t}{File_pref.t}
+let okfailwith'p = okfailwith{File_pref.t}
+
+(* ---------------------------------------------------------------- *)
+(*                            main lens                             *)
+
+let main_lens (prefs:File_pref.t)
+    (value_list:string List.t where File_pref.good prefs value_list)
+    :(l:lens where is_lens l) =  (* it's very well behaved *)
+  let data = File_pref.data prefs in
+  let cv_string = File_pref.cv_string prefs in
+  let c_regexp = File_pref.c_regexp prefs in
+  let ch_other = File_pref.ch_other prefs in
+  let c_stop = File_pref.c_stop prefs in
+  let values =
+    List.fold_left{string}{regexp}
+      (fun (acc:regexp) (value:string) -> acc | value)
+      [] value_list
+  in
+  let _:(unit where bij ((c_stop | c_regexp values) . data)) = () in
+  let section =
+    let hidden = Tag (Positional, Threshold 100, Key, "hidden") in
+      (c_stop | c_regexp values) . data
+    |  <hidden:ch_other values . del data>
+  in
+  let value_check = ins $ cv_string value_list in
+  data . value_check . align section*
+
+(* ---------------------------------------------------------------- *)
+(*                          main function                           *)
+
+(* command line arguments *)
+let read_help = Arg.create_bool_alias "help" "h" "print this help"
+let read_init = Arg.create_bool_alias "init" "i" "create the source file"
+let read_extension = Arg.create_string_alias
+  "extension" "e" "factor" "extension of source"
+let read_output = Arg.create_string_option_alias
+  "output" "o" "output file (default to the other file)"
+let read_default = Arg.create_string_mandatory_alias
+  "default" "d" "shell, c, cpp or ocaml"
+let read_file = Arg.create_string_mandatory_alias
+  "file" "f" "the source/view file"
+let _, read_rest = Arg.create_rest ()
+
+(* usage message *)
+let usage:string =
+  "Usage: " . Arg.get_prog_name ()
+  . " --default <file_type> --file <file> [values [...]]"
+
+(* main code *)
+let main () =
+  let check_string_with (r:regexp) (s:string) (m:string) =
+    let _, failwith, ok = okfailwith's in
+    match matches r s with
+    | true -> ok s
+    | false -> failwith m
+  in
+  let file_error (filename:string) (head:string) (advices:string List.t) =
+    let tail =
+      match advices with
+      | [] -> ""
+      | _ ->
+          List.fold_left{string}{string}
+            (fun (acc:string) (line:string) ->
+               acc . "\n* " . line)
+            "\n\nYou might want to check these:"
+            advices
+    in
+    "File " . show's filename . " " . head . "." . tail
+  in
+  main_end
+    (fun (exn:exception) ->
+       let err (s:string) =
+         let _ = put_str_ln $ Arg.get_prog_name () . ": " . s in 1
+       in
+       match exn with
+       | Exit i -> i
+       | Failure s -> (err $ "Failure: " . s)
+       | ErrNo e -> (err $ show_errno e)
+       | _ -> (err $ "Uncaught exception " . show{exception} exn)) $
+  bind'bi (read_help ()) $ fun (help:bool) ->
+  bind'ui
+    (let _, raise, _, ok = okfailwith'u in
+     match help with
+     | true -> (
+         let _ = Arg.print_usage usage in
+         raise (Exit 0))
+     | false -> ok ()) $
+    fun () ->
+  bind'si (read_default ()) $ fun (default:string) ->
+  bind'pi
+    (let _, failwith, ok = okfailwith'p in
+     match default with
+     | "shell" -> ok File_pref.shell_like
+     | "c" -> ok File_pref.c_like
+     | "cpp" -> ok File_pref.cpp_like
+     | "ocaml" -> ok File_pref.ocaml_like
+     | other -> (failwith $
+         show's other . " is not a valid file preference.")) $
+    fun (prefs:File_pref.t) ->
+  bind'si (read_file ()) $ fun (filename:string) ->
+  bind'bi (read_init ()) $ fun (init:bool) ->
+  bind'si
+    (bind'ss (read_extension ()) $ fun (extension:string) ->
+     let _, ok = okfailwith's in
+     ok $ "." . extension) $
+    fun (extension:string) ->
+  bind'sOi (read_output ()) $ fun (output:string option) ->
+  bind'sLi (read_rest ()) $ fun (values:string List.t) ->
+  let values = List.sort{string} String.compare values in
+  let _, raise, failwith, ok = okfailwith'i in
+  match init with
+  | true -> (  (* create the source file *)
+      (* TODO: check if no .conflin boom is already there *)
+      bind'ui  (* check if no value is are defined *)
+        (let _, failwith, ok = okfailwith'u in
+         match values with
+         | [] -> ok ()
+         | _ -> failwith "You can't give values with init.") $
+        fun () ->
+      let c_stop = File_pref.c_stop in
+      let data = File_pref.data prefs in
+      bind'si  (* read and check file *)
+        (bind'ss (safe_read filename) $ fun (file:string) ->
+         check_string_with data file
+           (file_error filename "contains commands-like comments"
+              #{string}[])) $
+        fun (file:string) ->
+      let output = if_none's (filename . extension) output in
+      ok $ write output $ c_stop prefs . file)
+  | false -> (  (* get or put *)
+      let mlpv = main_lens prefs values in
+      match String.end_with filename extension with
+      | true -> (  (* get *)
+          let sfile = filename in
+          let vfile = String.rdrop (length extension) filename in
+          bind'si
+            (bind'ss (safe_read sfile) $ fun (source:string) ->
+             check_string_with (stype mlpv) source $
+               file_error sfile "is not a valid source" #{string}[
+                 "The file_type is the right one";
+                 "The file does not contain mispelled commands"]) $
+            fun (source:string) ->
+          let output = if_none's vfile output in
+          ok $ write output $ get mlpv source)
+      | false -> (  (* put *)
+          let vfile = filename in
+          let sfile = filename . extension in
+          bind'si
+            (bind'ss (safe_read vfile) $ fun (view:string) ->
+             check_string_with (vtype mlpv) view $
+               file_error vfile "is not a valid view" #{string}[
+                 "The expanding value "
+                 . show's (File_pref.make_view prefs values)
+                 . " is the one after the view prefix";
+                 "The file_type is the right one";
+                 "You didn't misspelled a command"]) $
+            fun (view:string) ->
+          let source =
+            let _, try, raise, failwith, _ = okfailwith's in
+            try (safe_read sfile) $ fun (exn:exception) ->
+            match exn with
+            | ErrNo (ENOENT _) -> failwith
+                "Can't find a source file.  Did you forget --init?"
+            | x -> raise x
+          in
+          bind'si
+            (bind'ss source $ fun (source:string) ->
+             check_string_with (stype mlpv) source $
+               file_error sfile "is not a valid source" #{string}[
+                 "The file_type is the right one";
+                 "The extension " . show's (String.drop 1 extension)
+                 . " is the right one"]) $
+            fun (source:string) ->
+          let output = if_none's sfile output in
+          ok $ write output $ put mlpv view source))
+
+(* ---------------------------------------------------------------- *)
+(*                            unit tests                            *)
+
+(* --- Debug --- *)
+
+let mld = main_lens File_pref.debug_like
+
+let mldv = mld #{string}[]
+test get mldv (  "()d0(a)a0()d1(b)b1()d2")
+            = ("()()d0(!a)()d1(!b)()d2"  )
+test put mldv ("()" ."(!a)(!b)"  ) (* ()    (!a)(!b) *)
+              (  "()d0(a)a1(b)a2") (* ()()d0(!a)(!b) *)
+            = (      "(a)a1(b)a2")
+
+let mldv = mld #{string}["a"]
+test get mldv (   "()d0(a)a0()d1(b)b1()d2")
+            = ("(a)()d0(a)a0()d1(!b)()d2" )
+
+let mldv = mld #{string}["a";"b"]
+test get mldv (    "()d0(a)a0()d1(c)c1()d2(b)b2()d3")
+            = ("(ab)()d0(a)a0()d1(!c)()d2(b)b2()d3" )
+test put mldv ("(ab)()D0(a)A1()D2") (* (a)()D0(a)A1()D2 *)
+              (    "()d0"  ."()d2") (* (a)()d0     ()d2 *)
+            = (    "()D0(a)A1()D2")
+test put mldv ("(ab)()D0(!d)()D2" ) (* (a)()D0(!d)()D2 *)
+              (    "()d0(c)c1()d2") (* (a)()d0(!c)()d2 *)
+            = error
+(* test put mldv ("(ab)()D0"  ."()D2") (\* (a)()D0    ()D2 *\) *)
+(*               (    "()d0(c)c1()d2") (\* (a)()d0(!c)()d2 *\) *)
+(*             = error *)
+
+(*
+ * Local Variables:
+ * mode: tuareg
+ * End:
+ *)

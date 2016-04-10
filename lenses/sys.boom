@@ -1,0 +1,90 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2008                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/core.boom                                                          *)
+(* Imports natively-defined primitives                                        *)
+(* $Id: sys.boom 4629 2009-08-17 20:46:16Z ddavi $ *)
+(******************************************************************************)
+
+module Sys = 
+
+#{@}
+
+\section{System functions}
+
+\LENSSECTION{@read@} The @read@ function reads the contents of a file
+from the local filesystem. If the argument is @-@, it reads the
+contents of the standard input.
+
+#* let read : string -> string 
+## = Native.Prelude.read
+
+\LENSSECTION{@write@} The @write@ function writes a string to a file
+on the local filesystem. If the name of the file is @-@, the output is
+the standard output.
+
+#* let write : string -> string -> unit
+## = Native.Prelude.write
+#* let put_str : string -> unit
+#* = write "-"
+
+\LENSSECTION{@exec@} The @exec@ function executes a shell command. 
+
+#* let exec : string -> string 
+## = Native.Prelude.exec
+
+\LENSSECTION{@file_exists@} Test if a file with the given name exists.
+
+#* let file_exists : string -> bool
+## = Native.Prelude.file_exists
+
+\LENSSECTION{@is_directory@} Returns @true@ if the given name refers
+to a directory, @false@ if not.
+
+#* let is_directory : string -> bool
+## = Native.Prelude.is_directory
+
+\LENSSECTION{@remove@} Remove the given file name from the file system.
+
+#* let remove : string -> unit
+## = Native.Prelude.remove
+
+\LENSSECTION{@rename@} Rename a file. The first argument is the old
+name and the second is the new name. Returns @true@ iff the file has
+been renamed.
+
+#* let rename : string -> string -> bool
+## = Native.Prelude.rename
+
+\LENSSECTION{@getcwd@} Return the current working directory of the
+process.
+
+#* let getcwd : unit -> string
+## = Native.Prelude.getcwd
+
+\LENSSECTION{@os_type@} Operating system currently executing
+Boomerang. The return is the same as the ocaml function @sys.os_stype@
+and is
+\begin{itemize}
+ \item @"Unix"@ (for all Unix versions, including Linux and Mac OS X),
+ \item @"Win32"@ (for MS-Windows, OCaml compiled with MSVC++ or Mingw),
+ \item @"Cygwin"@ (for MS-Windows, OCaml compiled with Cygwin).
+\end{itemize}
+
+#* let os_type : string
+## = Native.Prelude.os_type
+

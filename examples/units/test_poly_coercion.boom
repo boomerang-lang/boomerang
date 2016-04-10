@@ -1,0 +1,14 @@
+module Test_poly_coercion =
+
+let xml_escs : (char * string) List.t =
+  #{char * string}[ ('>',"&gt;"); ('<',"&lt;"); ('&',"&amp;") ] 
+
+let str_map = List.map{char*string}{regexp}
+let cs_fst = fst{char}{string}
+let escaped_chars (escs : (char * string) List.t) : regexp List.t
+  = str_map cs_fst escs
+
+let unescaped (escs : (char * string) List.t) : regexp =
+  union_regexps (escaped_chars escs)
+
+test unescaped xml_escs = [&<>]

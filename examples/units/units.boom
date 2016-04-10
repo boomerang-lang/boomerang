@@ -1,0 +1,128 @@
+module Units =
+
+  let l1 : lens = copy [0-9]
+  let l2 : lens = copy [^0-9]
+  test (<l1> . <l2>) = error
+  test (<diffy "x":l1> . <diffy "x":l2>) = error
+  test (<diffy "x":l1> . <greedy 0 "x":l1>) = error
+  test (<Tag(Positional, Threshold 0, NoKey, "x"):l1> . <Tag(Positional, Threshold 1, NoKey, "x"):l1>) = error
+  test (<Tag(Positional, Threshold 0, NoKey, "x"):l1> . <Tag(Positional, Threshold 0, Key, "x"):l1>) = error
+
+  test "a"? . ("aa" <-> "b" | "a" <-> "c") = error
+
+  let single_cn : canonizer =
+    canonizer_of_lens ((WS . "<a x=") <-> "<b x=") .
+    canonizer_of_lens (dup1 DIGIT ("><c y=" . DIGIT) (fun (s:string) -> "><c y=" . s)) .
+    canonizer_of_lens ">"
+
+  let double_cn : canonizer =
+    canonizer_of_lens (WS <-> "") .
+    canonizer_of_lens ("<b x=" . DIGIT . ">") .
+    canonizer_of_lens (WS <-> "") .
+    canonizer_of_lens ("<c y=" . DIGIT . ">")
+
+  let double_lns : lens =
+    ("<b x=" <-> "") .
+    DIGIT .
+    ins "," .
+    ("><c y=" <-> "") .
+    DIGIT .
+    (">" <-> "")
+
+  test left_quot (single_cn | double_cn) double_lns = error
+
+  let final_lns = left_quot (double_cn | single_cn) double_lns
+
+  test final_lns.get "  \n<a x=7>" = "7,7"
+  test final_lns.get "\n  <b x=7>    <c y=7>" = "7,7"
+  test final_lns.create "7,7" = "<b x=7><c y=7>"
+  test final_lns.create "3,7" = "<b x=3><c y=7>"
+
+  let qc (v:string) (E:regexp) (D:regexp) (u:string) =
+    left_quot (canonizer_of_lens (const E v v))
+      (right_quot (v <-> u)
+         (canonizer_of_lens (const D u u)))
+
+  test (qc "x" [a-z] [0-9] "1").create "9" = "x"
+
+(* permute *)
+let l : lens = 
+  lens_permute
+    #{int}[1;0;2] 
+    #{lens}[copy [A-Z];key [0-9]; copy [a-z]]
+
+test stype l = ([A-Z] . [0-9] . [a-z])
+test vtype l = ([0-9] . [A-Z] . [a-z])
+test l.get "A5z" = "5Az"
+test l.create "0Az" = "A0z"
+
+let l : lens = copy [a] ~ copy [b]
+test l.get "ab" = "ba"
+test l.create "ba" = "ab"
+
+let l : lens = (copy [a])* ~ (copy [b])*
+test l.create "bbaaaaa" = "aaaaabb"
+
+(* sort *)
+let q : canonizer = sort #{regexp}[[0-9];[A-Z];[a-z]]
+
+test canonize q "f7N" = "7Nf"
+
+let sort3 (r1:regexp) (r2:regexp) (r3:regexp) = sort #{regexp}[r1;r2;r3] 
+let l3 = 
+(*  let r1,r2,r3 = "a","b","c" in *)
+  let r1,r2,r3 = "a","b","c" in
+  left_quot (sort3 r1 r2 r3) (copy (r1 . r2 . r3))
+
+test l3.get "abc" = "abc"
+test l3.get "abc" = "abc"
+test l3.get "acb" = "abc"
+test l3.get "acb" = "abc"
+test l3.get "abc" = "abc"
+test l3.get "acb" = "abc"
+test l3.get "bac" = "abc"
+test l3.get "bac" = "abc"
+test l3.get "bca" = "abc"
+test l3.get "bca" = "abc"
+test l3.get "bac" = "abc"
+test l3.get "bca" = "abc"
+test l3.get "cab" = "abc"
+test l3.get "cab" = "abc"
+test l3.get "cba" = "abc"
+test l3.get "cba" = "abc"
+test l3.get "cab" = "abc"
+test l3.get "cba" = "abc"
+test l3.get "abc" = "abc"
+test l3.get "acb" = "abc"
+test l3.get "bac" = "abc"
+test l3.get "bca" = "abc"
+test l3.get "cab" = "abc"
+test l3.get "cba" = "abc"
+
+(* fiat *)
+let lfiat =
+  fiat (Sort.sort_concat #{lens}[("a" . del [0-9]);
+                                 ("b" . del [0-9]);
+                                 ("c" . del [0-9])])
+let lnormal =
+       (Sort.sort_concat #{lens}[("a" . del [0-9]);
+                                 ("b" . del [0-9]);
+                                 ("c" . del [0-9])])
+
+test lfiat.get   "b2a1c3" = "abc"
+test lnormal.get "b2a1c3" = "abc"
+test lfiat.put   "abc" into "b2a1c3" = "b2a1c3"
+test lnormal.put "abc" into "b2a1c3" = "a1b2c3"
+
+(* application operator *)
+
+let f (x:string) = "f(".x.")"
+let g (x:string) = "g(".x.")"
+test (f $ g $ f $ f "x") = "f(g(f(f(x))))"
+
+let f (x:string) (g:string -> string) = g x
+test (f "x" $ fun (x:string) -> f "y" $ fun (y:string) -> x.y) = "xy"
+
+(* default chunk tag *)
+
+let _ = <[a-z]> . <greedy 0 "":[a-z]> (* if this fails, the documentation of lens_match in core.boom needs to be changed *)

@@ -1,0 +1,192 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2009 J. Nathan Foster                                        *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /examples/ical.boom                                                        *)
+(* iCal lens                                                                  *)
+(* $Id: ical.boom 4607 2009-08-03 16:53:28Z ddavi $ *)
+
+(* TODO: add proper escaping *)
+
+module Ical = 
+
+let SPACE,ASTERISK,COLON,DASH,LPAREN,RPAREN,NL = " ","*",":","-","(",")","\n"
+let BEGIN_CALENDAR,END_CALENDAR : (regexp * regexp) = "BEGIN:VCALENDAR","END:VCALENDAR"
+let BEGIN_EVENT,END_EVENT : (regexp * regexp) = "BEGIN:VEVENT","END:VEVENT"
+let PREAMBLE,POSTAMBLE : (regexp * regexp) = (BEGIN_CALENDAR . NL . ( ANY - containing BEGIN_EVENT)),(END_CALENDAR . NL)
+let text : lens = Escaping.escape [^\n] #{char*string}[('\',"\\\\");('(',"\\(");(')',"\\)")]
+let TEXT,ESCTEXT : regexp * regexp = stype text,vtype text
+let TIME,LOC : regexp * regexp = (DIGIT{2} . ":" . DIGIT{2}), (SPACE . LPAREN . ESCTEXT . RPAREN)
+
+let line (tag:string) (l:lens) : lens = del (tag . ":") . l . del "\n"
+let parens (l:lens) : lens = ins "(" . l . ins ")"
+let wrapl (l:lens) = left_quot (columnize 75 (stype l) ' ' ("\n  ")) l
+let wrapr (l:lens) = right_quot l (columnize 75 (vtype l) ' ' ("\n  "))
+let now (s:string) : string = Sys.exec "date +%H%M%S | tr -d '\n'"
+let today (s:string) : string = Sys.exec "date +%Y%m%d | tr -d '\n'"
+let uid (s:string) : string = Sys.exec "cat /dev/urandom|uuencode -m -|tail +2|tr -dc 'a-zA-Z0-9'|head -c25"
+let date (tag:string) (time:regexp -> regexp -> regexp -> lens) : lens = 
+  line tag (clobber DIGIT{8} "" today . del "T" . time DIGIT{2} DIGIT{2} DIGIT{2} . del "Z")
+let copy_time (H:regexp) (M:regexp) (S:regexp) : lens = copy H . ins ":" . copy M . del S 
+let clobber_time (H:regexp) (M:regexp) (S:regexp) : lens = clobber (H . M . S) "" now
+
+let event1 : lens = 
+  del (BEGIN_EVENT . NL) . 
+  fiat (Sort.sort_concat 
+    #{lens}[
+      line "CLASS" ("PRIVATE" <-> ASTERISK | "PUBLIC" <-> SPACE)
+    ; date "DTSTART" copy_time . ins DASH 
+    ; date "DTEND" copy_time . ins SPACE 
+    ; date "DTSTAMP" clobber_time 
+    ; date "CREATED" clobber_time 
+    ; date "LAST-MODIFIED" clobber_time 
+    ; line "UID" (clobber TEXT "" uid)
+    ; line "TRANSP" (const TEXT "" "OPAQUE") 
+    ; line "DESCRIPTION" (del TEXT)
+    ; line "STATUS" (const TEXT "" "TENTATIVE") 
+    ; line "SEQUENCE" (const NUMBER "" "0") 
+    ; line "SUMMARY" (wrapl (text; key ESCTEXT)) . ins SPACE
+    ; line "LOCATION" (parens (wrapl (text; key ESCTEXT))) ]) . 
+  del (END_EVENT) . copy NL
+let event2 : lens =  
+  copy (SPACE | ASTERISK) . merge_with_sep TIME DASH . 
+  copy SPACE . wrapr (key ESCTEXT . copy LOC) . copy NL
+let ical1 : lens = del PREAMBLE . <greedy 0 "":event1 >* . del POSTAMBLE
+let ical : lens = ical1; <greedy 0 "":event2 >*
+
+let l  =  (copy (SPACE | ASTERISK) . 
+merge_with_sep TIME "-" . 
+copy (SPACE . ESCTEXT. LOC . NL))*
+
+(* test "before ical" = ?  *)
+(* test avtype ical1 = ? *)
+(* test astype (<g_:event2 >* ) = ? *)
+(* test aequiv (avtype ical1) (astype (<g_:event2 >* )) = ? *)
+(* test sequiv (<g_:event2 >* ) = ? *)
+
+let ical2 : lens = 
+  align ical1; 
+  (copy (SPACE | ASTERISK) . 
+  merge_with_sep TIME "-" . 
+  copy (SPACE . ESCTEXT. LOC . NL))*
+
+
+let public : lens = 
+  del SPACE . 
+  copy TIME . 
+  copy (ESCTEXT . LOC) . 
+  copy NL
+
+let private : lens = 
+  del ASTERISK . 
+  copy TIME . 
+  (ESCTEXT . LOC) <-> "BUSY" . 
+  copy NL
+
+let redact : lens = 
+  (public | private)*
+
+let erase : lens = 
+  filter (stype private) (stype public); 
+  public*
+
+
+
+(* html stuff *)
+let pcdata : lens = 
+  invert text; 
+  Escaping.escape_with '&' [^\n] Escaping.xml_escs
+let PCDATA : regexp = vtype pcdata 
+let html_entry : lens = 
+  MkXml.simple_elt NL2 "time" (merge_with_sep TIME "-") . 
+  MkXml.simple_elt NL2 "description" (del " " . pcdata) .
+  MkXml.simple_elt NL2 "location" (del " (" . pcdata . del ")") .
+  del "\n"
+let html_pub : lens = del " " . MkXml.elt NL1 "entry" html_entry
+let html_pvt : lens = del "*" . MkXml.attr1_elt NL1 "entry" "class" (ins "private") html_entry
+let html : lens = MkXml.outer_elt NL0 "calendar" (html_pub | html_pvt)*
+
+let xml : lens = align ical1 ; html
+
+test xml.get
+<<
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+CLASS:PRIVATE
+DTSTART:20090215T081500Z
+DTEND:20090215T140000Z
+DTSTAMP:20090224T222716Z
+SUMMARY:Coffee with Sara
+LOCATION:La Columbe Coffee
+UID:856dv2lb8aiknrad10qq171jmg@google.com
+TRANSP:OPAQUE
+CREATED:20090224T222529Z
+DESCRIPTION:
+LAST-MODIFIED:20090227T233055Z
+STATUS:CONFIRMED
+SEQUENCE:0
+END:VEVENT
+BEGIN:VEVENT
+CLASS:PRIVATE
+DTSTART:20090215T200000Z
+DTEND:20090215T210000Z
+DTSTAMP:20090224T222716Z
+SUMMARY:Worko
+LOCATION:Gym
+UID:usqehvnsot5gplg7qkvig6ljvc@google.com
+TRANSP:OPAQUE
+CREATED:20090224T222610Z
+DESCRIPTION:
+LAST-MODIFIED:20090227T233055Z
+STATUS:CONFIRMED
+SEQUENCE:0
+END:VEVENT
+BEGIN:VEVENT
+CLASS:PRIVATE
+DTSTART:20090227T210000Z
+DTEND:20090227T210000Z
+DTSTAMP:20090227T231702Z
+SUMMARY:Meeting with Michael
+LOCATION:My office
+UID:jH0z0t7RKbx0BYGp5OkZ9zcLN@google.com
+TRANSP:OPAQUE
+CREATED:20090227T231702Z
+DESCRIPTION:
+LAST-MODIFIED:20090227T233055Z
+STATUS:TENTATIVE
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR
+
+>> = 
+<<
+<calendar>
+ <entry class="private">
+  <time>08:15</time>
+  <description>Coffee with Sara</description>
+  <location>La Columbe Coffee</location>
+ </entry>
+ <entry class="private">
+  <time>20:00</time>
+  <description>Worko</description>
+  <location>Gym</location>
+ </entry>
+ <entry class="private">
+  <time>21:00</time>
+  <description>Meeting with Michael</description>
+  <location>My office</location>
+ </entry>
+</calendar>
+>>

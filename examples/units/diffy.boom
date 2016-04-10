@@ -1,0 +1,819 @@
+module Diffy =
+
+let sep_list (a:lens) (b:lens) = a . (b . a)*
+
+let df (name:string) = Tag (Diffy true, Threshold 0, Key, name)
+let dl (name:string) = Tag (Diffy false, Threshold 0, Key, name)
+let g (t:int) (name:string) = Tag (Greedy, Threshold t, Key, name)
+let p (name:string) = Tag (Positional, Threshold 0, Key, name)
+
+let main = (* df *)
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <df "w":word> " " in
+  let file = sep_list <df "l":line> "\n" in
+  file
+
+test get main "aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>>
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+
+test put main "a b c d f" "aA cC dD eE fF" = "aA b cC dD fF"
+
+test put main "a b c" "bB cC" = "a bB cC"
+test put main "a b c" "aA cC" = "aA b cC"
+test put main "a b c" "aA bB" = "aA bB c"
+
+test put main "b c" "aA bB cC" = "bB cC"
+test put main "a c" "aA bB cC" = "aA cC"
+test put main "a b" "aA bB cC" = "aA bB"
+
+test put main "a" "aAa aAAAA" = "aA" (* put is done first with <df:l> *)
+test put main "a a" "aA" = "aA a" (* put is done first *)
+
+test put main "b a" "aA bB" = "b aA"
+
+test put main <<
+  ooo ooo oo
+  nn nnn
+  aaa a aa
+  uu u
+  ddd dd d
+>> <<
+  oooOOoO oOOooO oOo
+  aaAAa aAaa aAA aAAa
+  eeEeEE eE
+  uUUuuU uuUU
+>> = <<
+  oooOO oOOooO oOo
+  nn nnn
+  aaAAa aA aAAa
+  uUUu u
+  ddd dd d
+>>
+
+test put main "ooo o" "oOoOoOO oOOoO oO" = "oOoOoOO oOO" (* strange case *)
+
+test put main "o a o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA"
+
+test put main "o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO aAA oOO aAAA oOOO aAAAA"
+
+test put main "o o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO oOO oOOO oOOOO oOOOOO"
+
+test put main "o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO oOO oOOO oOOOO"
+
+let main =
+  let word = ([a-m] . del [A-Z]* | [n-z] . del [A-Z]* )+ in
+  sep_list ("+" . <df "w":word> | "-" . <df "w":word>) " "
+
+test get main "+aA -bB" = "+a -b"
+test put main "+a -b +c -d" "+aA -bB +cC -dD" = "+aA -bB +cC -dD"
+test put main "+a +c -d" "+aA -bB +cC" = "+aA +cC -d"
+test put main "-a +n +d -e" "+aA -bB +cC -dD" = "-aA +n +dD -e"
+
+let main = (* dl *)
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <dl "w":word> " " in
+  let file = sep_list <dl "l":line> "\n" in
+  file
+
+test get main "aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>>
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+
+test put main "a b c" "bB cC" = "a bB cC"
+test put main "a b c" "aA cC" = "aA b cC"
+test put main "a b c" "aA bB" = "aA bB c"
+
+test put main "b c" "aA bB cC" = "bB cC"
+test put main "a c" "aA bB cC" = "aA cC"
+test put main "a b" "aA bB cC" = "aA bB"
+
+test put main <<
+  ooo ooo oo
+  nn nnn
+  aaa a aa
+  uu u
+  ddd dd d
+>> <<
+  oooOOoO oOOooO oOo
+  aaAAa aAaa aAA aAAa
+  eeEeEE eE
+  uUUuuU uuUU
+>> = <<
+  oooOO oOOooO oOo
+  nn nnn
+  aAaa aAA aAAa
+  uUUu u
+  ddd dd d
+>>
+
+test put main "a" "aA aAA" = "aAA" (* deletion is done first ; put at the end *)
+test put main "a a" "aA" = "a aA" (* creation is done first *)
+
+test put main "b a" "aA bB" = "bB a"
+
+test put main "ooo o" "oOoOoOO oOoOO oO" = "oOoOoOO oO" (* strange case *)
+
+test put main "o a o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA"
+
+test put main "o a o a o a"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oOO aAAA oOOO aAAAA oOOOO aAAAAA"
+
+test put main "o o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oO oOO oOOO oOOOO oOOOOO"
+
+test put main "o o o o"
+              "aA oO aAA oOO aAAA oOOO aAAAA oOOOO aAAAAA oOOOOO"
+            = "oOO oOOO oOOOO oOOOOO"
+
+(* compose *)
+
+let main =
+  let a = copy [a-z] . copy [A-Z] . del [0-9] in
+  let b = copy [a-z] . del [A-Z] in
+  let c = a;b in
+  ( <g 0 "":a>* ; <g 0 "":b>* ) . <g 0 "":c>
+
+test get main "bB1cC2" = "bc"
+test put main "cb" "bB1cC2" = "cC2bB1"
+
+let main =
+  let word1 = ([a-z] . [A-Z]* . del [0-9]* )+ in
+  let line1 = sep_list <df "w":word1> " " in
+  let file1 = sep_list <df "l":line1> "\n" in
+  let word2 = ([a-z] . del [A-Z]* )+ in
+  let line2 = sep_list <df "w":word2> " " in
+  let file2 = sep_list <df "l":line2> "\n" in
+  file1 ; file2
+
+test get main "aA0 bB1 cC2" = "a b c"
+test create main "a b c" = "a b c"
+test put main "a b c" "aA0 bB1 cC2" = "aA0 bB1 cC2"
+test put main "a c d" "aA0 bB1 cC2" = "aA0 cC2 d"
+
+(* we could have wanted "aA0 cC2 d"
+   so we need to write : *)
+
+let main =
+  let word = ([a-z] . [A-Z]* . del [0-9]* )+ ; ([a-z] . del [A-Z]* )+ in
+  let line = sep_list <df "w":word> " " in
+  let file = sep_list <df "l":line> "\n" in
+  file
+
+test get main "aA0 bB1 cC2" = "a b c"
+test create main "a b c" = "a b c"
+test put main "a b c" "aA0 bB1 cC2" = "aA0 bB1 cC2"
+test put main "a c d" "aA0 bB1 cC2" = "aA0 cC2 d"
+
+let a = copy "a" . copy "b"*
+let a2 = copy ("a" . "b"* )
+let b = copy "a" . del "b"*
+let b2 = align b
+
+test ("1" . <p "":a2> | "2" . <p "":b>) = error
+
+let main = "1" . <p "":a> | "2" . <p "":b>  (* TODO: change <a> to <a2> *)
+
+test get main "1abbb" = "1abbb"
+test get main "2abbb" = "2a"
+test create main "2a" = "2a"
+test put main "2a" "1abbb" = "2abbb"
+
+let main = "1" . <p "":a2> | "2" . <p "":b2>
+
+test get main "1abbb" = "1abbb"
+test get main "2abbb" = "2a"
+test create main "2a" = "2a"
+test put main "2a" "1abbb" = "2abbb"
+
+test <p "":main> = error (* no recursive lenses *)
+
+let main =
+  let wc = copy [a-z] . copy [A-Z]* in
+  let wd = copy [a-z] . del  [A-Z]* in
+  let lwc = ("C" . copy [0-9]) . <p "":wc> | ("D" . copy [0-9]) . <p "":wd> in
+  let lwd =  "C" . del  [0-9]  . <p "":wc> |  "D" . del  [0-9]  . <p "":wd> in
+  "A" . <p "l":lwc> | "B" . <p "l":lwd>
+
+test get main "AC1aA" = "AC1aA"
+test get main "BD2bB" = "BDb"
+
+let main =
+  let sep_iter (a:lens) (b:lens) (n:int) = a . lens_iter (b . a) n n in
+  let cn = [a-z] . [A-Z]* in
+  let wn = <df "c":cn>+ in
+  let wnc = <df "w":wn> in
+  let c = [a-z] . del [A-Z]* in
+  let w = <df "c":c>+ in
+  let wc = <df "w":w> in
+  ( sep_iter   wnc " " 3 . '1' <-> '2' 
+  ; sep_iter   wnc " " 3 . '2' <-> '3')
+  ; ( sep_iter wnc " " 3 . '3' <-> '4' 
+    ; sep_iter wc " " 3 . '4' <-> '5')
+
+test get main "aAbB cCdD eE fF1" = "ab cd e f5"
+test create main "a b c e5" = "a b c e1"
+test put main "b de ge h5" "aAbB cC dDeE fFgG1" = "bB dDeE gGe h1"
+
+(* invert *)
+
+let main =
+  let l = invert (copy [a-z] . del "B") . del [ 0-9]
+  in <df "":l>*
+
+test get main "a1b2" = "aBbB"
+test create main "aBbB" = "a b "
+test put main "aBbBcBeB" "a1c3d4e5" = "a1b3c4e5"
+
+let l = copy [a-z] . del "B"
+
+test (invert <p "":l>) = error (* chunks in invert *)
+
+(* default *)
+
+let main =
+  let l = default (copy [a-z] . del [ A-Z]) "aN" in
+  <df "":l>*
+
+test get main "aAbBcCdD" = "abcd"
+test create main "abcd" = "aNbNcNdN"
+test put main "acde" "aAbBcCdD" = "aAcCdDeN"
+
+(* left quot *)
+
+let main =
+  let c = canonizer_of_lens (sep_list [a-z]+ (" " . del " "* )) in
+  left_quot c (sep_list [a-z]+ " ")
+
+test get main "a  b   c d" = "a b c d"
+test create main "a b c d" = "a b c d"
+
+(* let main = *)
+(*   let a = ([a-z] . [A-Z]* )+ in *)
+(*   let c = canonizer_of_lens (sep_list a (" " . del " "* )) in *)
+(*   let a = ([a-z] . del [A-Z]* )+ in *)
+(*   left_quot c (sep_list <df:a> " ") *)
+
+(* test get main "a  b   c d" = "a b c d" *)
+(* test create main "a b c d" = "a b c d" *)
+(* test put main "ab c d ef" "aAbB   cC  dD  eEfF" = "aAbB cC dD eEfF" *)
+(* test put main "a d ef" "aAbB   cC  dD  eEfF" = "aA dD eEfF" *)
+
+(* let main = *)
+(*   let s = canonizer_of_lens (" " . del " "* ) in *)
+(*   let a = ([a-z] . del [A-Z]* )+ in *)
+(*   sep_list <df:a> (left_quot s " ") *)
+
+(* test get main "a  b   c d" = "a b c d" *)
+(* test create main "a b c d" = "a b c d" *)
+(* test put main "ab c d ef" "aAbB   cC  dD  eEfF" = "aAbB cC dD eEfF" *)
+(* test put main "a d ef" "aAbB   cC  dD  eEfF" = "aA dD eEfF" *)
+
+(* right quot *)
+
+let main =
+  let c = canonizer_of_lens (sep_list [a-z]+ (" " . del " "* )) in
+  right_quot (sep_list [a-z]+ " ") c
+
+test get main "a b c d" = "a b c d"
+test create main "a    b   c  d" = "a b c d"
+
+(* let main = *)
+(*   let a = ([a-z] . [A-Z]* )+ in *)
+(*   let c = canonizer_of_lens (sep_list a (" " . del " "* )) in *)
+(*   let a = [a-z]+ in *)
+(*   let d = canonizer_of_lens (sep_list a (" " . del " "* )) in *)
+(*   let a = ([a-z] . del [A-Z]* )+ in *)
+(*   right_quot (left_quot c (sep_list <df:a> " ")) d *)
+
+(* test get main "a  b   c d" = "a b c d" *)
+(* test create main "a   b  c    d" = "a b c d" *)
+(* test put main "ab  c   d  ef" "aAbB   cC  dD  eEfF" = "aAbB cC dD eEfF" *)
+(* test put main "a     d   ef" "aAbB   cC  dD  eEfF" = "aA dD eEfF" *)
+
+(* let main = *)
+(*   let s = canonizer_of_lens (" " . del " "* ) in *)
+(*   let a = ([a-z] . del [A-Z]* )+ in *)
+(*   sep_list <df:a> (left_quot s (right_quot " " s)) *)
+
+(* test get main "a  b   c d" = "a b c d" *)
+(* test create main "a     b   c  d" = "a b c d" *)
+(* test put main "ab    c  d   ef" "aAbB   cC  dD  eEfF" = "aAbB cC dD eEfF" *)
+(* test put main "a   d   ef" "aAbB   cC  dD  eEfF" = "aA dD eEfF" *)
+
+(* sort *)
+
+let main =
+  sort #{regexp}['a';'b';'c']
+
+test canonize main "bac" = "abc"
+test canonize main "ba" = error
+test canonize main "bbac" = error
+test choose main "bac" = error
+test choose main "abc" = "abc"
+
+(* fiat *)
+
+let main =
+  let c = sort #{regexp}['a';'b';'c'] in
+  let l = "abc" in
+  fiat (right_quot (left_quot c l) c)
+
+test get main "abc" = "abc"
+test get main "bca" = "abc"
+
+test put main "cba" "bca" = "abc"
+test put main "abc" "bca" = "bca"
+
+(* permute *)
+
+let main =
+  let cc (m:char) (M:char) = m . del M? in
+  let a = cc 'a' 'A' in
+  let b = cc 'b' 'B' in
+  let c = cc 'c' 'C' in
+  lens_permute #{int}[2;0;1] #{lens}[a;b;c]
+
+test get main "aAbBcC" = "bca"
+test create main "bca" = "abc"
+test put main "bca" "aAbcC" = "aAbcC"
+
+let main =
+  let l = [a-z] . del [A-Z]* in
+  let lc = <df "":l> in
+  lens_permute #{int}[2;0;1] #{lens}[lc;lc;lc]
+
+test get main "aAbBcC" = "bca"
+test create main "bca" = "abc"
+test put main "bca" "aAbcC" = "aAbcC"
+
+test put main "ebc" (* bca *) "aAbBcC" = "cCebB" (* crossing in the source with diffy *)
+
+let main =
+  let a =
+    let c =[a-z] . del [A-Z] in
+    <g 0 "":c>
+  in
+  let b =
+    let c = key [a-z] in
+    <g 0 "":c>
+  in
+  ( a ; b ) . (
+    ("+"|"-").a.a.a ; (
+      "+" . lens_permute #{int}[2;0;1] #{lens}[b;b;b]
+    | "-" . b.b.b
+    )
+  ) . ( a ; b )
+
+test get main "bB+cCdDeEfF" = "b+decf"
+test put main "b+decf" "bB+cCdDeEfF" = "bB+cCdDeEfF"
+test create main "b+decf" = "bA+cAdAeAfA"
+
+test get main "bB-cCdDeEfF" = "b-cdef"
+test put main "b-cdef" "bB-cCdDeEfF" = "bB-cCdDeEfF"
+test create main "b-cdef" = "bA-cAdAeAfA"
+
+test put main "b-decf" "bB+cCdDeEfF" = "bB-dDeEcCfF"
+test put main "b+cdef" "bB-cCdDeEfF" = "bB+eEcCdDfF"
+
+test put main "d+befc" "bB+cCdDeEfF" = "dD+fFbBeEcC"
+
+(* align *)
+
+let main =
+  (* this is an example of rewriting a asymmetric compose:
+     (file . "\n")? . (p ; line)
+  *)
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <df "w":word> " " in
+  let file = sep_list <df "l":line> "\n" in
+  let p = del "LAST " . stype line in
+  ((stype file . "\n")? . p) ; align file
+
+test get main "LAST aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  LAST aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "LAST aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  LAST snt aoe nst
+>>
+
+test put main "a b c" "LAST aA bB cC" = "LAST aA bB cC"
+
+test put main "a b c d f" "LAST aA cC dD eE fF" = "LAST aA b cC dD fF"
+
+test put main "a b c" "LAST bB cC" = "LAST a bB cC"
+test put main "a b c" "LAST aA cC" = "LAST aA b cC"
+test put main "a b c" "LAST aA bB" = "LAST aA bB c"
+
+test put main "b c" "LAST aA bB cC" = "LAST bB cC"
+test put main "a c" "LAST aA bB cC" = "LAST aA cC"
+test put main "a b" "LAST aA bB cC" = "LAST aA bB"
+
+test put main "a"   "LAST aA aAA" = "LAST aA" (* put is done first with <df:l> *)
+test put main "a a" "LAST aA"     = "LAST aA a" (* put is done first *)
+
+test put main "b a" "LAST aA bB" = "LAST b aA"
+
+test put main <<
+  ooo ooo oo
+  nn nnn
+  aaa a aa
+  uu u
+  ddd dd d
+>> <<
+  oooOOoO oOOooO oOo
+  aaAAa aAaa aAA aAAa
+  eeEeEE eE
+  LAST uUUuuU uuUU
+>> = <<
+  oooOO oOOooO oOo
+  nn nnn
+  aaAAa aA aAAa
+  uUUu u
+  LAST ddd dd d
+>>
+
+(* weight test *)
+
+let main =
+  sep_list <df "l":sep_list <df "w":force_nokey (copy [a-z] . del [A-Z]* )+> " "> "\n"
+
+test get main "aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>>
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+
+test put main "a b c d f" "aA cC dD eE fF" = "aA bC cD dE fF"  (* we're doing positional since everything but spaces costs one *)
+
+test put main "a b c" "bB cC" = "aB bC c"
+test put main "a b c" "aA cC" = "aA bC c"
+test put main "a b c" "aA bB" = "aA bB c"
+
+test put main "b c" "aA bB cC" = "bA cB"
+test put main "a c" "aA bB cC" = "aA cB"
+test put main "a b" "aA bB cC" = "aA bB"
+
+(* ambiguous concat *)
+
+let main =
+  let ac = Native.Prelude.lens_concat in
+  let w = [a-z] . del [ A-Z] in
+  let l = w* in
+  let s = del "." in
+  ac (l . s) l
+
+test get main "aAbBcC." = "abc"
+test put main "abcde" "aAbBcC." = "aAbBcC.d e "
+test put main "ab" "aAbBcC." = "aAbB."
+test put main "cd" "aAbBcC." = "cAdB."
+test put main "ab" "aA.bBcC" = "aA.bB"
+
+let main =
+  let part (r:regexp) (s:regexp) =
+    let ac = Native.Prelude.lens_concat in
+    ac (lens_swap r* s) r*
+  in
+  let wisp = [a-z] in
+  let needle = '!' in
+  let haystack =
+    ( part wisp needle
+    | wisp*
+    )
+  in
+  let needle = needle <=> 'y' in
+  let nothing = "" <=> 'n' in
+  let straw = del wisp+ . ins '.' in
+  let sep = ' ' in
+  let first = sep_list haystack sep in
+  let search =
+    ( needle
+    | needle . <p "p":straw>
+    | nothing
+    | nothing . <p "p":straw>
+    )
+  in
+  let second = sep_list <df "df":search> sep in
+  first ; align second
+
+let source =        "aoze !  ce!tz totz! nth !nt "
+let view =             "n. y n y. y. n. y. n"
+let edited_view =      "n. n n n. y. n n. n."
+let edited_source = "aoze   cetz totz!  nt a"
+
+test get main source = view
+test put main view source = source
+test put main edited_view source = edited_source
+test put main edited_view edited_source = edited_source
+
+test put main "n." "aoeu!snth" = "aoeusnth"
+test put main "y." "snth" = "!snth"
+
+(* ambiguous star *)
+
+let main =
+  let star = Native.Prelude.lens_star in
+  let concat = Native.Prelude.lens_concat in
+  let w = [a-z] . del [ A-Z] in
+  let l = w* in
+  let s = del "." in
+  concat l (star (s . l))
+
+test get main ".aAbB.cC..dD" = "abcd"
+test put main "abc" "..aA.bB.cC.." = "..aA.bB.cC.."
+test put main "abc" ".aAbB.cC..dD" = ".aAbB.cC.."
+test put main "ab" ".aAbB.cC..dD" = ".aAbB..."
+test put main "" ".aAbB.cC..dD" = "...."
+test put main "ab" "" = ".a .b "
+test put main "abcde" ".aAbB.cC..dD" = ".aAbB.cC..dD.e "
+test put main "abcde" ".aAbB.cC..dD..." = ".aAbB.cC..dD....e "
+test put main "aoeu" "" = ".a .o .e .u "
+
+let main =
+  let star = Native.Prelude.lens_star in
+  let filter (r:regexp) (s:regexp) =
+    star (copy s | del r?)
+  in
+  filter [A-Z] [a-z]
+
+let source = "aoeuAOEUsnNtThH"
+let view = "aoeusnth"
+
+test get main source = view
+test put main view source = source
+
+let edited_view = "aoeu"
+let edited_source = "aoeuAOEUNTH"
+
+test put main edited_view source = edited_source
+
+(* quotienting with alignment *)
+
+let main =
+  let ch = copy [a-z] . del [A-Z] in
+  let vch = vtype ch in
+  let space = ' '* <-> ' ' in
+  let c =
+    canonizer_of_lens (
+      sep_list space <g 0 "":vch>
+    )
+  in
+  let l = sep_list ' ' <g 0 "":ch> in
+  right_quot l c . "#" . right_quot l c
+
+test get main " aA bB # cC dD " = "ab#cd"
+test put main "ab#c" " aA bB # cC " = " aA bB # cC "
+test put main "a#bc" " aA bB # cC " = " aA # bB cC "
+test put main "  c    b  a  #  d  " " aA bB # cC dD " = " cC bB aA # dD "
+
+let main =
+  let word1 = ([a-z] . del [0-9]* )+ in
+  let line1 = sep_list <df "w":word1> " " in
+  let file1 = sep_list <df "l":line1> "\n" in
+  let word2 = ([a-z] . del [A-Z]* )+ in
+  let line2 = sep_list <df "w":word2> " " in
+  let file2 = sep_list <df "l":line2> "\n" in
+  right_quot file1 (canonizer_of_lens file2)
+
+test get main "a0 b1 c2" = "a b c"
+test create main "aA bB cC" = "a b c"
+test put main "aAO bEU cNSTH" "a0 b1 c2" = "a0 b1 c2"
+test put main "aAOEU cCCC dD" "a0 b1 c2" = "a0 c2 d"
+
+let main =
+  let a =
+    let c = [a-z] . del [A-Z] in
+    <g 0 "":c>
+  in
+  let b =
+    let c = key [a-z] in
+    <g 0 "":c>
+  in
+  let ab = right_quot a (canonizer_of_lens b) in
+  ab . (
+    right_quot (
+    ("+"|"-").a.a.a 
+    ) (
+      canonizer_of_lens (
+        "+" . lens_permute #{int}[2;0;1] #{lens}[b;b;b]
+      | "-" . b.b.b
+      )
+    )
+  ) . ab
+
+test get main "bB+cCdDeEfF" = "b+ecdf"
+test put main "b+ecdf" "bB+cCdDeEfF" = "bB+cCdDeEfF"
+test create main "b+ecdf" = "bA+cAdAeAfA"
+
+test get main "bB-cCdDeEfF" = "b-cdef"
+test put main "b-cdef" "bB-cCdDeEfF" = "bB-cCdDeEfF"
+test create main "b-cdef" = "bA-cAdAeAfA"
+
+test put main "b-ecdf" "bB+cCdDeEfF" = "bB-eEcCdDfF"
+test put main "b+cdef" "bB-cCdDeEfF" = "bB+dDeEcCfF"
+
+test put main "d+efbc" "bB+cCdDeEfF" = "dD+fFbBeEcC"
+
+(* sort *)
+
+let main =
+  let X = [A-M] in
+  let Y = [N-Z] in
+  let x = [a-m] in
+  let y = [n-z] in
+  let a = <p "z":X> . <p "w":Y> in
+  let b = <p "x":x> . <p "y":y> in
+  let c = <p "y":y> . <p "z":X> in
+  sort (astypes #{lens}[a;b;c])
+    
+test canonize main "AZazyB" = "AZazyB"
+test canonize main "yBazAZ" = "AZazyB"
+test canonize main "AZaz" = error
+test canonize main "AZAZaz" = error
+test choose main "azAZyB" = error
+test choose main "AZazyB" = "AZazyB"
+
+(* copy on aregexp *)
+
+(* let X = [A-Z] *)
+(* let x = [a-z] *)
+(* let a = astype <p:X> *)
+(* let b = astype <p:x> *)
+(* let c = astype (<p:X> . <p:x>) *)
+
+(* TODO: uncomment *)
+(* test (copy "" . a) . b = ? *)
+(* test copy "" . (a . b) = ? *)
+
+(* let main = ( a . c )* *)
+
+(* test get main "BBbCCcDDd" = "BBbCCcDDd" *)
+(* test put main "EEeFFfBBbDDd" "BBbCCcDDd" = "EEeFFfBBbDDd" *)
+
+(* representative of the equivalence *)
+
+let main =
+  let ch = copy [a-z] . del [A-Z]* in
+  let space = ' '* <-> ' ' in
+  let c =
+    canonizer_of_lens (
+      sep_list <g 0 "":ch> space
+    )
+  in
+  let l = sep_list <g 0 "":ch> ' ' in
+  right_quot l c
+
+test get main "aA bB" = "ab"
+test put main "aBBB    bAAA" "aAAAA bBBBB" = "aAAAA bBBBB"
+test vrep main "aBBB     bCCC" = "ab"
+
+(* ktype and mtype *)
+
+let main =
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <df "w":word> " " in
+  let file = sep_list <df "l":line> "\n" in
+  file
+
+(* test ktype main = ? *)
+(* test mtype main = ? *)
+
+(* mmatch as an operator *)
+
+let main =
+  <p "":align (copy 'a'* . del 'b'* )> . '#' . <p "":copy ('a'* . 'b'* )>
+
+let main = <p "a":'a'*>.<p "b":'b'>.<p "a":del 'a'*>
+
+(* dynamic tags *)
+
+let main =
+  let c = 'a' in
+  <p "a":'a'>.<p c:del 'a'>
+
+let main = <p "a":"12">.<p "a":'1'.'2'>
+
+test main.<p "a":copy '1'.'2'> = error
+
+(* threshold *)
+
+let main =
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <g 100 "w":word> (nokey " ") in
+  let file = sep_list <g 100 "l":line> (nokey "\n") in
+  file
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+
+test put main "a b c d f" "aA cC dD eE fF" = "aA b cC dD fF"
+
+test put main "a b c" "bB cC" = "a bB cC"
+test put main "a b c" "aA cC" = "aA b cC"
+test put main "a b c" "aA bB" = "aA bB c"
+
+test put main "b c" "aA bB cC" = "bB cC"
+test put main "a c" "aA bB cC" = "aA cC"
+test put main "a b" "aA bB cC" = "aA bB"
+
+test put main "b c c a d a b" "aA aAA aAAA bB bBB cC" = "bB cC c aA d aAA bBB"
+
+(* mtype_match_compatible *)
+
+test <df "a":"">.<dl "a":""> = error
+test <df "a":<dl "a":"">> = error
+
+test <df "a":rxlift "">.<dl "a":rxlift ""> = error
+test <df "a":<dl "a":rxlift "">> = error

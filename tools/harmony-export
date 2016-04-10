@@ -1,0 +1,56 @@
+#!/bin/sh -x
+
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 arch seas-account"
+  echo "FYI: $(uname -mo)"
+  exit 1
+fi
+
+arch="$1"
+user="$2"
+
+DIR="boomerang-$(date +%Y%m%d)"
+SUFFIXDIR="-$arch-binary"
+TARNAME="$DIR$SUFFIXDIR.tar.gz"
+
+build="build"
+
+rm -rf $build
+mkdir $build
+cd $build
+mkdir -p writing/papers/onlybcpshouldmodify
+repos="svn+ssh://$user@eniac.seas.upenn.edu/mnt/eclipse/plclub1/svnroot/harmony"
+bcp="writing/papers/onlybcpshouldmodify/bcp.bib"
+harmony="writing/papers/harmony.bib"
+svn export $repos/trunk
+svn export $repos/$bcp $bcp
+svn export $repos/$harmony $harmony
+mv trunk $DIR
+
+tar cvf ../$DIR-source.tar $DIR
+cd $DIR
+  omake
+cd ..
+
+echo "Building binary tar..."
+tar czvf "../$DIR-$arch-binary.tar.gz" \
+  $DIR/bin \
+  $DIR/COPYING \
+  $DIR/doc/main.pdf \
+  $DIR/examples/*.boom \
+  $DIR/examples/alignment.src \
+  $DIR/examples/xsugar \
+  $DIR/QuickStart.src
+
+echo "Building source tar..."
+tar rvf ../$DIR-source.tar $DIR/doc/main.pdf
+gzip ../$DIR-source.tar
+
+#chmod 755 "$DIR-$arch-binary.tar.gz"
+#chmod 755 "$DIR-source.tar.gz"
+#scp "$DIR-$arch-binary.tar.gz" harmony@eniac-l.seas.upenn.edu:html/download/
+#scp "$DIR-source.tar.gz" harmony@eniac-l.seas.upenn.edu:html/download/
+cd ..
+rm -fr $build
+#rm "$DIR-$arch-binary.tar.gz"
+#rm "$DIR-source.tar.gz"

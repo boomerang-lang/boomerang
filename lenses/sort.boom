@@ -1,0 +1,176 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2008                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/sort.boom                                                          *)
+(* Sorting functions                                                          *)
+(* $Id: sort.boom 4658 2009-11-14 02:55:39Z jnfoster $ *)
+(******************************************************************************)
+
+module Sort =
+
+#{@}
+
+\section{Sorting}
+
+The @Sort@ module defines functions for building lenses that do sorting. 
+
+\subsection{Permutation Sorting}
+
+Using the @lens_permute@ operator, and the functions for manipulating 
+integer lists representing permutations from the @List@ module it is 
+straightforward to define lenses that do sorting. 
+
+\LENSSECTION{@perms_regexps@} The @perms_regexps@ function computes the
+permutations of a list of regular expressions as a list of lists of
+regular expressions.
+
+#* let perms_regexps (rl:regexp List.t) : (regexp List.t) List.t = 
+#*   List.map{int List.t}{regexp List.t}
+#*     (fun (sigmai:int List.t) -> List.permute{regexp} sigmai rl)
+#*     (List.permutations (List.length{regexp} rl))
+
+#* test perms_regexps #{regexp}["a";"b"] 
+#* = #{regexp List.t}[#{regexp}["a";"b"]; #{regexp}["b";"a"]]
+
+\LENSSECTION{@perm_regexps@} The @perm_regexps@ function is similar but
+flattens the inner lists using @regexp_concat@.
+
+#* let perm_regexps (rl:regexp List.t) : regexp List.t = 
+#*   List.map{regexp List.t}{regexp} concat_regexps (perms_regexps rl)
+
+
+#* test perm_regexps #{regexp}["a";"b"] 
+#* = #{regexp}["ab";"ba"]
+
+\LENSSECTION{@perm_sortable@} The @perm_sortable@ predicate returns
+@true@ iff the concatenations of all permutations of a list of regular
+expressions are unambiguous and also disjoint.
+
+#* let perm_sortable (rl:regexp List.t) : bool =
+#*   let perms = perms_regexps rl in 
+#*   List.for_all{regexp List.t} (fun (pi:regexp List.t) -> concatable pi) perms
+#*   && disjoint_regexps (List.map{regexp List.t}{regexp} concat_regexps perms)
+
+\LENSSECTION{@perm_sort@} The @perm_sort@ lens sorts a list of regular
+expressions using instances of the @lens_permute@ combinator.
+
+#* let perm_sort 
+#*   (rl:regexp List.t where perm_sortable rl)
+#* : (lens in union_regexps (perm_regexps rl) <-> concat_regexps rl) = 
+#*   let k : int = List.length{lens} rl in
+#*   let ls_perms : lens List.t = 
+#*     List.map{int List.t}{lens} 
+#*       (fun (sigma:int List.t) -> 
+#*          let sigma_inv = List.invert_permutation sigma in 
+#*          lens_permute sigma (List.permute{lens} sigma_inv rl))
+#*       (List.permutations (List.length{lens} rl)) in
+#*   List.fold_left{lens}{lens}
+#*     (fun (acc:lens) (permi:lens) -> acc || permi)
+#*     (copy EMPTY) ls_perms
+
+## let l2 : (lens in ("ab" | "ba") <-> "ab") = 
+##   perm_sort #{regexp}["a";"b"]
+## test l2.get "ab" = "ab"
+## test l2.get "ba" = "ab"
+
+#* let l3 : (lens in ("abc" | "acb" | "bac" | "bca" | "cab" | "cba") <-> "abc") = 
+#*   perm_sort #{regexp}["a";"b";"c"]
+#* test l3.get "abc" = "abc"
+#* test l3.get "acb" = "abc"
+#* test l3.get "bac" = "abc"
+## test l3.get "bca" = "abc"
+## test l3.get "cab" = "abc"
+## test l3.get "cba" = "abc"
+
+## let l4 
+## : (lens in
+##      ( "abcd" | "abdc" | "acbd" | "acdb" | "adbc" | "adcb"  
+##      | "bacd" | "badc" | "bcad" | "bcda" | "bdac" | "bdca"  
+##      | "cabd" | "cadb" | "cbad" | "cbda" | "cdab" | "cdba" 
+##      | "dabc" | "dacb" | "dbac" | "dbca" | "dcab" | "dcba" ) <-> "abcd" ) = 
+##  perm_sort #{regexp}["a";"b";"c";"d"]
+
+## test l4.get "abcd" = "abcd"
+## test l4.get "abdc" = "abcd"
+## test l4.get "acbd" = "abcd"
+## test l4.get "acdb" = "abcd"
+## test l4.get "adbc" = "abcd"
+## test l4.get "adcb" = "abcd"
+## test l4.get "bacd" = "abcd"
+## test l4.get "badc" = "abcd"
+## test l4.get "bcad" = "abcd"
+## test l4.get "bcda" = "abcd"
+## test l4.get "bdac" = "abcd"
+## test l4.get "bdca" = "abcd"
+## test l4.get "cabd" = "abcd"
+## test l4.get "cadb" = "abcd"
+## test l4.get "cbad" = "abcd"
+## test l4.get "cbda" = "abcd"
+## test l4.get "cdab" = "abcd"
+## test l4.get "cdba" = "abcd"
+## test l4.get "dabc" = "abcd"
+## test l4.get "dacb" = "abcd"
+## test l4.get "dbac" = "abcd"
+## test l4.get "dbca" = "abcd"
+## test l4.get "dcab" = "abcd"
+## test l4.get "dcba" = "abcd"
+
+\LENSSECTION{@perm_sort_concat@} The @perm_sort_concat@ quotient lens
+uses a canonizer built using @perm_sort@ to sort the source string
+before it is processed by (the concatenation of) a list of lenses.
+
+#* let perm_sort_concat 
+#*    (ls:lens List.t where perm_sortable (stypes ls) && concatable (vtypes ls))
+#*  : (lens in union_regexps (perm_regexps (stypes ls)) <-> concat_regexps (vtypes ls))
+#*  = left_quot (canonizer_of_lens (perm_sort (stypes ls))) (concat_lenses ls)
+
+\LENSSECTION{@perm_concat@} The @perm_sort_concat@ lens does
+sorting, but its type on the source side grows as the {\em factorial} of
+the regular expressions being sorted. The final @sort_concat@ lens uses
+the @sort@ canonizer, which has a much more compact (although imprecise)
+type.
+
+#* let sort_concat 
+#*    (ls:lens List.t where sortable (stypes ls) && concatable (vtypes ls))
+#*  : (lens in (union_regexps (stypes ls))* <-> concat_regexps (vtypes ls))
+#*  = left_quot (sort (astypes ls)) (concat_lenses ls)  
+
+#* let ls : (lens in [abc]* <-> "abc") = 
+#*   sort_concat #{lens}["a"; "b"; "c"]
+
+#* test get ls "abc" = "abc"
+#* test get ls "cba" = "abc"
+#* test get ls "bca" = "abc"
+#* test get ls "bba" = error
+#* test get ls "dba" = error
+#* test put ls "abc" "cba" = "abc"
+
+#* let partition_sort_concat 
+#*   (ls:lens List.t where concatable (vtypes ls))
+#*   (l:lens where sortable (List.Cons{regexp} (stype l,stypes ls))
+#*              && splittable_cex (concat_regexps (vtypes ls)) (vtype l)* )
+#* : (lens in (union_regexps (stypes ls) | (stype l))* <->
+#*            (concat_regexps (vtypes ls) . (vtype l)* ))
+#*  = 
+#*  let cn_partition =
+#*    canonizer_of_lens (partition #{regexp}[((union_regexps (stypes ls)) - EPSILON);(stype l)])
+#*  in 
+#*  let cn_sort = sort (stypes ls) in
+#*  left_quot cn_partition (left_quot cn_sort (concat_lenses ls) . l* )
+
+#* test (partition_sort_concat #{lens}[copy [A-Z]; copy [0-9]] (copy [a-z])).get "aBc3d" = "B3acd"
+#* test (partition_sort_concat #{lens}[copy [A-Z]; copy [0-9]] (copy [a-z])).put "Z9xyz" into "A1" = "Z9xyz"

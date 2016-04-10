@@ -1,0 +1,938 @@
+module Plist =
+
+(* nesting *)
+let indent (spaces:string in Xml.WS) : (string in Xml.WS) = spaces . "  "
+
+(* simple values in plist/xml
+   
+   we let the inner lens, l, handle whitespace at the front; pvalue
+   will eliminate whitespace at the end
+*)
+let kill_ws : (lens in Xml.WS <-> "") = qdel Xml.WS ""
+let pvalue (spaces:string in Xml.WS) (tag:string) (l:lens where lens_splittable l kill_ws)
+    : (lens in Xml.ELT tag (stype l) <-> vtype l)
+    = Xml.simple_elt spaces tag (l . kill_ws)
+
+(* used to remove whitespace at the front of pvalues
+
+   we use pvalues/padded instead of Xml.elt so we can get a nicer
+   canonized form: we'd rather see 
+
+     <integer>5</integer> 
+
+   than 
+
+     <integer>5
+     </integer>
+*)
+let PADDED (R:regexp) : regexp = Xml.WS . R
+let padded (l:lens) : (lens in PADDED (stype l) <-> vtype l)
+    = del Xml.WS . l
+
+(* DTD taken from http://www.apple.com/DTDs/PropertyList-1.0.dtd *)
+
+(* Primitive types
+
+   <!ELEMENT string (#PCDATA)>
+
+   <!ELEMENT data (#PCDATA)> <!-- Contents interpreted as Base-64 encoded -->
+ 
+   <!ELEMENT date (#PCDATA)> 
+   <!-- Contents should conform to a subset of ISO 8601 (in particular,
+   YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'.  Smaller units may be
+   omitted with a loss of precision) -->
+*)
+
+let pstring (spaces:string in Xml.WS) (l:lens where lens_splittable l kill_ws)
+    : (lens in Xml.ELT "string" (stype l) <-> vtype l)
+    = pvalue spaces "string" l
+
+(* http://tools.ietf.org/html/rfc1421 pages 12-3
+
+   The encoding process represents 24-bit groups of input bits as output
+   strings of 4 encoded characters. Proceeding from left to right across
+   a 24-bit input group extracted from the output of step 3, each 6-bit
+   group is used as an index into an array of 64 printable characters.
+   The character referenced by the index is placed in the output string.
+   These characters, identified in Table 1, are selected so as to be
+   universally representable, and the set excludes characters with
+   particular significance to SMTP (e.g., ".", "<k:CR>", "<k:LF>").
+
+   Special processing is performed if fewer than 24 bits are available
+   in an input group at the end of a message.  A full encoding quantum
+   is always completed at the end of a message.  When fewer than 24
+   input bits are available in an input group, zero bits are added (on
+   the right) to form an integral number of 6-bit groups.  Output
+   character positions which are not required to represent actual input
+   data are set to the character "=".  Since all canonically encoded
+   output is an integral number of octets, only the following cases can
+   arise: (1) the final quantum of encoding input is an integral
+   multiple of 24 bits; here, the final unit of encoded output will be
+   an integral multiple of 4 characters with no "=" padding, (2) the
+   final quantum of encoding input is exactly 8 bits; here, the final
+   unit of encoded output will be two characters followed by two "="
+   padding characters, or (3) the final quantum of encoding input is
+   exactly 16 bits; here, the final unit of encoded output will be three
+   characters followed by one "=" padding character.
+*)
+
+let BASE64CHAR : regexp = [A-Za-z0-9+/]
+let BASE64QUANTUM : regexp = (BASE64CHAR . Xml.WS){4}
+let BASE64ENDING : regexp = 
+  ((BASE64CHAR . Xml.WS){3} . (BASE64CHAR | "=")) | 
+  ((BASE64CHAR . Xml.WS){2} . "=" . Xml.WS . "=")
+let BASE64 : regexp = BASE64QUANTUM* . BASE64ENDING
+
+let pdata (spaces:string in Xml.WS) (l:lens where subset (stype l) (PADDED BASE64))
+  : (lens in Xml.ELT "data" (stype l) <-> vtype l)
+  = pvalue spaces "data" l
+
+(* TODO ISO 8601 calls 19 valid way to refer to the 20th century, etc. *)
+let NUM2 : regexp = DIGIT{2}
+let ISO8601_DATE : regexp = ISO8601.Date.COMPLETE . "T".NUM2.":".NUM2.":".NUM2."Z"
+
+let pdate (spaces:string in Xml.WS) (l:lens where subset (stype l) (PADDED ISO8601_DATE))
+  : (lens in Xml.ELT "date" (stype l) <-> vtype l)
+  = pvalue spaces "date" l
+
+(* Numerical primitives
+
+   <!ELEMENT true EMPTY>  <!-- Boolean constant true -->
+
+   <!ELEMENT false EMPTY> <!-- Boolean constant false -->
+
+   <!ELEMENT real (#PCDATA)> 
+   <!-- Contents should represent a floating point number matching ("+" | "-")? 
+   d+ ("."d* )? ("E" ("+" | "-") d+)? where d is a digit 0-9.  -->
+
+   <!ELEMENT integer (#PCDATA)> 
+   <!-- Contents should represent a (possibly signed) integer number in base 10 -->
+*)
+
+let ptrue (spaces:string in Xml.WS)
+  : (lens in (Xml.WS . Xml.EMPTYELT "true") <-> "")
+  = Xml.simple_elt_no_kids spaces "true"
+
+let pfalse (spaces:string in Xml.WS)
+  : (lens in (Xml.WS . Xml.EMPTYELT "false") <-> "")
+  = Xml.simple_elt_no_kids spaces "false"
+
+(* is there another way to do this, e.g., using ptrue and pfalse?
+
+   it seems like we keep having to lift conditionals all the way to the top...
+*)
+let pbool (spaces:string in Xml.WS) (strue:string) (sfalse:string where not (strue = sfalse))
+  : (lens in (Xml.WS . (Xml.EMPTYELT "true" | Xml.EMPTYELT "false")) <-> (strue | sfalse))
+  = qdel Xml.WS spaces . (Xml.EMPTYELT "true" <-> strue || Xml.EMPTYELT "false" <-> sfalse)
+
+test (pbool "" "yes" "no").get "<true/>" = "yes"
+test (pbool "" "yes" "no").put "no" into "<true/>" = "<false/>"
+
+let PLUSMINUS : regexp = '+' | '-'
+
+let REAL : regexp = PLUSMINUS? . DIGIT+ . ( '.' . DIGIT* )? . ("E" . PLUSMINUS . DIGIT+)?
+let preal (spaces:string in Xml.WS) (l:lens where subset (stype l) (PADDED REAL))
+  : (lens in Xml.ELT "real" (stype l) <-> vtype l)
+  = pvalue spaces "real" l
+
+test (preal "  " REAL).get "<real>+3.01E-10</real>" = "+3.01E-10"
+test (preal "  " REAL).create "-1" = "  <real>-1</real>"
+
+let INTEGER : regexp = PLUSMINUS? . DIGIT+
+let pinteger (spaces:string in Xml.WS) (l:lens where subset (stype l) (PADDED INTEGER))
+  : (lens in Xml.ELT "integer" (stype l) <-> vtype l)
+  = pvalue spaces "integer" l
+
+test (pinteger "  " INTEGER).get "<integer>120</integer>" = "120"
+test (pinteger "  " INTEGER).put "5" into "<integer>0 </integer>" = "  <integer>5</integer>"
+test (pinteger "  " INTEGER).create "120" = "  <integer>120</integer>"
+
+(* Collections
+
+   <!ELEMENT array (%plistObject;)*>
+
+   <!ELEMENT dict (key, %plistObject;)*>
+
+   <!ELEMENT key (#PCDATA)>
+
+   "When encoding the contents of a CFDictionary object, each member is
+   encoded by placing the dictionary key in a <key> tag and immediately
+   following it with the corresponding value"
+
+   http://developer.apple.com/documentation/CoreFoundation/Conceptual/CFPropertyLists/Articles/XMLTags.html
+*)
+
+let EMPTY_ARRAY : regexp = Xml.WS . Xml.EMPTYELT "array"
+
+let empty_array (spaces:string in Xml.WS)
+    : (lens in EMPTY_ARRAY <-> "")
+    = Xml.simple_elt_no_kids spaces "array"
+
+let NONEMPTY_ARRAY (R:regexp) : regexp = Xml.ELT "array" R+
+
+let nonempty_array (spaces:string in Xml.WS) (tag:string) (l:lens where lens_iterable l)
+  : (lens in NONEMPTY_ARRAY (stype l) <-> (vtype l)+ )
+  = Xml.elt spaces "array" <dictionary tag:l>+
+
+let ARRAY (R:regexp) : regexp = EMPTY_ARRAY | NONEMPTY_ARRAY R
+
+let parray (spaces:string in Xml.WS) (tag:string) (l:lens where lens_iterable l)
+  : (lens in ARRAY (stype l) <-> (vtype l)* )
+  = empty_array spaces | nonempty_array spaces tag l
+
+let larray = parray "" "nums" (pinteger "" (copy INTEGER . ins ";"))
+test larray.get "<array>\n <integer>1</integer></array>" = "1;"
+test larray.create "" = "<array/>"
+test larray.put "5;4;3;" into "<array/>" =
+  "<array><integer>5</integer><integer>4</integer><integer>3</integer></array>"
+
+let pdict (spaces:string in Xml.WS) (l:lens)
+  : (lens in Xml.ELT "dict" (stype l) <-> vtype l)
+  = Xml.elt spaces "dict" l
+
+let EMPTY_DICT = Xml.WS . Xml.EMPTYELT "dict"
+
+let empty_dict (spaces:string in Xml.WS)
+  : (lens in EMPTY_DICT <-> "")
+  = Xml.simple_elt_no_kids spaces "dict"
+
+(* first, homogenous dictionaries *)
+let KEY (K:regexp) : regexp = Xml.ELT "key" K
+
+let pkey (spaces:string in Xml.WS) (K:regexp)
+  : (lens in KEY K <-> K)
+  = pvalue spaces "key" (key K)
+
+let KVELT (K:regexp) (V:regexp) : regexp =
+  KEY K . V
+
+let KV (K:regexp) (V:regexp) : regexp =
+  K . V
+
+let VALID_KV (spaces:string in Xml.WS) (K:regexp) (v:lens) : bool =
+  lens_splittable (pkey spaces K) v &&
+  lens_iterable (pkey spaces K . v)
+
+let kvpair (spaces:string in Xml.WS) (K:regexp) (v:lens where lens_splittable (KEY K) v)
+  : (lens in KVELT K (stype v) <-> KV K (vtype v))
+  = pkey spaces K . v
+
+let NONEMPTY_HDICT (K:regexp) (V:regexp) : regexp =
+  Xml.ELT "dict" (KVELT K V)+
+
+let nonempty_hdict (spaces:string in Xml.WS) (tag:string) (KEYS:regexp) 
+    (v:lens where VALID_KV (indent spaces) KEYS v)
+  : (lens in NONEMPTY_HDICT KEYS (stype v) <-> (KV KEYS (vtype v))+)
+  = let kv = kvpair (indent spaces) KEYS v in
+    pdict spaces <dictionary tag:kv>+
+
+let HDICT (K:regexp) (V:regexp) : regexp = EMPTY_DICT | NONEMPTY_HDICT K V
+
+let phdict (spaces:string in Xml.WS) (tag:string) (KEYS:regexp) 
+    (v:lens where VALID_KV (indent spaces) KEYS v)
+  : (lens in HDICT KEYS (stype v) <-> (KV KEYS (vtype v))* )
+  = empty_dict spaces | nonempty_hdict spaces tag KEYS v
+
+(* precomputed indentation *)
+let field (l:lens) = ins "=" . l . ins ";"
+let lhdict = 
+  phdict "\n" "hdict" ("foo"|"bar"|"baz") (field (pinteger "\n  " INTEGER))
+test lhdict.get "<dict>\n<key>foo</key><integer>5</integer>\n</dict>" = "foo=5;"
+test lhdict.get "<dict/>" = ""
+test lhdict.put "bar=5;foo=4;" into "<dict/>" =
+  <<
+    
+    <dict>
+      <key>bar</key>
+      <integer>5</integer>
+      <key>foo</key>
+      <integer>4</integer>
+    </dict>
+  >>
+
+(* automatically managed indentation -- would be much less ugly with anaphora 
+
+   also, this would be more elegant if spaces were always the _last_
+   argument.  then we could pass around partially applied elements, etc.
+*)
+let nonempty_hsdict (spaces:string in Xml.WS) (tag:string) (KEYS:regexp)
+    (mk_v:(spaces2:(string in Xml.WS) -> (v:lens where VALID_KV spaces2 KEYS v)))
+  : (lens in NONEMPTY_HDICT KEYS (stype (mk_v (indent spaces))) <-> (KV KEYS (vtype (mk_v (indent spaces))))+)
+  = let inner_spaces = indent spaces in
+    let kv = kvpair inner_spaces KEYS (mk_v inner_spaces) in
+    pdict spaces <dictionary tag:kv>+
+
+let phsdict (spaces:string in Xml.WS) (tag:string) (KEYS:regexp)
+    (mk_v:(spaces2:(string in Xml.WS) -> 
+	  (v:lens where VALID_KV spaces2 KEYS v)))
+  : (lens in HDICT KEYS (stype (mk_v (indent spaces))) <-> (KV KEYS (vtype (mk_v (indent spaces))))* )
+  = empty_dict spaces | nonempty_hsdict spaces tag KEYS mk_v
+
+let lhsdict = 
+  phsdict "\n" "hsdict" ("foo"|"bar"|"baz") 
+    (fun (spaces:string in Xml.WS) -> pinteger spaces (field INTEGER))
+test lhsdict.get "<dict>\n<key>foo</key><integer>5</integer>\n</dict>" = "foo=5;"
+test lhsdict.get "<dict/>" = ""
+test lhsdict.put "bar=5;foo=4;" into "<dict/>" =
+  <<
+    
+    <dict>
+      <key>bar</key>
+      <integer>5</integer>
+      <key>foo</key>
+      <integer>4</integer>
+    </dict>
+  >>
+
+(* fixed-length fixed-order heterogenous *)
+
+let KVELTS (spec:(regexp*lens) List.t) : regexp List.t = 
+  List.map{regexp*lens}{regexp}
+    (fun (p:regexp*lens) ->
+       let k,v = p in
+       KVELT k (stype v))
+    spec
+
+let KVS (spec:(regexp*lens) List.t) : regexp List.t =
+  List.map{regexp*lens}{regexp}
+    (fun (p:regexp*lens) ->
+       let k,v = p in
+       KV k (vtype v))
+    spec       
+
+let VALID_KVS (spec:(regexp*lens) List.t) =
+  concatable (KVELTS spec) &&
+  concatable (KVS spec)
+
+(* TODO this pattern keeps coming up...we should have
+   concat_lenses_ne, etc. for nonempty lists *)
+let kvpairs (spaces:string in Xml.WS)
+    (spec:(regexp*lens) List.t where List.nonempty{regexp*lens} spec
+                                  && VALID_KVS spec)
+  : (lens in concat_regexps (KVELTS spec) <-> concat_regexps (KVS spec))
+  = let (Some(l)) = 
+      List.fold_left{regexp*lens}{lens option}
+	(fun (lo:lens option) (p:regexp*lens) ->
+	   let k,v = p in
+	   let l = kvpair spaces k v in
+	   match lo with
+	     | None -> Some{lens}(l)
+	     | Some(l2) -> Some{lens}(l2 . l))
+	None{lens} spec in
+    l
+
+let NONEMPTY_ODICT (spec:(regexp*lens) List.t) : regexp =
+  Xml.ELT "dict" (concat_regexps (KVELTS spec))
+
+let nonempty_odict (spaces:string in Xml.WS) 
+    (spec:(regexp*lens) List.t where List.nonempty{regexp*lens} spec
+                                  && VALID_KVS spec)
+  : (lens in NONEMPTY_ODICT spec <-> concat_regexps (KVS spec))
+  = let kv = kvpairs (indent spaces) spec in
+    pdict spaces kv
+
+let ODICT (spec:(regexp*lens) List.t) : regexp 
+  =  match List.empty{regexp*lens} spec with
+      | true -> EMPTY_DICT
+      | false -> NONEMPTY_ODICT spec
+
+let podict (spaces:string in Xml.WS) 
+    (spec:(regexp*lens) List.t where VALID_KVS spec)
+  : (lens in ODICT spec <-> concat_regexps (KVS spec))
+  = match List.empty{regexp*lens} spec with
+      | true -> empty_dict spaces
+      | false -> nonempty_odict spaces spec
+
+let LINECHAR = [a-zA-Z,.]
+let LINE = (LINECHAR . ((LINECHAR | " ")* . LINECHAR)?)?
+
+let lodict =
+  podict "\n" 
+    #{regexp*lens}["Author",field (pstring "\n  " LINE) . ins '\n';
+		   "Lines",
+		   field (parray "\n  " "lines"
+			    (pstring "\n    " (LINE . ins " / "))) .
+		   ins '\n';
+		   "Birthdate",field (pinteger "\n  " INTEGER)]
+
+let sample = 
+  <<
+   
+    <dict>
+      <key>Author</key>
+      <string>William Shakespeare</string>
+      <key>Lines</key>
+      <array>
+        <string>It is a tale told by an idiot,</string>
+        <string>Full of sound and fury, signifying nothing.</string>
+      </array>
+      <key>Birthdate</key>
+      <integer>1564</integer>
+    </dict>
+  >>
+
+test lodict.get sample = 
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+    Birthdate=1564;
+  >>
+
+test lodict.create 
+  <<
+    Author=William Carlos Williams;
+    Lines=so much depends / upon /  / a red wheel / barrow /  / glazed with rain / water /  / beside the white / chickens. / ;
+    Birthdate=1883;
+  >> =
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>William Carlos Williams</string>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red wheel</string>
+       <string>barrow</string>
+       <string></string>
+       <string>glazed with rain</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1883</integer>
+   </dict>
+  >>
+
+test lodict.put
+  <<
+    Author=Michael Greenberg;
+    Lines=so much depends / upon /  / a red sail / boat /  / glazed with delaware / water /  / beside the white / chickens. / ;
+    Birthdate=1984;
+  >> into
+  <<
+
+   <dict>
+     <key>Author</key>
+     <string>Michael Greenberg</string>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red wheel</string>
+       <string>barrow</string>
+       <string></string>
+       <string>glazed with rain</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1984</integer>
+   </dict>
+  >>
+  =
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>Michael Greenberg</string>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red sail</string>
+       <string>boat</string>
+       <string></string>
+       <string>glazed with delaware</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1984</integer>
+   </dict>
+  >>
+
+(* ---- *)
+
+let OPT (o:bool) (E:regexp) : regexp =
+  match o with
+    | true -> E?
+    | false -> E
+
+let opt (o:bool) (l:lens) : (lens in OPT o (stype l) <-> OPT o (vtype l)) =
+  match o with
+    | true -> l?
+    | false -> l
+
+let KVELTSOPT (spec:(bool*regexp*lens) List.t) : regexp List.t = 
+  List.map{bool*regexp*lens}{regexp}
+    (fun (p:bool*regexp*lens) ->
+       let o,k,v = p in
+       OPT o (KVELT k (stype v)))
+    spec
+
+let KVSOPT (spec:(bool*regexp*lens) List.t) : regexp List.t =
+  List.map{bool*regexp*lens}{regexp}
+    (fun (p:bool*regexp*lens) ->
+       let o,k,v = p in
+       OPT o (KV k (vtype v)))
+    spec
+
+let full_spec (spec:(bool*regexp*lens) List.t) : (regexp*lens) List.t =
+  List.map{bool*regexp*lens}{regexp*lens}
+    (fun (p:bool*regexp*lens) -> let (_,k,v) = p in (k,v))
+    spec
+
+(* TODO this pattern keeps coming up...we should have
+   concat_lenses_ne, etc. for nonempty lists *)
+let kvpairsopt (spaces:string in Xml.WS)
+    (spec:(bool*regexp*lens) List.t where List.nonempty{bool*regexp*lens} spec
+                                  && VALID_KVS (full_spec spec))
+  : (lens in concat_regexps (KVELTSOPT spec) <-> concat_regexps (KVSOPT spec))
+  = let (Some(l)) = 
+      List.fold_left{bool*regexp*lens}{lens option}
+	(fun (lo:lens option) (p:bool*regexp*lens) ->
+	   let o,k,v = p in
+	   let l = opt o (kvpair spaces k v) in
+	   match lo with
+	     | None -> Some{lens}(l)
+	     | Some(l2) -> Some{lens}(l2 . l))
+	None{lens} spec in
+    l
+
+let NONEMPTY_ODICTOPT (spec:(bool*regexp*lens) List.t) : regexp =
+  Xml.ELT "dict" (concat_regexps (KVELTSOPT spec))
+
+let nonempty_odictopt (spaces:string in Xml.WS) 
+    (spec:(bool*regexp*lens) List.t where List.nonempty{bool*regexp*lens} spec
+                                  && VALID_KVS (full_spec spec))
+  : (lens in NONEMPTY_ODICTOPT spec <-> concat_regexps (KVSOPT spec))
+  = let kv = kvpairsopt (indent spaces) spec in
+    pdict spaces kv
+
+let ODICTOPT (spec:(bool*regexp*lens) List.t) : regexp 
+  =  match List.empty{bool*regexp*lens} spec with
+      | true -> EMPTY_DICT
+      | false -> NONEMPTY_ODICTOPT spec
+
+let podictopt (spaces:string in Xml.WS) 
+    (spec:(bool*regexp*lens) List.t where VALID_KVS (full_spec spec))
+  : (lens in ODICTOPT spec <-> concat_regexps (KVSOPT spec))
+  = match List.empty{bool*regexp*lens} spec with
+      | true -> empty_dict spaces
+      | false -> nonempty_odictopt spaces spec
+
+let lodictopt =
+  podictopt "\n" 
+    #{bool*regexp*lens}[false,"Author",field (pstring "\n  " LINE) . ins '\n';
+		        false,"Lines",field (parray "\n  " "lines"
+			                 (pstring "\n    " (LINE . ins " / "))) . ins '\n';
+		        true, "Birthdate",field (pinteger "\n  " INTEGER)]
+
+let sample1 = 
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>William Shakespeare</string>
+     <key>Lines</key>
+     <array>
+       <string>It is a tale told by an idiot,</string>
+       <string>Full of sound and fury, signifying nothing.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1564</integer>
+   </dict>
+  >>
+
+test lodictopt.get sample1 = 
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+    Birthdate=1564;
+  >>
+
+let sample2 = 
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>William Shakespeare</string>
+     <key>Lines</key>
+     <array>
+       <string>It is a tale told by an idiot,</string>
+       <string>Full of sound and fury, signifying nothing.</string>
+     </array>
+   </dict>
+  >>
+
+let sample3 =
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+
+  >>
+
+test lodictopt.get sample2 = sample3
+
+test lodictopt.put sample3 into sample1 = sample2
+
+
+(* ----- *)
+
+(* fast-sorted heterogenous *)
+
+let VALID_SKVS (spec:(regexp*lens) List.t) =
+  sortable (KVELTS spec) &&
+  concatable (KVS spec)
+
+(* TODO this pattern keeps coming up...we should have
+   concat_lenses_ne, etc. for nonempty lists *)
+let skvpairs (spaces:string in Xml.WS)
+    (spec:(regexp*lens) List.t where List.nonempty{regexp*lens} spec
+                                  && VALID_SKVS spec)
+  : (lens in (union_regexps (KVELTS spec))* <-> concat_regexps (KVS spec))
+  = let kvs = 
+      List.map{regexp*lens}{lens}
+	(fun (p:regexp*lens) ->
+	   let k,v = p in
+	   kvpair spaces k v)
+	spec in
+    Sort.sort_concat kvs
+
+let NONEMPTY_SDICT (spec:(regexp*lens) List.t) : regexp =
+  Xml.ELT "dict" (union_regexps (KVELTS spec))*
+
+let nonempty_sdict (spaces:string in Xml.WS) 
+    (spec:(regexp*lens) List.t where List.nonempty{regexp*lens} spec
+                                  && VALID_SKVS spec)
+  : (lens in NONEMPTY_SDICT spec <-> concat_regexps (KVS spec))
+  = pdict spaces (skvpairs (indent spaces) spec)
+
+let SDICT (spec:(regexp*lens) List.t) : regexp 
+  =  match List.empty{regexp*lens} spec with
+      | true -> EMPTY_DICT
+      | false -> NONEMPTY_SDICT spec
+
+let psdict (spaces:string in Xml.WS) 
+    (spec:(regexp*lens) List.t where VALID_KVS spec)
+  : (lens in SDICT spec <-> concat_regexps (KVS spec))
+  = match List.empty{regexp*lens} spec with
+      | true -> empty_dict spaces
+      | false -> nonempty_sdict spaces spec
+
+let lsdict =
+  psdict "\n" 
+    #{regexp*lens}["Author",field (pstring "\n  " LINE) . ins '\n';
+		   "Lines",
+		   field (parray "\n  " "lines"
+			    (pstring "\n    " (LINE . ins " / "))) .
+		   ins '\n';
+		   "Birthdate",field (pinteger "\n  " INTEGER)]
+
+test lsdict.get sample = 
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+    Birthdate=1564;
+  >>
+
+test lsdict.get
+  <<
+   
+    <dict>
+      <key>Lines</key>
+      <array>
+        <string>It is a tale told by an idiot,</string>
+        <string>Full of sound and fury, signifying nothing.</string>
+      </array>
+      <key>Author</key>
+      <string>William Shakespeare</string>
+      <key>Birthdate</key>
+      <integer>1564</integer>
+    </dict>
+  >>
+  =
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+    Birthdate=1564;
+  >>
+
+
+test lsdict.create 
+  <<
+    Author=William Carlos Williams;
+    Lines=so much depends / upon /  / a red wheel / barrow /  / glazed with rain / water /  / beside the white / chickens. / ;
+    Birthdate=1883;
+  >> =
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>William Carlos Williams</string>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red wheel</string>
+       <string>barrow</string>
+       <string></string>
+       <string>glazed with rain</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1883</integer>
+   </dict>
+  >>
+
+test lsdict.put
+  <<
+    Author=Michael Greenberg;
+    Lines=so much depends / upon /  / a red sail / boat /  / glazed with delaware / water /  / beside the white / chickens. / ;
+    Birthdate=1984;
+  >> into
+  <<
+   <dict>
+     <key>Author</key>
+     <string>Michael Greenberg</string>
+     <key>Birthdate</key>
+     <integer>1984</integer>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red wheel</string>
+       <string>barrow</string>
+       <string></string>
+       <string>glazed with rain</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+   </dict>
+  >>
+  =
+  <<
+   
+   <dict>
+     <key>Author</key>
+     <string>Michael Greenberg</string>
+     <key>Lines</key>
+     <array>
+       <string>so much depends</string>
+       <string>upon</string>
+       <string></string>
+       <string>a red sail</string>
+       <string>boat</string>
+       <string></string>
+       <string>glazed with delaware</string>
+       <string>water</string>
+       <string></string>
+       <string>beside the white</string>
+       <string>chickens.</string>
+     </array>
+     <key>Birthdate</key>
+     <integer>1984</integer>
+   </dict>
+  >>
+
+(* TODO
+
+   even better dictionaries
+
+   -- sorted finite mappings
+   -- optional elements
+   -- homogenous (or simply regular?) tails
+*)
+
+(* Top level element
+
+   <!ELEMENT plist %plistObject;>
+   <!ATTLIST plist version CDATA "1.0" >
+*)
+
+(* we allow any local DTD, but if you use a public DTD, it has to be
+   the right one.
+
+   TODO
+
+   this DTD is simple enough that we could specify the scope of the
+   internal subset, if we wanted
+*)
+let DTD_ID : regexp =
+  Xml.DOCTYPE "plist"
+    (("SYSTEM" . Xml.WSP . Xml.SYSTEMID) |
+     ("PUBLIC" . Xml.WSP . 
+	"\"-//Apple Computer//DTD PLIST 1.0//EN\"" . Xml.WSP .
+	"\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\""))
+
+let PLIST (BODY:regexp) : regexp = 
+  Xml.ATTR_ELT "plist" (Xml.ATTR "version" "1.0") BODY
+    
+let plist (l:lens)
+  : (lens in ((Xml.PROLOG DTD_ID)? . PLIST (stype l)) <-> vtype l)
+  = del (Xml.PROLOG DTD_ID)? .
+    Xml.attr1_elt_open "" "plist" "version" (del "1.0") . 
+    l . 
+    Xml.close_tag "\n" "plist"
+
+let llist = plist lhsdict
+test llist.get 
+  <<
+    <plist version="1.0">
+      <dict>
+        <key>foo</key><integer>5</integer>
+      </dict>
+    </plist>
+  >> = "foo=5;"
+test llist.get "<plist version='1.0'><dict/></plist>" = ""
+test llist.put "bar=5;foo=4;" into "<plist version='1.0'><dict/></plist>" =
+  <<
+    <plist version='1.0'>
+    <dict>
+      <key>bar</key>
+      <integer>5</integer>
+      <key>foo</key>
+      <integer>4</integer>
+    </dict>
+    </plist>
+  >>
+
+(* from http://developer.apple.com/documentation/Cocoa/Conceptual/PropertyLists/UnderstandXMLPlist/UnderstandXMLPlist.html *)
+let llist2 = plist lodict
+test llist2.get
+  <<
+    <?xml version="1.0" encoding="UTF-8"?>
+    
+    <!DOCTYPE plist SYSTEM "file://localhost/System/Library/DTDs/PropertyList.dtd">
+    
+    <plist version="1.0">
+    
+    <dict>
+    
+        <key>Author</key>
+    
+        <string>William Shakespeare</string>
+    
+        <key>Lines</key>
+    
+        <array>
+    
+            <string>It is a tale told by an idiot,</string>
+    
+            <string>Full of sound and fury, signifying nothing.</string>
+    
+        </array>
+    
+        <key>Birthdate</key>
+    
+        <integer>1564</integer>
+    
+    </dict>
+    
+    </plist>
+  >> = 
+  <<
+    Author=William Shakespeare;
+    Lines=It is a tale told by an idiot, / Full of sound and fury, signifying nothing. / ;
+    Birthdate=1564;
+  >>
+
+(* from http://www.apple.com/applescript/features/propertylists.html *)
+let llist3 =
+  plist (podict "\n  "
+	   #{regexp*lens}["booleanKey",field (pbool "\n    " "#t" "#f");
+			  "dateKey",field (pdate "\n    " ISO8601_DATE);
+			  "listKey",empty_array "\n    " . ins ";";
+			  "numberKey",field (pinteger "\n    " INTEGER);
+			  "recordKey",empty_dict "\n    " . ins ";";
+			  "stringKey",field (pstring "\n    " LINE)])
+			  
+test llist3.get
+  <<
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+      <dict>
+        <key>booleanKey</key>
+        <true/>
+        <key>dateKey</key>
+        <date>2007-08-07T22:09:04Z</date>
+        <key>listKey</key>
+        <array/>
+        <key>numberKey</key>
+        <integer>5</integer>
+        <key>recordKey</key>
+        <dict/>
+        <key>stringKey</key>
+        <string>string value</string>
+      </dict>
+    </plist>
+  >>
+  =
+  "booleanKey=#t;dateKey=2007-08-07T22:09:04Z;listKey;numberKey=5;recordKey;stringKey=string value;"
+
+let llist4 =
+  let tab = "\n    " in
+  plist 
+    (podict "\n"
+       #{regexp*lens}["Year Of Birth",field (pinteger tab INTEGER);
+		      "Pets Names",
+		      field (empty_array tab);
+		      "Picture", field (pdata tab (padded BASE64)) . ins '\n';
+		      "City of Birth",field (pstring tab LINE);
+		      "Name",field (pstring tab LINE);
+		      "Kids Names",
+		      field (parray tab "kids"
+			       (pstring (tab . "    ") LINE . ins ";"))])
+
+(* from http://developer.apple.com/documentation/Darwin/Reference/ManPages/man5/plist.5.html *)
+test llist4.get
+  <<
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+        <key>Year Of Birth</key>
+        <integer>1965</integer>
+        <key>Pets Names</key>
+        <array/>
+        <key>Picture</key>
+        <data>
+            PEKBpYGlmYFCPA==
+        </data>
+        <key>City of Birth</key>
+        <string>Springfield</string>
+        <key>Name</key>
+        <string>John Doe</string>
+        <key>Kids Names</key>
+        <array>
+            <string>John</string>
+            <string>Kyra</string>
+        </array>
+    </dict>
+    </plist>
+  >> = 
+  <<
+    Year Of Birth=1965;Pets Names=;Picture=PEKBpYGlmYFCPA==;
+    City of Birth=Springfield;Name=John Doe;Kids Names=John;Kyra;;
+  >>
+

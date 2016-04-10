@@ -1,0 +1,45 @@
+module UniRX =
+
+let attr (name:string) (value:lens) : lens = 
+  del name .  
+  del "=" . 
+  value
+
+let perm_sort3 (l1:lens) (l2:lens) (l3:lens) : lens =
+  let s23 : lens = (l2 . l3) || (l3 ~ l2) in 
+    begin
+       (l3 ~ (l1 . l2))
+    || (s23 ~ l1)
+    end
+
+let l1 = attr "t" ("M")
+let l2 = attr "k" (del NUMBER)
+let l3 = attr "i" ANY
+
+let l2' = const ('t') "" "t" . 
+          const ('=') "" "=" . 
+          copy ('M') . 
+          ((const ('k') "" "k" . 
+	    const ('=') "" "=" . 
+	    const ('0'|[1-9].[0-9]* ) "" "0" . 
+	    const ('i') "" "i" . 
+	    const ('=') "" "=" . copy ANY ||
+	    ((const ('i') "" "i" . 
+	      const ('=') "" "=" . 
+	      copy ANY) ~
+	     (const ('k') "" "k" . 
+	      const ('=') "" "=" . 
+	      const ('0'|[1-9].[0-9]* ) "" "0"))) ~
+	   (const ('t') "" "t" . 
+	    const ('=') "" "=" . copy ('M')))
+
+let l2'' = l1 . (((l2 . l3) || (l3 . l2)) ~ l1)
+
+test stype l2' = stype l2''
+test vtype l2' = vtype l2''
+
+let u' = perm_sort3 l1 l2 l3
+
+test splittable "a"? "a"? = false
+test splittable "ab"? "ab"? = false
+test splittable "abc"? "abc"? = false

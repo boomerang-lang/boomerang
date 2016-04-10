@@ -1,2 +1,0 @@
-# boomerang
-The Boomerang Language

@@ -1,0 +1,13 @@
+module Test_qmark =
+
+let l : (lens in ? <-> ANY) = copy ANY
+
+let mk_l (R:regexp) : (lens in R <-> ?) = del R
+
+let l' : (lens in ANY <-> EPSILON) = mk_l ANY
+
+let l : (lens in ANY <=> ?) = copy ANY
+
+let mk_l (R:regexp) : (lens in R <=> ?) = copy R
+
+let l' : (lens in ANY <=> ANY) = mk_l ANY

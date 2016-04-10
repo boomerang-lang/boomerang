@@ -1,0 +1,4296 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2008                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /examples/uniProtV2.boom                                                   *)
+(* UniProtKB XML <-> UniProtKB ASCII lens                                     *)
+(* $Id: uniProtV2.boom 4607 2009-08-03 16:53:28Z ddavi $ *)
+(******************************************************************************)
+
+module UniProtV2 = 
+
+(* --------------------------------------------------------------------------- *)
+(* GENERIC HELPER FUNCTIONS *)
+
+(* [bracket l] inserts enclosing square bracket. *) 
+let brackets (l:lens) : lens = 
+  ins "[" . l . ins "]" 
+
+(* [parens l] inserts enclosing parentheses. *) 
+let parens (l:lens) : lens = 
+  ins "(" . l . ins ")"
+
+(* [quotes s] inserts enclosing quotation marks. *) 
+let quotes (l:lens) : lens = 
+  ins "\"" . l . ins "\"" 
+  
+(* --------------------------------------------------------------------------- *)
+(* CONSTANTS *)
+
+
+(* [nlX]: X^th amount of whitespace--used to canonize XML *)
+let NL = newline
+let NL0 = NL
+let NL1 = NL0 . "  "
+let NL2 = NL1 . "  "
+let NL3 = NL2 . "  "
+let NL4 = NL3 . "  "
+let NL5 = NL4 . "  "
+let NL6 = NL5 . "  "
+let NL7 = NL6 . "  " 
+let NL8 = NL7 . "  "
+let NL9 = NL8 . "  "
+let NL10 = NL9 . "  "
+
+let esc : lens = Xml.unesc_string [] 
+let esc_s : lens = Xml.unesc_string [;]
+let esc_c : lens = Xml.unesc_string [,] 
+let esc_cs : lens = Xml.unesc_string [,;]
+let esc_csp : lens = Xml.unesc_string [,;()]
+let esc_p : lens = Xml.unesc_string [()]
+let esc_q : lens = Xml.unesc_string [""''] 
+let esc_qnl : lens = Xml.unesc_string [""''\n] 
+let esc_dq : lens = Xml.unesc_string [""''.] 
+let esc_dsq : lens = Xml.unesc_string [\-;''""] 
+let esc_sq : lens = Xml.unesc_string [;""''] 
+let esc_qp : lens = Xml.unesc_string [""''()] 
+let esc_cq : lens = Xml.unesc_string [,""''] 
+let esc_cdq : lens = Xml.unesc_string [.,""''] 
+let esc_d : lens = Xml.unesc_string [.] 
+let esc_n : lens = Xml.unesc_string [:]
+let esc_p : lens = Xml.unesc_string [ ]
+let raw : regexp = 
+  let e : regexp = [^;\n ] in 
+  let m : regexp = [^;\n] in 
+  e . (m* . e)?
+
+(* --------------------------------------------------------------------------- *)
+(* ASCII Helpers *)
+
+(* [tag t] formats a UniProtKB format and standard three spaces. 
+   o [t] tag. 
+*)
+let tag (t:string) : string = 
+  t . "   "
+
+(* [split (t,l)] wraps [l] so that it also breaks long lines. *)
+let split_n (n:int) (tag:string) (l:lens) : lens = 
+  let cn : canonizer = columnize n (vtype l) ' ' (NL . tag) in 
+  right_quot l cn
+
+let split (tag:string) (l:lens) : lens = split_n 75 tag l
+let split70 (tag:string) (l:lens) : lens = split_n 70 tag l
+
+(* [terminate l] wraps [l] so that it also inserts [NL]. 
+   o [l] lens
+*)
+let terminate (l:lens) : lens = l . ins NL
+
+(* [split_terminate (t,l)] wraps [l] so that it also breaks long lines and inserts [NL]. 
+   o [(t,l)] tag * lens
+*)
+let split_terminate (tag:string) (l:lens) : lens = 
+  terminate (split tag l)
+
+(* insert strings into the view *)
+let space : lens = ins " " 
+let qspace : lens = qins [ ]* ""
+let qsp : lens = qins [ ]+ " "
+let semi : lens = ins ";"
+let colon : lens = ins ":"
+let dot : lens = ins "." 
+let comma : lens = ins "," 
+let dash : lens = ins "-" 
+let nl : lens = ins NL
+
+(* [iter_with_sep l s] iterate lens [l] with separator [s] *)
+let iter_with_sep (l:lens) (sep:lens) : lens = 
+  l . (sep . l)*
+
+(* [iter_with_sqsp] iterate a lens with "; " as a separator. used
+   all over ASCII UniProtKB. *)
+let iter_with_sqsp (l:lens) : lens = 
+  iter_with_sep l (semi . qsp)
+
+let qualifiers : lens = 
+  ( "by similarity" <-> " (By similarity)"
+  | "potential"     <-> " (Potential)"    
+  | "probable"      <-> " (Probable)" )
+
+(* [date] and [partial_date] map between aphanumeric and numeric dates *)
+let date,partial_date : lens * lens = 
+  let DD : regexp = DIGIT{2} in 
+  let MMM : lens = 
+    ( "01" <-> "JAN" 
+    | "02" <-> "FEB" 
+    | "03" <-> "MAR" 
+    | "04" <-> "APR" 
+    | "05" <-> "MAY" 
+    | "06" <-> "JUN" 
+    | "07" <-> "JUL" 
+    | "08" <-> "AUG" 
+    | "09" <-> "SEP" 
+    | "10" <-> "OCT" 
+    | "11" <-> "NOV" 
+    | "12" <-> "DEC" ) in       
+  let YYYY : regexp = DIGIT{4} in 
+  let d : lens =  YYYY ~ (("-" . MMM . "-") ~ DD) in 
+  let pd : lens = YYYY ~ (del "-" . MMM . ins "-") in
+  (default d "1900-01-01", 
+   default pd "1900-01")
+
+(* unit tests for date *)
+let date_ascii : string = "20-JAN-2009" 
+let date_xml : string = "2009-01-20" 
+test date.get date_xml = date_ascii
+test date.create date_ascii = date_xml
+
+(* unit tests for partial_date *)
+let partial_ascii : string = "JAN-2009"
+let partial_xml : string = "2009-01"
+test partial_date.get partial_xml = partial_ascii
+test partial_date.create partial_ascii = partial_xml
+
+(* --------------------------------------------------------------------------- *)
+(* ID line *)
+
+test "----- ID line-----" = ?
+
+(* Notes: the ASCII representation of the ID line is dead simple, but
+   there are a few quirks that make generating it from the XML source
+   slightly tricky. First, the status of the entry--whether it is
+   SwissProt ("Reviewed") or TrEMBL ("Unreviewed") is actually
+   contained in the "dataset" attribute of the "entry" element. Since
+   there are only two possibilities, we handle this by parameterizing
+   the entire lens on a datatype and using types to determine which
+   branch we are in. Second, the sequence length is contained in the
+   "length" attribute of the "sequence" element, which appears at the
+   *end* of the entry. Thus, "id_Xml.start" lens actually only
+   generates the start of the ID line; the end of the line is
+   generated in the "uniprot_entry" lens using "duplicate" on the
+   "sequence" element, and a "swap" to pull it up to the top.
+*)
+
+(* [entry] representing kind of entry: SwissProt (human annotated) or
+   TrEMBL (computer generated). *)
+type entry = SwissProt | TrEMBL
+
+let id_tag : string = tag "ID"
+
+let id_xml_start (ty:entry) : lens = 
+  (* helpers *)
+  let EntryName : regexp = [A-Z0-9_]{1,12} in 
+  let Status : lens = 
+    ( match ty with 
+    | SwissProt -> ins "Reviewed"
+    | TrEMBL    -> ins "Unreviewed") . 
+    semi in 
+  let SequenceLength : lens = 
+    qins DIGIT+ "000" . qsp . 
+    ins "AA" . 
+    dot in 
+  (* id_xml body *)
+  ins id_tag . 
+  Xml.simple_elt NL1 "name" 
+    begin 
+      key EntryName . qsp . 
+      Status . qsp 
+    end
+
+(* unit tests for ID line *)
+let P12544_id_ascii : string = 
+  "ID   GRAA_HUMAN              Reviewed; " 
+
+let P12544_id_ascii_cn : string = 
+  "ID   GRAA_HUMAN Reviewed; " 
+
+let P12544_id_xml : string = 
+  NL . "  <name>GRAA_HUMAN</name>"
+
+test (id_xml_start SwissProt).create 
+  P12544_id_ascii = P12544_id_xml
+
+test (id_xml_start SwissProt).get 
+  P12544_id_xml = P12544_id_ascii_cn 
+
+(* --------------------------------------------------------------------------- *)
+(* AC line *)
+test "----- AC line-----" = ?
+
+let ac_tag : string = tag "AC"
+
+let ac_xml : lens =  
+  let AC_number : regexp = 
+    ( [A-NR-Z] . DIGIT . UALPHACHAR . UALPHANUMCHAR{2} . DIGIT 
+    | [OPQ]    . DIGIT . UALPHANUMCHAR{3}           . DIGIT ) in       
+  let ac_elt : lens = Xml.simple_elt NL1 "accession" AC_number in 
+  ins ac_tag . 
+  qspace . 
+  iter_with_sqsp ac_elt . 
+  semi
+
+let ac_line : lens = split_terminate ac_tag ac_xml
+
+(* unit tests for AC line *)
+let P12544_ac_ascii : string = 
+  "AC   P12544; Q6IB36;" . NL
+
+let P12544_ac_xml : string = 
+  NL . 
+  "  <accession>P12544</accession>
+  |  <accession>Q6IB36</accession>"
+
+test ac_line.get 
+  P12544_ac_xml = P12544_ac_ascii
+
+test ac_line.create 
+  P12544_ac_ascii = P12544_ac_xml
+
+(* --------------------------------------------------------------------------- *)
+(* DT line *)
+test "----- DT line-----" = ?
+
+let dt_tag : string = tag "DT" 
+
+let dt_lines (ty:entry) : lens =   
+  let dataset : lens = match ty with 
+    | SwissProt -> "Swiss-Prot" 
+    | TrEMBL -> "TrEMBL" in 
+  ins dt_tag . 
+  Xml.attr4_elt_open NL1 "entry" 
+    "created" (date . comma . qsp . ins "integrated into UniProtKB/")
+    "dataset" (dataset . dot . ins NL)
+    "modified" (ins dt_tag . date . comma. qsp)
+    "version" (ins "entry version" . qsp . NUMBER . dot . ins NL)
+
+(* unit tests for DT lines *)
+let P12544_dt_xml : string = 
+  NL . 
+  "  <entry dataset=\"Swiss-Prot\" created=\"1989-10-01\" modified=\"2008-01-15\" version=\"101\">"
+
+let P12544_dt_xml_cn : string = 
+  NL . 
+  "  <entry created=\"1989-10-01\" dataset=\"Swiss-Prot\" modified=\"2008-01-15\" version=\"101\">"
+
+let P12544_dt_xml : string = 
+  NL . 
+  "  <entry dataset=\"Swiss-Prot\" created=\"1989-10-01\" modified=\"2008-01-15\" version=\"101\">"
+
+let P12544_dt_ascii : string = 
+  "DT   01-OCT-1989, integrated into UniProtKB/Swiss-Prot.
+  |DT   15-JAN-2008, entry version 101." . NL
+
+test (dt_lines SwissProt).get 
+  P12544_dt_xml = P12544_dt_ascii
+
+test (dt_lines SwissProt).create 
+  P12544_dt_ascii = P12544_dt_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* DE line *)
+test "----- DE line-----" = ?
+
+let de_tag : string = tag "DE" 
+
+let de_xml : lens = 
+  let Description : lens = Xml.unesc_string [;()[\]] in 
+  let name (space:string) : lens =
+    Xml.raw_open space "name" . 
+    ( (Xml.attr "ref" (qsp . brackets NUMBER))? ~ 
+     (Xml.close . Description) ) . 
+    Xml.simple_close_tag "name" in 
+  let (name2,name3) : lens * lens = name NL2, name NL3 in 
+  let names (tag:string) : lens = Xml.elt NL2 tag (name3 . (parens name3)* ) in 
+  let (domain,component) : lens * lens = names "domain", names "component" in 
+    ins de_tag .
+    Xml.elt NL1 "protein" 
+      begin
+        name2 . (qsp . parens name2)* . 
+        (qsp . brackets (ins "Includes" . colon . qsp . iter_with_sqsp domain))? . 
+        (qsp . brackets (ins "Contains" . colon . qsp . iter_with_sqsp component))?
+      end . 
+    dot
+
+let de_line : lens = split_terminate de_tag de_xml
+
+(* unit tests for DE line *)
+let P12544_de_ascii : string = 
+  "DE   Granzyme A precursor (EC 3.4.21.78) (Cytotoxic T-lymphocyte proteinase
+  |DE   1) (Hanukkah factor) (H factor) (HF) (Granzyme-1) (CTL tryptase)
+  |DE   (Fragmentin-1)."
+
+let P12544_de_ascii_actual : string = 
+  "DE   Granzyme A precursor [1] (Cytotoxic T-lymphocyte proteinase 1)
+  |DE   (Hanukkah factor) (H factor) (HF) (Granzyme-1) (CTL tryptase)
+  |DE   (Fragmentin-1)." . 
+  NL
+
+let P12544_de_xml : string = 
+  "<protein>
+  |<name ref=\"1\">Granzyme A precursor</name>
+  |<name>Cytotoxic T-lymphocyte proteinase 1</name>
+  |<name>Hanukkah factor</name>
+  |<name>H factor</name>
+  |<name>HF</name>
+  |<name>Granzyme-1</name>
+  |<name>CTL tryptase</name>
+  |<name>Fragmentin-1</name>
+  |</protein>" 
+
+let P12544_de_xml_cn : string = 
+  NL . 
+  "  <protein>
+  |    <name ref=\"1\">Granzyme A precursor</name>
+  |    <name>Cytotoxic T-lymphocyte proteinase 1</name>
+  |    <name>Hanukkah factor</name>
+  |    <name>H factor</name>
+  |    <name>HF</name>
+  |    <name>Granzyme-1</name>
+  |    <name>CTL tryptase</name>
+  |    <name>Fragmentin-1</name>
+  |  </protein>" 
+
+test de_line.get 
+  P12544_de_xml = P12544_de_ascii_actual
+
+test de_line.create 
+  P12544_de_ascii_actual = P12544_de_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* GN line *)
+test "----- GN line-----" = ?
+
+let gn_tag : string = tag "GN"
+
+let gn_xml : lens = 
+  let gn_aux (ty:string) (f:lens -> lens) : lens = 
+    Xml.attr1_simple_elt NL2 "name" 
+      "type" (del ty) 
+      (f esc_cs) in 
+  let gn_primary : lens = 
+    gn_aux "primary" (fun (l:lens) -> ins "Name=" . l) in 
+  let gn_fst_syn : lens = 
+    gn_aux "synonym" (fun (l:lens) -> ins "Synonyms=" . l) in 
+  let gn_syn : lens = 
+    gn_aux "synonym" (fun (l:lens) -> comma . space . l) in 
+  let gn_fst_ordered_locus : lens = 
+    gn_aux "ordered locus" (fun (l:lens) -> ins "OrderedLocusNames=" . l) in 
+  let gn_ordered_locus : lens = 
+    gn_aux  "ordered locus" (fun (l:lens) -> comma . space . l) in 
+  let gn_fst_orf : lens = 
+    gn_aux "ORF" (fun (l:lens) -> ins "ORFNames=" . l) in 
+  let gn_orf : lens = 
+    gn_aux "ORF" (fun (l:lens) -> comma . space . l) in 
+  let gn_names : lens = 
+    gn_primary . 
+    (semi . space . gn_fst_syn . gn_syn* )? . 
+    (semi . space . gn_fst_ordered_locus . gn_ordered_locus* )? .
+    (semi . space . gn_fst_orf . gn_orf* )? . 
+    semi in 
+  let gn_elt : lens = 
+    ins gn_tag . 
+    Xml.elt NL1 "gene" gn_names in 
+  let gn_elt_line : lens = split gn_tag gn_elt in
+    gn_elt_line . 
+    (ins "\n" . ins gn_tag . ins "and\n" . gn_elt_line)*
+
+let gn_line : lens = terminate gn_xml 
+
+(* unit tests for GN line *)
+let P12544_gn_ascii : string = 
+  "GN   Name=GZMA; Synonyms=CTLA3, HFSP;" . 
+  NL
+
+let P12544_gn_xml : string = 
+  "<gene>
+  |<name type=\"primary\">GZMA</name>
+  |<name type=\"synonym\">CTLA3</name>
+  |<name type=\"synonym\">HFSP</name>
+  |</gene>"
+
+let P12544_gn_xml_cn : string = 
+  NL . 
+  "  <gene>
+  |    <name type=\"primary\">GZMA</name>
+  |    <name type=\"synonym\">CTLA3</name>
+  |    <name type=\"synonym\">HFSP</name>
+  |  </gene>"
+
+test gn_line.get
+  P12544_gn_xml = P12544_gn_ascii
+
+test gn_line.create
+  P12544_gn_ascii = P12544_gn_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* OS line *)
+test "----- OS line-----" = ?
+
+(* [names_xml sp] processes a sequence of name elements. It is also
+   used to format the OH line. *)
+let names_xml (spaces:string) : lens = 
+  let os_aux (ty:string) (f:lens -> lens) : lens = 
+    Xml.attr1_simple_elt spaces "name" 
+      "type" (del ty) 
+      (f esc_csp) in 
+  let scientific : lens = os_aux "scientific" (fun (l:lens) -> l) in 
+  let common : lens = os_aux "common" (fun (l:lens) -> parens l) in 
+  let synonym : lens = os_aux "synonym" (fun (l:lens) -> parens l) in 
+    ( scientific 
+    | scientific . space . common
+    | scientific . space . common . space . synonym+ )
+
+let os_tag : string = tag "OS" 
+
+let os_xml : lens = 
+  ins os_tag . 
+    names_xml NL2 . 
+    dot
+
+let os_line : lens = split_terminate os_tag os_xml
+
+(* unit tests for OS line *)
+let P12544_os_ascii : string = 
+  "OS   Homo sapiens (Human)." . 
+    NL
+
+let P12544_os_xml : string = 
+  "<name type=\"scientific\">Homo sapiens</name>
+  |<name type=\"common\">Human</name>"
+
+let P12544_os_xml_cn : string = 
+  NL . 
+    "    <name type=\"scientific\">Homo sapiens</name>
+  |    <name type=\"common\">Human</name>"
+    
+test os_line.get
+  P12544_os_xml = P12544_os_ascii
+
+test os_line.create
+  P12544_os_ascii = P12544_os_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* OG line *)
+test "----- OG line-----" = ?
+
+let og_tag : string = tag "OG" 
+
+let og_xml : lens = 
+  let og_plasmid : lens = 
+    Xml.attr1_elt NL1 "geneLocation" "type" (del "plasmid") 
+      (ins "Plasmid" . 
+       qsp . 
+       Xml.simple_elt NL2 "name" esc_c) in
+  let og_other : lens = 
+    Xml.attr1_elt_no_kids NL1 "geneLocation" "type"   
+      ( "hydrogenosome" <-> "Hydrogenosome" 
+      | "mitochondrion" <-> "Mitochondrion" 
+      | "nucleomorph"   <-> "Nucleomorph"   
+      | "plastid"       <-> "Plastid"       
+      | "apicoplast"  <-> "Plastid; Apicoplast"  
+      | "chloroplast" <-> "Plastid; Chloroplast" 
+      | "cyanelle"    <-> "Plastid; Cyanelle"    
+      | "non-photosynthetic plastid" <-> "Plastid; Non-photosynthetic plastid") in
+   ins og_tag . 
+   ( og_plasmid . ((comma . space . og_plasmid)* . 
+                   (comma . space . ins "and" . space . og_plasmid))?
+   | og_other) .       
+   dot
+
+let og_line : lens = split_terminate og_tag og_xml
+
+(* unit tests for OG line *)
+test og_line.create 
+  ( "OG   Plasmid R6-5, Plasmid IncFII R100 (NR1), and Plasmid IncFII R1-19 (R1
+    |OG   drd-19)." .  
+    NL) 
+= 
+  ( NL . 
+  "  <geneLocation type=\"plasmid\">
+  |    <name>R6-5</name>
+  |  </geneLocation>
+  |  <geneLocation type=\"plasmid\">
+  |    <name>IncFII R100 (NR1)</name>
+  |  </geneLocation>
+  |  <geneLocation type=\"plasmid\">
+  |    <name>IncFII R1-19 (R1 drd-19)</name>
+  |  </geneLocation>" )
+  
+test og_line.get
+  "<geneLocation type=\"non-photosynthetic plastid\"/>" 
+= 
+  ( "OG   Plastid; Non-photosynthetic plastid." . 
+    NL )
+
+(* --------------------------------------------------------------------------- *)
+(* OC line *)
+test "----- OC line-----" = ?
+
+let oc_tag : string = tag "OC"
+let oc_xml : lens = 
+  let oc_aux : lens = Xml.simple_elt NL3 "taxon" esc_s in 
+  ins oc_tag . 
+  Xml.elt NL2 "lineage" (oc_aux . (semi . space . oc_aux)* ) . 
+  dot
+let oc_line : lens = split_terminate oc_tag oc_xml
+
+(* unit tests for OC line *)
+let P12544_oc_ascii : string = 
+  "OC   Eukaryota; Metazoa; Chordata; Craniata; Vertebrata; Euteleostomi;
+  |OC   Mammalia; Eutheria; Euarchontoglires; Primates; Haplorrhini;
+  |OC   Catarrhini; Hominidae; Homo." . 
+  NL
+
+let P12544_oc_xml : string = 
+  "<lineage>
+  |<taxon>Eukaryota</taxon>
+  |<taxon>Metazoa</taxon>
+  |<taxon>Chordata</taxon>
+  |<taxon>Craniata</taxon>
+  |<taxon>Vertebrata</taxon>
+  |<taxon>Euteleostomi</taxon>
+  |<taxon>Mammalia</taxon>
+  |<taxon>Eutheria</taxon>
+  |<taxon>Euarchontoglires</taxon>
+  |<taxon>Primates</taxon>
+  |<taxon>Haplorrhini</taxon>
+  |<taxon>Catarrhini</taxon>
+  |<taxon>Hominidae</taxon>
+  |<taxon>Homo</taxon>
+  |</lineage>"
+
+let P12544_oc_xml_cn : string = 
+  NL . 
+  "    <lineage>
+  |      <taxon>Eukaryota</taxon>
+  |      <taxon>Metazoa</taxon>
+  |      <taxon>Chordata</taxon>
+  |      <taxon>Craniata</taxon>
+  |      <taxon>Vertebrata</taxon>
+  |      <taxon>Euteleostomi</taxon>
+  |      <taxon>Mammalia</taxon>
+  |      <taxon>Eutheria</taxon>
+  |      <taxon>Euarchontoglires</taxon>
+  |      <taxon>Primates</taxon>
+  |      <taxon>Haplorrhini</taxon>
+  |      <taxon>Catarrhini</taxon>
+  |      <taxon>Hominidae</taxon>
+  |      <taxon>Homo</taxon>
+  |    </lineage>"
+
+test oc_line.get 
+  P12544_oc_xml = P12544_oc_ascii
+
+test oc_line.create 
+  P12544_oc_ascii = P12544_oc_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* OX line *)
+test "----- OX line-----" = ?
+
+(* [ncbi_xml sp] processes a "dbReference" element. It is also used to
+   format the OH line. *)
+let ncbi_xml (spaces:string) : lens = 
+  ins "NCBI_TaxID=" . 
+  ( Xml.attr3_elt_no_kids spaces "dbReference"
+     "type" (del "NCBI Taxonomy")
+     "key" (del NUMBER)          
+     "id" (NUMBER) ) . 
+  semi
+
+let ox_tag : string = tag "OX"
+
+let ox_xml : lens = 
+  ins ox_tag . 
+  ncbi_xml NL2
+
+let ox_line : lens = split_terminate ox_tag ox_xml
+
+(* unit tests for OX line *)
+let P12544_ox_ascii : string = 
+  "OX   NCBI_TaxID=9606;" . 
+  NL
+
+let P12544_ox_xml : string = 
+  "<dbReference type=\"NCBI Taxonomy\" id=\"9606\" key=\"3\" />"
+
+let P12544_ox_xml_cn : string = 
+  NL . 
+  "    <dbReference type=\"NCBI Taxonomy\" key=\"0\" id=\"9606\"/>"
+
+test ox_line.get 
+  P12544_ox_xml = P12544_ox_ascii 
+
+test ox_line.create 
+  P12544_ox_ascii = P12544_ox_xml_cn 
+
+(* --------------------------------------------------------------------------- *)
+(* OH line *)
+test "----- OH line-----" = ?
+
+let oh_tag : string = tag "OH"
+
+let oh_xml : lens =
+  ins oh_tag . 
+  Xml.attr1_elt NL1 "organism" "key" (del NUMBER) 
+  (names_xml NL2 ~ (ncbi_xml NL2 . qsp)) . 
+  dot 
+
+let oh_line : lens = split_terminate oh_tag oh_xml
+
+(* unit tests for OH line *)
+test oh_line.create
+  "OH   NCBI_TaxID=9481; Callithrix.
+  |" 
+= 
+  "
+  |  <organism key=\"0\">
+  |    <name type=\"scientific\">Callithrix</name>
+  |    <dbReference type=\"NCBI Taxonomy\" key=\"0\" id=\"9481\"/>
+  |  </organism>"
+
+test oh_line.get 
+  "<organism key=\"0\">
+  |  <name type=\"scientific\">Callithrix</name>
+  |  <dbReference type=\"NCBI Taxonomy\" key=\"1\" id=\"9481\"/>
+  |</organism>" 
+= 
+  "OH   NCBI_TaxID=9481; Callithrix.
+  |"
+
+(* --------------------------------------------------------------------------- *)
+(* Organism block *)
+
+let organism_block = 
+  Xml.attr1_elt_open NL1 "organism" "key" (del NUMBER) . 
+  os_line . 
+  (((ox_line ~ oc_line) . 
+   Xml.close_tag NL1 "organism" . 
+   oh_line* ) ~
+  og_line)
+
+(* unit tests for Organism block *)
+let organism_block_xml : string = 
+  NL . 
+  "  <organism key=\"0\">
+  |    <name type=\"scientific\">Solanum melongena</name>
+  |    <name type=\"common\">Eggplant</name>
+  |    <name type=\"synonym\">Aubergine</name>
+  |    <dbReference type=\"NCBI Taxonomy\" key=\"0\" id=\"9606\"/>
+  |    <lineage>
+  |      <taxon>Mammalia</taxon>
+  |      <taxon>Eutheria</taxon>
+  |    </lineage>
+  |  </organism>
+  |  <organism key=\"0\">
+  |    <name type=\"scientific\">Callithrix</name>
+  |    <dbReference type=\"NCBI Taxonomy\" key=\"0\" id=\"9481\"/>
+  |  </organism>
+  |  <organism key=\"0\">
+  |    <name type=\"scientific\">Cercopithecus hamlyni</name>
+  |    <name type=\"common\">Owl-faced monkey</name>
+  |    <name type=\"synonym\">Hamlyn's monkey</name>
+  |    <dbReference type=\"NCBI Taxonomy\" key=\"0\" id=\"9536\"/>
+  |  </organism>
+  |  <geneLocation type=\"apicoplast\"/>"
+
+let organism_block_ascii : string = 
+  "OS   Solanum melongena (Eggplant) (Aubergine).
+  |OG   Plastid; Apicoplast.
+  |OC   Mammalia; Eutheria.
+  |OX   NCBI_TaxID=9606;
+  |OH   NCBI_TaxID=9481; Callithrix.
+  |OH   NCBI_TaxID=9536; Cercopithecus hamlyni (Owl-faced monkey) (Hamlyn's
+  |OH   monkey)." . 
+  NL 
+
+test organism_block.get 
+  organism_block_xml = organism_block_ascii
+
+test organism_block.create 
+  organism_block_ascii = organism_block_xml
+
+(* --------------------------------------------------------------------------- *)
+(* RN line *)
+test "----- RN line-----" = ?
+
+let rn_tag : string = tag "RN" 
+
+let rn_xml : lens = 
+  ins rn_tag . 
+    Xml.attr1_elt_open NL1 "reference" "key" (brackets NUMBER) 
+
+let rn_line : lens = 
+  terminate rn_xml
+
+(* unit tests for RN line *)
+test rn_line.create 
+  "RN   [1]
+  |" 
+= 
+  "
+  |  <reference key=\"1\">" 
+
+test rn_line.get 
+  "  <reference key=\"1\">" 
+= 
+  ( "RN   [1]" . 
+    NL )
+
+(* --------------------------------------------------------------------------- *)
+(* RP line *)
+test "----- RP line-----" = ?
+
+let rp_tag : string = tag "RP"
+
+let rp_xml : lens = 
+  ins rp_tag . 
+  Xml.simple_elt NL2 "scope" esc . 
+  dot
+
+let rp_line : lens =  split_terminate rp_tag rp_xml
+
+(* unit tests for RP line *)
+test rp_line.create 
+  "RP   NUCLEOTIDE SEQUENCE [GENOMIC DNA].
+  |" 
+= 
+  "
+  |    <scope>NUCLEOTIDE SEQUENCE [GENOMIC DNA]</scope>"
+
+test rp_line.get 
+  "<scope>NUCLEOTIDE SEQUENCE [GENOMIC DNA]</scope>"
+=
+  "RP   NUCLEOTIDE SEQUENCE [GENOMIC DNA].
+  |" 
+
+(* --------------------------------------------------------------------------- *)
+(* RC line *)
+test "----- RC line-----" = ?
+
+let rc_tag : string = tag "RC"
+
+let rc_xml : lens = 
+  let rx_aux (xml:string) (ascii:string) : lens = 
+    let l : lens = Xml.simple_elt NL3 xml esc_cs in 
+    ins ascii . ins "=" . 
+    l . 
+    (( comma . space . l)* . 
+     ( comma . space . ins "and" . space . l))? . 
+    semi in 
+  let strain : lens =  rx_aux "strain" "STRAIN" in 
+  let tissue : lens =  rx_aux "tissue" "TISSUE" in 
+  let plasmid : lens =  rx_aux "plasmid" "PLASMID" in 
+  let transposon : lens =  rx_aux "transposon" "TRANSPSON" in 
+  let final_plasmid : lens = (strain . qsp)? . plasmid in 
+  let final_transposon : lens = ((strain | final_plasmid) . qsp)? . transposon in 
+  let final_tissue : lens = ((strain | final_plasmid | final_transposon) . qsp)? . tissue in 
+  let all = strain | final_tissue | final_plasmid | final_transposon in 
+  ins rc_tag . 
+  Xml.elt NL2 "source" all 
+
+let rc_line : lens = split_terminate rc_tag rc_xml
+
+(* unit tests for RC line *)
+test rc_line.create 
+  "RC   STRAIN=AL.012, AZ.026, AZ.180, DC.005, GA.039, GA2181, IL.014, and IL2.17;
+  |" 
+= 
+  "
+  |    <source>
+  |      <strain>AL.012</strain>
+  |      <strain>AZ.026</strain>
+  |      <strain>AZ.180</strain>
+  |      <strain>DC.005</strain>
+  |      <strain>GA.039</strain>
+  |      <strain>GA2181</strain>
+  |      <strain>IL.014</strain>
+  |      <strain>IL2.17</strain>
+  |    </source>"
+
+test rc_line.get
+  "      <source>
+  |        <plasmid>R1 (R7268)</plasmid>
+  |        <transposon>Tn3</transposon>
+  |      </source>" 
+= 
+  "RC   PLASMID=R1 (R7268); TRANSPSON=Tn3;
+  |" 
+
+(* --------------------------------------------------------------------------- *)
+(* RX line *)
+test "----- RX line-----" = ?
+
+let rx_tag : string = tag "RX"
+
+let rx_xml : lens = 
+  let rx_aux (db:string) : lens = 
+    let l : lens = Xml.slow_attr3_elt_no_kids NL3 "dbReference" 
+      "type" (db . ins "=")
+      "key" (del NUMBER) 
+      "id" esc_s in 
+    l . semi in
+  let any_ref = (rx_aux "MEDLINE" | rx_aux "PubMed" | rx_aux "DOI") in 
+  ins rx_tag . 
+  any_ref . (space . any_ref)*
+
+let rx_line : lens = split_terminate rx_tag rx_xml
+
+(* unit tests for RX line *)
+let P12544_rx_ascii : string = 
+  "RX   MEDLINE=88125000; PubMed=3257574;" . NL
+
+let P12544_rx_xml : string = 
+  "<dbReference type=\"MEDLINE\" id=\"88125000\" key=\"5\" />
+  |<dbReference type=\"PubMed\" id=\"3257574\" key=\"6\" />"
+
+let P12544_rx_xml_cn : string = 
+  NL . 
+  "      <dbReference type=\"MEDLINE\" key=\"0\" id=\"88125000\"/>
+  |      <dbReference type=\"PubMed\" key=\"0\" id=\"3257574\"/>"
+
+test rx_line.get
+  P12544_rx_xml = P12544_rx_ascii
+
+test rx_line.create 
+  P12544_rx_ascii = P12544_rx_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* RG line *)
+test "----- RG line-----" = ?
+
+let rg_tag : string = tag "RG" 
+
+let rg_xml : lens = 
+  ins rg_tag . 
+  Xml.attr1_elt_no_kids NL4 "consortium" "name" esc_s .
+  semi
+
+let rg_line : lens = split_terminate rg_tag rg_xml
+
+(* unit tests for RG line *)
+let P12544_rg_ascii : string =  
+  "RG   The MGC Project Team;" . 
+  NL
+
+let P12544_rg_xml : string = 
+  "<consortium name=\"The MGC Project Team\" />"
+
+let P12544_rg_xml_cn : string = 
+  NL4 . 
+  "<consortium name=\"The MGC Project Team\"/>"
+
+test rg_line.get
+  P12544_rg_xml = P12544_rg_ascii
+
+test rg_line.create 
+  P12544_rg_ascii = P12544_rg_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* RA line *)
+test "-----RA line-----" = ?
+
+let person (spaces:string) : lens = 
+  Xml.attr1_elt_no_kids spaces "person" "name" esc_cs
+
+let ra_tag : string = tag "RA" 
+
+let ra_xml : lens = 
+  ins ra_tag . 
+  iter_with_sep (person NL4) (comma . space) . 
+  semi
+
+let ra_line : lens = split_terminate ra_tag ra_xml
+
+(* unit tests for RA line *)
+let P12544_ra_ascii : string = 
+  "RA   Gershenfeld H.K., Hershberger R.J., Shows T.B., Weissman I.L.;" . 
+  NL
+
+let P12544_ra_xml : string = 
+  "<person name=\"Gershenfeld H.K.\" />
+  |<person name=\"Hershberger R.J.\" />
+  |<person name=\"Shows T.B.\" />
+  |<person name=\"Weissman I.L.\" />"
+
+let P12544_ra_xml_cn : string = 
+  NL . 
+  "        <person name=\"Gershenfeld H.K.\"/>
+  |        <person name=\"Hershberger R.J.\"/>
+  |        <person name=\"Shows T.B.\"/>
+  |        <person name=\"Weissman I.L.\"/>"
+
+test ra_line.get
+  P12544_ra_xml = P12544_ra_ascii
+
+test ra_line.create 
+  P12544_ra_ascii = P12544_ra_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* RT line *)
+test "----- RT line-----" = ?
+
+let rt_tag : string = tag "RT" 
+
+let rt_xml : lens = 
+  ins rt_tag . 
+  Xml.simple_elt NL3 "title" (quotes (esc . [.!?])) . 
+  semi 
+
+let rt_line : lens = split_terminate rt_tag rt_xml
+
+(* unit tests for RT line *)
+let P12544_rt_ascii : string = 
+  "RT   \"Cloning and chromosomal assignment of a human cDNA encoding a T cell-
+  |RT   and natural killer cell-specific trypsin-like serine protease.\";" . 
+  NL 
+
+let P12544_rt_xml : string = 
+  "<title>Cloning and chromosomal assignment of a human cDNA encoding a T cell- " . 
+  "and natural killer cell-specific trypsin-like serine protease.</title>"
+  
+test rt_line.get
+  P12544_rt_xml = P12544_rt_ascii
+
+test rt_line.create
+  P12544_rt_ascii = ( NL3 . P12544_rt_xml )
+
+(* --------------------------------------------------------------------------- *)
+(* RL line *)
+test "----- RL line-----" = ?
+
+let rl_tag : string = tag "RL"
+
+(* journal citations *)
+let journal_xml : lens = 
+  ins rl_tag . 
+  Xml.attrs_open NL2 "citation" 
+    begin
+      (* this sorting is fragile: some interleavings of the abstract
+         schemas are not unambiguous (due to two-pass sorting in
+         swap4). This makes some assumptions--e.g., that volume,
+         first, last are grouped together--that seem reasonable. *)
+      Xml.attr "type" (del "journal article") . 
+        Sort.sort_concat #{lens}[(Xml.attr "name" (esc_qp . space));
+				 ((Xml.attr "volume" (NUMBER . colon)) . 
+				    (Xml.attr "first" (NUMBER . dash)) . 
+				    (Xml.attr "last" (NUMBER)));
+				 (Xml.attr "date" (parens NUMBER))]
+    end . 
+    dot 
+
+let journal_line : lens = split_terminate rl_tag journal_xml
+
+(* unit tests for journal citations *)
+test journal_line.get 
+  "<citation type=\"journal article\" date=\"2005\" name=\"Science\" volume=\"309\" first=\"131\" last=\"133\">" 
+  =
+  ( "RL   Science 309:131-133(2005)." . 
+    NL )
+
+let P12544_journal_ascii : string = 
+  "RL   Proc. Natl. Acad. Sci. U.S.A. 85:1184-1188(1988)." . 
+   NL 
+
+let P12544_journal_xml : string = 
+  "<citation type=\"journal article\" date=\"1988\"" . 
+  " name=\"Proc. Natl. Acad. Sci. U.S.A.\"" . 
+  " volume=\"85\" first=\"1184\" last=\"1188\">"
+
+let P12544_journal_xml_cn : string = 
+  "<citation type=\"journal article\" name=\"Proc. Natl. Acad. Sci. U.S.A.\"" . 
+  " volume=\"85\" first=\"1184\" last=\"1188\" date=\"1988\">"
+
+test journal_line.get
+  P12544_journal_xml = P12544_journal_ascii 
+
+test journal_line.create
+  P12544_journal_ascii = ( NL2 . P12544_journal_xml_cn )
+
+(* electronic citations *)
+let electronic_xml : lens = 
+  ins rl_tag . 
+  Xml.slow_attr2_elt_open NL2 "citation"
+    "type" (("online journal article" <-> "(er)" ) . space)
+    "name" esc_q . 
+  dot
+
+let electronic_line : lens = split_terminate rl_tag electronic_xml
+
+(* unit tests for electronic citations *)
+test electronic_line.get
+  "<citation type=\"online journal article\" name=\"Plant Gene Register PGR98-023\">" 
+= 
+  ( "RL   (er) Plant Gene Register PGR98-023." . 
+    NL )
+
+test electronic_line.create 
+  ("RL   (er) Plant Gene Register PGR98-023." . NL) 
+= 
+  ( NL2 . 
+    "<citation type=\"online journal article\" name=\"Plant Gene Register PGR98-023\">" )
+
+(* editor list citations *)
+let editors_xml : lens = 
+  ins "(In)" . space . 
+  Xml.elt NL3 "editorList"
+    begin 
+      iter_with_sep (person NL4) (comma . space)     
+    end . 
+  space . 
+  ins "(eds.)" . 
+  semi 
+
+(* unit tests for editor lists *)
+test editors_xml.get 
+"<editorList>
+|<person name=\"Rich D.H.\"/>
+|<person name=\"Gross E.\"/>
+|</editorList>"
+=
+"(In) Rich D.H., Gross E. (eds.);" 
+
+test editors_xml.create 
+ "(In) Rich D.H., Gross E. (eds.);" 
+=
+  ( NL .
+ "      <editorList>
+ |        <person name=\"Rich D.H.\"/>
+ |        <person name=\"Gross E.\"/>
+ |      </editorList>" )
+
+
+(* book citations *)
+let book_xml : lens = 
+  ins rl_tag . 
+  ( (Xml.attrs_open NL2 "citation" 
+      begin 
+        Xml.attr "type" (del "book") . 
+        Xml.attr "name" (esc_cq . comma . space) . 
+        (Xml.attr "volume" (NUMBER . colon))? . 
+        Xml.attr "first" (ins "pp." . NUMBER . dash) . 
+        Xml.attr "last" (NUMBER . comma . space) . 
+        Xml.attr "publisher" (esc_cq . comma . space) . 
+        Xml.attr "city" (esc_cq . space) . 
+        Xml.attr "date" (parens NUMBER)
+      end . 
+    dot) ~
+    (editors_xml . space) ) 
+
+let book_line : lens = split_terminate rl_tag book_xml
+
+(* unit tests for book citation *)
+test book_line.get
+  "<citation type=\"book\" name=\"Proceedings of the 7th American peptide symposium\" first=\"69\" last=\"72\" publisher=\"Pierce Chemical Co.\" city=\"Rockford Il.\" date=\"1981\">
+  |<editorList>
+  |<person name=\"Rich D.H.\"/>
+  |<person name=\"Gross E.\"/>
+  |</editorList>"
+= 
+  ( "RL   (In) Rich D.H., Gross E. (eds.); Proceedings of the 7th American
+    |RL   peptide symposium, pp.69-72, Pierce Chemical Co., Rockford Il. (1981)." . 
+    NL )
+
+test book_line.create
+  ("RL   (In) Rich D.H., Gross E. (eds.); Proceedings of the 7th American peptide symposium," . 
+  " pp.69-72, Pierce Chemical Co., Rockford Il. (1981)." . 
+  NL)
+=
+  ( NL . 
+    "    <citation type=\"book\" name=\"Proceedings of the 7th American peptide symposium\" first=\"69\" last=\"72\" publisher=\"Pierce Chemical Co.\" city=\"Rockford Il.\" date=\"1981\">
+    |      <editorList>
+    |        <person name=\"Rich D.H.\"/>
+    |        <person name=\"Gross E.\"/>
+    |      </editorList>" )
+
+(* unpublished citations *)
+let unpublished_xml : lens = 
+  ins rl_tag . 
+  ins "Unpublished observations" . space . 
+  Xml.slow_attr2_elt_no_kids NL2 "citation" 
+    "type" (del "unpulished observations") 
+    "date" (parens partial_date) . 
+  dot 
+
+let unpublished_line : lens = split_terminate rl_tag unpublished_xml
+
+(* unit tests for unpublished citations *)
+test unpublished_line.create 
+  ("RL   Unpublished observations (JAN-2009)." . 
+   NL)
+= 
+  ( NL . 
+    "    <citation type=\"unpulished observations\" date=\"2009-01\"/>" )
+
+test unpublished_line.get 
+  "<citation type=\"unpulished observations\" date=\"2009-01\"/>"
+=
+  ( "RL   Unpublished observations (JAN-2009)." . 
+    NL )
+
+(* thesis citations *)
+let thesis_xml : lens = 
+  ins rl_tag . 
+  Xml.slow_attr4_elt_no_kids NL2 "citation"
+    "type" (("thesis" <-> "Thesis") . space) 
+    "date" (parens esc_cdq . comma . space) 
+    "institute" (esc_cdq . comma . space)
+    "country" (esc_cdq . dot) 
+
+let thesis_line : lens = split_terminate rl_tag thesis_xml
+
+(* unit tests for thesis citations *)
+test thesis_line.get 
+  "<citation type=\"thesis\" date=\"1977\" institute=\"University of Geneva\" country=\"Switzerland\"/>"
+=
+  ( "RL   Thesis (1977), University of Geneva, Switzerland." . 
+  NL )
+
+test thesis_line.create 
+  ("RL   Thesis (1977), University of Geneva, Switzerland." . 
+   NL)
+= 
+  ( NL . 
+    "    <citation type=\"thesis\" date=\"1977\" institute=\"University of Geneva\" country=\"Switzerland\"/>" )
+
+(* patent citations *)
+let patent_xml : lens = 
+  ins rl_tag . 
+  Xml.slow_attr3_elt_no_kids NL2 "citation"
+    "type" (("patent" <-> "Patent number") . space)
+    "number" (esc_q . comma . space)
+    "date" date . 
+  dot
+
+let patent_line : lens = split_terminate rl_tag patent_xml
+
+(* unit tests for patent citations *)
+test patent_line.get
+  "<citation type=\"patent\" number=\"WO9010703\" date=\"1990-09-20\"/>"
+=
+  ( "RL   Patent number WO9010703, 20-SEP-1990." . 
+    NL )
+
+test patent_line.create
+  ("RL   Patent number WO9010703, 20-SEP-1990." . 
+   NL)
+= 
+  ( NL2 . 
+    "<citation type=\"patent\" number=\"WO9010703\" date=\"1990-09-20\"/>" )
+
+(* submitted citations *)
+let submitted_xml : lens = 
+  ins rl_tag . 
+  Xml.slow_attr3_elt_open NL2 "citation" 
+     "type" (("submission" <-> "Submitted") . space) 
+     "date" (parens partial_date . space . ins "to" . space) 
+     "db"   ( ins "the " . "EMBL/GenBank/DDBJ databases"
+            | "UniProtKB"
+            | ins "the " . "PDB data bank"
+            | ins "the " . "PIR data bank" ) . 
+  dot
+
+let submitted_line : lens = split_terminate rl_tag submitted_xml
+
+(* unit tests for submitted citations *)
+let P12544_submitted_ascii : string = 
+  "RL   Submitted (JUN-2004) to the EMBL/GenBank/DDBJ databases." . 
+  NL
+
+let P12544_submitted_xml : string = 
+  "<citation type=\"submission\" date=\"2004-06\" db=\"EMBL/GenBank/DDBJ databases\">"
+
+test submitted_line.get
+  P12544_submitted_xml = P12544_submitted_ascii
+
+test submitted_line.create
+  P12544_submitted_ascii = ( NL2 . P12544_submitted_xml )
+
+test submitted_line.create 
+  ("RL   Submitted (OCT-1995) to the EMBL/GenBank/DDBJ databases." . 
+  NL)
+= 
+  ( NL2 . 
+    "<citation type=\"submission\" date=\"1995-10\" db=\"EMBL/GenBank/DDBJ databases\">" )
+
+(* RL line final assembly *)
+
+let rl_line : lens = 
+  ( journal_line | electronic_line | book_line | unpublished_line | thesis_line 
+  | submitted_line)
+
+(* --------------------------------------------------------------------------- *)
+(* Reference block *)
+
+let rp_rc_rx_block : lens = 
+  (rx_line? . Xml.close_tag NL2 "citation") ~ 
+  ( rp_line . rc_line? )
+
+let rg_ra_block : lens = 
+  Xml.elt NL3 "authorList" 
+    ( rg_line
+    | ra_line . 
+      rg_line? )
+
+let rg_ra_rt_block : lens = 
+  rt_line? ~ rg_ra_block 
+
+let reference_block : lens = 
+  rn_line . 
+  ( (rl_line ~ rg_ra_rt_block) ~ 
+    rp_rc_rx_block ) . 
+  Xml.close_tag NL1 "reference"
+
+(* unit tests for reference block *)
+let P12544_reference_ascii : string = 
+  "RN   [3]
+  |RP   NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA].
+  |RC   TISSUE=Blood;
+  |RX   PubMed=15489334; DOI=10.1101/gr.2596504;
+  |RG   The MGC Project Team;
+  |RT   \"The status, quality, and expansion of the NIH full-length cDNA
+  |RT   project: the Mammalian Gene Collection (MGC).\";
+  |RL   Genome Res. 14:2121-2127(2004)." . 
+  NL
+
+(* deviates from version found on beta.uniprot.org: reference number
+   [8] vs [3], and order of entries in RX field. *)
+let P12544_reference_ascii_actual : string = 
+  "RN   [8]
+  |RP   NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA].
+  |RC   TISSUE=Blood;
+  |RX   DOI=10.1101/gr.2596504; PubMed=15489334;
+  |RG   The MGC Project Team;
+  |RT   \"The status, quality, and expansion of the NIH full-length cDNA
+  |RT   project: the Mammalian Gene Collection (MGC).\";
+  |RL   Genome Res. 14:2121-2127(2004)." . 
+    NL
+
+let P12544_reference_xml : string = 
+  "<reference key=\"8\">
+  |<citation type=\"journal article\" date=\"2004\" name=\"Genome Res.\" volume=\"14\" first=\"2121\" last=\"2127\">
+  |<title>The status, quality, and expansion of the NIH full-length cDNA project: the Mammalian Gene Collection (MGC).</title>
+  |<authorList>
+  |<consortium name=\"The MGC Project Team\" />
+  |</authorList>
+  |<dbReference type=\"DOI\" id=\"10.1101/gr.2596504\" key=\"9\" />
+  |<dbReference type=\"PubMed\" id=\"15489334\" key=\"10\" />
+  |</citation>
+  |<scope>NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA]</scope>
+  |<source>
+  |<tissue>Blood</tissue>
+  |</source>
+  |</reference>"
+
+let P12544_reference_xml_cn : string = 
+  NL . 
+  "  <reference key=\"8\">
+  |    <citation type=\"journal article\" name=\"Genome Res.\" volume=\"14\" first=\"2121\" last=\"2127\" date=\"2004\">
+  |      <title>The status, quality, and expansion of the NIH full-length cDNA project: the Mammalian Gene Collection (MGC).</title>
+  |      <authorList>
+  |        <consortium name=\"The MGC Project Team\"/>
+  |      </authorList>
+  |      <dbReference type=\"DOI\" key=\"0\" id=\"10.1101/gr.2596504\"/>
+  |      <dbReference type=\"PubMed\" key=\"0\" id=\"15489334\"/>
+  |    </citation>
+  |    <scope>NUCLEOTIDE SEQUENCE [LARGE SCALE MRNA]</scope>
+  |    <source>
+  |      <tissue>Blood</tissue>
+  |    </source>
+  |  </reference>"
+
+test reference_block.get 
+  P12544_reference_xml = P12544_reference_ascii_actual
+
+test reference_block.create 
+  P12544_reference_ascii_actual = P12544_reference_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* CC line *)
+test "----- CC line-----" = ?
+
+let cc_tag : string = tag "CC" 
+let cc_bang : string = "-!- " 
+let cc_long_tag : string = cc_tag . "    "
+let cc_fix (l:lens) : lens = 
+  split (cc_long_tag . "  ") l
+
+let cc_fix70 (l:lens) : lens = 
+  split70 (cc_long_tag . "  ") l
+
+let cc_status : lens = Xml.attr "status" qualifiers
+
+let cc_generic_xml (ty:lens) : lens = 
+  let typ : lens = Xml.attr "type" ty in 
+  let data_no_dot : lens = Xml.unesc_string_ends [""] [.] in 
+  let data_dot : lens = esc_q . "." in 
+  let txt (d:lens) : lens = colon . space . Xml.simple_elt NL2 "text" d in 
+  ins cc_tag . ins cc_bang . 
+  Xml.raw_open NL1 "comment" . 
+  ( typ . ( (cc_status . Xml.close) ~ (txt data_no_dot) ) . dot 
+  || ( cc_status ~ (typ . Xml.close . txt data_no_dot) ) . dot  
+  || typ . Xml.close . txt (data_dot | data_no_dot) ) . 
+  Xml.close_tag NL1 "comment" 
+
+(* CC unstructured lines *)
+test "----- CC unstructured lines-----" = ?
+let cc_unstructured_xml : lens = 
+  cc_generic_xml
+    ( "allergen"             <-> "ALLERGEN"
+    | "biotechnology"        <-> "BIOTECHNOLOGY"       
+    | "catalytic activity"   <-> "CATALYTIC ACTIVITY"  
+    | "cofactor"             <-> "COFACTOR"            
+    | "developmental stage"  <-> "DEVELOPMENTAL STAGE" 
+    | "disease"              <-> "DISEASE"             
+    | "domain"               <-> "DOMAIN"              
+    | "enzyme regulation"    <-> "ENZYME REGULATION"   
+    | "function"             <-> "FUNCTION"            
+    | "induction"            <-> "INDUCTION"           
+    | "miscellaneous"        <-> "MISCELLANEOUS"       
+    | "pathway"              <-> "PATHWAY"             
+    | "pharmaceutical"       <-> "PHARMACEUTICAL"      
+    | "polymorphism"         <-> "POLYMORPHISM"        
+    | "PTM"                  <-> "PTM"                 
+    | "RNA editing"          <-> "RNA EDITING"         
+    | "similarity"           <-> "SIMILARITY"          
+    | "subcellular location" <-> "SUBCELLULAR LOCATION"
+    | "subunit"              <-> "SUBUNIT"             
+    | "tissue specificity"   <-> "TISSUE SPECIFICITY"  
+    | "toxic dose"           <-> "TOXIC DOSE" )
+
+let cc_unstructured_line : lens = 
+  split_terminate cc_long_tag cc_unstructured_xml
+
+(* unit tests for CC unstructured lines *)
+test cc_unstructured_line.create 
+  ("CC   -!- ALLERGEN: Causes an allergic reaction in humans. Binds to IgE.
+   |CC       Partially heat-labile allergen that may cause both respiratory and
+   |CC       food-allergy symptoms in patients with the bird-egg syndrome." . 
+   NL) = 
+  "
+  |  <comment type=\"allergen\">
+  |    <text>Causes an allergic reaction in humans. Binds to IgE. Partially heat-labile allergen that may cause both respiratory and food-allergy symptoms in patients with the bird-egg syndrome.</text>
+  |  </comment>"
+
+test cc_unstructured_line.create
+  ("CC   -!- SUBCELLULAR LOCATION: Golgi apparatus (By similarity)." . 
+   NL)
+= 
+  "
+  |  <comment type=\"subcellular location\" status=\"by similarity\">
+  |    <text>Golgi apparatus</text>
+  |  </comment>" 
+
+(* UniProtKB breaks its own guidelines here, splitting a line at a hyphen :( *)
+let P12544_cc_unstructured_ascii : string = 
+  "CC   -!- FUNCTION: This enzyme is necessary for target cell lysis in cell-
+  |CC       mediated immune responses. It cleaves after Lys or Arg. May be
+  |CC       involved in apoptosis." . 
+  NL
+
+let P12544_cc_unstructured_xml : string = 
+  NL . 
+  "  <comment type=\"function\">
+  |    <text>This enzyme is necessary for target cell lysis in cell- mediated immune responses. It cleaves after Lys or Arg. May be involved in apoptosis.</text>
+  |  </comment>" 
+
+
+test cc_unstructured_line.get 
+  P12544_cc_unstructured_xml = P12544_cc_unstructured_ascii
+
+test cc_unstructured_line.create 
+  P12544_cc_unstructured_ascii = P12544_cc_unstructured_xml
+
+(* CC biophysiochemical properties line *)
+test "----- CC biophysiochemical properties line -----" = ?
+let cc_biophysicochemical_properties_xml : lens = 
+  let aux (xml:string) (ascii:string) : lens = 
+    Xml.simple_elt NL3 xml (ins ascii . ins "=" . esc_s . semi) in 
+  let absorption : lens = 
+    space . ins "Absorption" . colon . space . 
+    Xml.elt NL2 "absorption"
+      (aux "max" "Abs(max)" . space . 
+       aux "text" "Note") in 
+  let kinetic_parameters : lens = 
+    space . ins "Kinetic parameters: " . 
+    Xml.elt NL2 "kinetics" 
+      (aux "KM" "KM" . space . 
+       aux "Vmax" "Vmax" . space . 
+       aux "text" "Note") in 
+  let generic (xml:string) (ascii:string) : lens = 
+    space . ins ascii . colon . space . 
+    Xml.elt NL2 xml (esc_s . semi . space) in 
+  let ph_dependence : lens = generic "phDependence" "pH dependence" in
+  let redox_potential : lens = generic "redoxPotential" "Redox potential" in
+  let temperature_dependence : lens = generic "temperatureDependence" "Temperature dependence" in       
+  ins cc_tag . ins cc_bang . 
+  Xml.attr1_elt NL1 "comment"
+    "type" (("biophysicochemical properties" <-> "BIOPHYSICOCHEMICAL PROPERTIES") . colon)
+    begin
+      absorption? . 
+      kinetic_parameters? . 
+      ph_dependence? . 
+      redox_potential? . 
+      temperature_dependence? 
+    end
+
+let cc_biophysicochemical_properties_line : lens = 
+  split_terminate cc_long_tag cc_biophysicochemical_properties_xml
+
+(* unit tests for biophysiochemical properties CC lines *)
+let cc_bp_ascii : string = 
+  "CC   -!- BIOPHYSICOCHEMICAL PROPERTIES: Absorption: Abs(max)=465 nm;
+  |CC       Note=The above maximum is for the oxidized form. Shows a maximal
+  |CC       peak at 330 nm in the reduced form. These absorption peaks are for
+  |CC       the tryptophylquinone cofactor; Kinetic parameters: KM=5.4 uM for
+  |CC       tyramine; Vmax=17 umol/min/mg enzyme; Note=The enzyme is substrate
+  |CC       inhibited at high substrate concentrations (Ki=1.08 mM for
+  |CC       tyramine);" .  
+  NL
+
+let cc_bp_xml : string = 
+  NL . 
+  "  <comment type=\"biophysicochemical properties\">
+  |    <absorption>
+  |      <max>465 nm</max>
+  |      <text>The above maximum is for the oxidized form. Shows a maximal peak at 330 nm in the reduced form. These absorption peaks are for the tryptophylquinone cofactor</text>
+  |    </absorption>
+  |    <kinetics>
+  |      <KM>5.4 uM for tyramine</KM>
+  |      <Vmax>17 umol/min/mg enzyme</Vmax>
+  |      <text>The enzyme is substrate inhibited at high substrate concentrations (Ki=1.08 mM for tyramine)</text>
+  |    </kinetics>
+  |  </comment>"
+
+test cc_biophysicochemical_properties_line.get
+  cc_bp_xml = cc_bp_ascii 
+
+test cc_biophysicochemical_properties_line.create
+  cc_bp_ascii = cc_bp_xml 
+
+(* CC interactions block *)
+test "----- CC interactions block -----" = ?
+
+let interaction : lens = 
+   let experiments : lens = 
+     ins "NbExp=" . 
+     Xml.simple_elt NL2 "experiments" NUMBER . 
+     semi . space in
+  let self_rest : lens = 
+    ins "Self" . 
+    Xml.slash_close .     
+    Xml.simple_elt NL2 "organismsDiffer" (del "false") in
+  let id_rest : lens = 
+    Xml.close . 
+    Xml.simple_elt NL3 "id" esc_n . colon . 
+    (dash || Xml.simple_elt NL3 "label" esc_p) . 
+     Xml.close_tag NL2 "interactant" . 
+     Xml.simple_elt NL2 "organismsDiffer" ( "true" <-> " (xeno)" | del "false") in    
+  ins cc_long_tag . 
+  Xml.attr1_elt NL1 "comment" "type" (del "interaction") 
+    begin  
+      ( ins "IntAct=" . 
+        Xml.attr1_elt_no_kids NL2 "interactant" "intactId" esc_cs . 
+        comma . space . 
+        Xml.raw_open NL2 "interactant" . 
+        Xml.attr "intactId" esc_s . 
+        semi ) ~
+      ( ( self_rest | id_rest ) . 
+      semi . space .
+      experiments )
+    end
+
+let interaction_line : lens = terminate interaction
+
+(* unit tests for interaction line *)
+test interaction_line.get 
+  "  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-1043398\"/>
+  |    <interactant intactId=\"EBI-1050185\">
+  |      <id>Q8NBH6</id>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>" 
+= 
+ ( "CC       Q8NBH6:-; NbExp=1; IntAct=EBI-1043398, EBI-1050185;" . 
+    NL )
+
+test interaction_line.create 
+  ("CC       Q8NBH6:-; NbExp=1; IntAct=EBI-1043398, EBI-1050185;" . 
+   NL)
+=
+  ( NL . 
+    "  <comment type=\"interaction\">
+    |    <interactant intactId=\"EBI-1043398\"/>
+    |    <interactant intactId=\"EBI-1050185\">
+    |      <id>Q8NBH6</id>
+    |    </interactant>
+    |    <organismsDiffer>false</organismsDiffer>
+    |    <experiments>1</experiments>
+    |  </comment>" )
+
+(* interaction block *)
+let cc_interaction_block : lens =
+  ins cc_tag . 
+  ins cc_bang . 
+  ins "INTERACTION:" . nl . 
+  interaction_line+
+
+(* unit tests for interaction block *)
+test cc_interaction_block.get 
+"  <comment type=\"interaction\">
+    <interactant intactId=\"EBI-1043398\"/>
+    <interactant intactId=\"EBI-1043398\"/>
+    <organismsDiffer>false</organismsDiffer>
+    <experiments>1</experiments>
+  </comment>
+  <comment type=\"interaction\">
+    <interactant intactId=\"EBI-1043398\"/>
+    <interactant intactId=\"EBI-1050185\">
+      <id>Q8NBH6</id>
+    </interactant>
+    <organismsDiffer>false</organismsDiffer>
+    <experiments>1</experiments>
+  </comment>
+  <comment type=\"interaction\">
+    <interactant intactId=\"EBI-1043398\"/>
+    <interactant intactId=\"EBI-350350\">
+      <id>P21266</id>
+      <label>GSTM3</label>
+    </interactant>
+    <organismsDiffer>false</organismsDiffer>
+    <experiments>1</experiments>
+  </comment>" 
+= 
+  ( "CC   -!- INTERACTION:
+    |CC       Self; NbExp=1; IntAct=EBI-1043398, EBI-1043398;
+    |CC       Q8NBH6:-; NbExp=1; IntAct=EBI-1043398, EBI-1050185;
+    |CC       P21266:GSTM3; NbExp=1; IntAct=EBI-1043398, EBI-350350;" . 
+    NL )
+
+test cc_interaction_block.create
+  ("CC   -!- INTERACTION:
+   |CC       Self; NbExp=1; IntAct=EBI-476263, EBI-476263;
+   |CC       P31749:AKT1; NbExp=2; IntAct=EBI-476263, EBI-296087;
+   |CC       Q9UER7:DAXX; NbExp=3; IntAct=EBI-476263, EBI-77321;
+   |CC       P25445:FAS; NbExp=1; IntAct=EBI-476263, EBI-494743;
+   |CC       P15626:Gstm2 (xeno); NbExp=1; IntAct=EBI-476263, EBI-1209729;
+   |CC       P09211:GSTP1; NbExp=1; IntAct=EBI-476263, EBI-353467;
+   |CC       Q9WTR2:Map3k6 (xeno); NbExp=1; IntAct=EBI-476263, EBI-1254790;
+   |CC       O08815:Slk (xeno); NbExp=1; IntAct=EBI-476263, EBI-986112;
+   |CC       Q12933:TRAF2; NbExp=1; IntAct=EBI-476263, EBI-355744;
+   |CC       P63104:YWHAZ; NbExp=1; IntAct=EBI-476263, EBI-347088;" . 
+   NL)
+= 
+  "
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-296087\">
+  |      <id>P31749</id>
+  |      <label>AKT1</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>2</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-77321\">
+  |      <id>Q9UER7</id>
+  |      <label>DAXX</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>3</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-494743\">
+  |      <id>P25445</id>
+  |      <label>FAS</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-1209729\">
+  |      <id>P15626</id>
+  |      <label>Gstm2</label>
+  |    </interactant>
+  |    <organismsDiffer>true</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-353467\">
+  |      <id>P09211</id>
+  |      <label>GSTP1</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-1254790\">
+  |      <id>Q9WTR2</id>
+  |      <label>Map3k6</label>
+  |    </interactant>
+  |    <organismsDiffer>true</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-986112\">
+  |      <id>O08815</id>
+  |      <label>Slk</label>
+  |    </interactant>
+  |    <organismsDiffer>true</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-355744\">
+  |      <id>Q12933</id>
+  |      <label>TRAF2</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-476263\"/>
+  |    <interactant intactId=\"EBI-347088\">
+  |      <id>P63104</id>
+  |      <label>YWHAZ</label>
+  |    </interactant>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>"
+
+let P12544_cc_interaction_ascii : string = 
+  "CC   -!- INTERACTION:
+  |CC       Self; NbExp=1; IntAct=EBI-519800, EBI-519800;" . 
+  NL
+
+let P12544_cc_interaction_xml : string = 
+  "<comment type=\"interaction\">
+  |<interactant intactId=\"EBI-519800\" />
+  |<interactant intactId=\"EBI-519800\" />
+  |<organismsDiffer>false</organismsDiffer>
+  |<experiments>1</experiments>
+  |</comment>" 
+
+let P12544_cc_interaction_xml_cn : string = 
+  NL . 
+  "  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-519800\"/>
+  |    <interactant intactId=\"EBI-519800\"/>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>" 
+
+test cc_interaction_block.get 
+  P12544_cc_interaction_xml = P12544_cc_interaction_ascii 
+
+test cc_interaction_block.create 
+  P12544_cc_interaction_ascii = P12544_cc_interaction_xml_cn
+
+(* CC alternative products *)
+test "----- CC alternative products -----" = ?
+
+(* Notes: this comment is a little tricky because the number of
+   isoforms needs to be counted and included in the view. We do this
+   using a Q-lens that duplicates the names. Edits to the number in
+   the view are discarded. *)
+let cc_alternative_products_xml : lens = 
+  let event : lens = 
+    Xml.attr1_elt_no_kids NL2 "event" "type" 
+      ( "alternative promoter"    <-> "Alternative promoter usage" 
+      | "alternative splicing"    <-> "Alternative splicing"       
+      | "alternative initiation"  <-> "Alternative initiation"     
+      | "ribosomal frameshifting" <-> "Ribosomal frameshifting") in 
+  let events : lens = ins cc_long_tag . ins "Event=" . iter_with_sqsp event . semi in 
+  let generic (xml:string) (ascii:string) : lens = 
+    ins ascii . ins "=" . 
+      Xml.simple_elt NL2 xml esc_s . 
+      semi in 
+  let name : lens =     
+    let id : lens = Xml.simple_elt NL3 "id" esc_csp in 
+    let synonyms : lens = 
+      ins "Synonyms=" . 
+        iter_with_sep (Xml.simple_elt NL3 "name" esc_csp) (comma . space) . 
+        semi in
+    let sequence : lens = 
+      let vsp : lens = "VSP_" . DIGIT+ in 
+        ins "Sequence=" . 
+          ( Xml.attr1_elt_no_kids NL3 "sequence" "type"
+              ( "displayed"     <-> "Displayed"
+              | "external"      <-> "External"
+              | "not described" <-> "Not described")
+          | Xml.slow_attr2_elt_no_kids NL3 "sequence" 
+              "type" (del "described")
+              "ref"  (iter_with_sep vsp (comma . space)) ) . 
+          semi in 
+      Xml.elt NL2 "isoform" 
+        begin 
+          ((ins "IsoId=" . 
+              iter_with_sep id (comma . space) . 
+              semi . space ) ~
+             (ins "Name=" . 
+                Xml.simple_elt NL3 "name" esc_csp . 
+                semi . space . 
+                (synonyms . space )? )) . 
+            sequence . 
+            (generic "note" "Note")? 
+        end in 
+  let prelude : lens = 
+    ins cc_tag . ins cc_bang . 
+      ins "ALTERNATIVE_PRODUCTS:" . nl in 
+  let named_isos_regexp : regexp = " Named isoforms=" . NUMBER .  ";" in
+  let names : lens = (nl . ins cc_long_tag . cc_fix70 name)* in 
+  let comment : lens = (space . generic "comment" "Comment")? in 
+  let preprocess : lens = 
+     del (stype comment) . 
+     copy (stype name)* in 
+  let named_isos (s:string) = 
+     " Named isoforms=" . 
+     string_of_int (count (stype name) ((get preprocess) s)) . 
+     ";" in 
+  let entry : lens = 
+    prelude . 
+      Xml.attr1_elt NL1 "comment" "type" (del "alternative products") 
+      begin 
+        events . 
+        dup2 named_isos_regexp named_isos (comment . names) 
+      end in 
+  let canonizer_copy (R:regexp) = canonizer_of_lens (copy R) in 
+  let cn : canonizer =
+    begin
+      canonizer_copy (vtype prelude) . 
+      (columnize 70 
+         (vtype events . vtype named_isos_regexp . vtype comment)
+         ' ' (NL . cc_long_tag . "  ")) .
+      canonizer_copy (vtype names)
+     end in
+    terminate (right_quot entry cn) 
+
+let cc_alternative_products_line : lens =   
+  cc_alternative_products_xml 
+
+(* unit tests for CC alternative products *)
+let cc_alternative_products_xml : string = 
+  NL . 
+  "  <comment type=\"alternative products\">
+  |    <event type=\"alternative splicing\"/>
+  |    <comment>This is a rather lengthy comment.</comment>
+  |    <isoform>
+  |      <id>P48347-1</id>
+  |      <name>1</name>
+  |      <name>D</name>
+  |      <name>This is a really long synonym that should cause the line to break</name>
+  |      <name>E</name>
+  |      <sequence type=\"displayed\"/>
+  |    </isoform>
+  |    <isoform>
+  |      <id>P48347-2</id>
+  |      <name>2</name>
+  |      <sequence type=\"described\" ref=\"VSP_008972\"/>
+  |    </isoform>
+  |  </comment>" 
+
+let cc_alternative_products_ascii : string =
+  "CC   -!- ALTERNATIVE_PRODUCTS:
+  |CC       Event=Alternative splicing; Named isoforms=2; Comment=This is
+  |CC         a rather lengthy comment.;
+  |CC       Name=1; Synonyms=D, This is a really long synonym that should cause
+  |CC         the line to break, E; IsoId=P48347-1; Sequence=Displayed;
+  |CC       Name=2; IsoId=P48347-2; Sequence=VSP_008972;" .
+  NL
+
+test cc_alternative_products_line.get
+ cc_alternative_products_xml = cc_alternative_products_ascii
+
+test cc_alternative_products_line.create
+  cc_alternative_products_ascii =  cc_alternative_products_xml
+
+(* CC mass spectrometry line *)
+test "----- CC mass spectrometry line -----" = ?
+
+let cc_mass_spectrometry_xml : lens = 
+  let src : lens = qins (WSP . "Source=" . raw . ";")? "" in 
+  ins cc_tag . ins cc_bang . 
+  ins "MASS SPECTROMETRY" . colon . space . 
+  ( ( Xml.slow_attr3_elt_open NL1 "comment" 
+        "type" (del "mass spectrometry")    
+        "mass" (ins "Mass=" . FNUMBER . semi . space)
+        "method"  (ins "Method=" . esc_sq . semi . space) )
+  | ( Xml.slow_attr4_elt_open NL1 "comment" 
+       "type" (del "mass spectrometry")    
+       "mass" (ins "Mass=" . FNUMBER . semi . space)
+       "error "(ins "Mass_error=" . FNUMBER . semi . space) 
+       "method"  (ins "Method=" . esc_sq . semi . space) ) ) . 
+  ins "Range=" . 
+  Xml.raw_open NL2 "location" . 
+  ( (Xml.attr "sequence" (qsp . parens esc_csp))? ~    
+    (Xml.close . 
+     Xml.attr1_elt_no_kids NL3 "begin" "position" NUMBER . 
+     dash . 
+     Xml.attr1_elt_no_kids NL3 "end" "position" NUMBER) ) . 
+  Xml.close_tag NL2 "location" . semi . space . 
+  ins "Note=" . 
+  Xml.simple_elt NL2 "note" esc_s . semi . 
+  Xml.close_tag NL1 "comment" . 
+  src
+
+let cc_mass_spectrometry_line : lens = 
+  split_terminate cc_long_tag cc_mass_spectrometry_xml
+
+(* CC mass spectrometry unit tests *)
+let cc_mass_spectrometry_ascii : string = 
+   "CC   -!- MASS SPECTROMETRY: Mass=23290.2; Mass_error=2.9;
+   |CC       Method=Electrospray; Range=16-214 (P04653-2); Note=Allele D, with
+   |CC       6 phosphate groups; Source=PubMed:7601973;" . 
+   NL
+
+let cc_mass_spectrometry_ascii_cn : string = 
+   "CC   -!- MASS SPECTROMETRY: Mass=23290.2; Mass_error=2.9;
+   |CC       Method=Electrospray; Range=16-214 (P04653-2); Note=Allele D, with
+   |CC       6 phosphate groups;" . 
+   NL
+
+let cc_mass_spectrometry_xml : string = 
+  NL . 
+  "  <comment type=\"mass spectrometry\" mass=\"23290.2\" error =\"2.9\" method=\"Electrospray\">
+  |    <location sequence=\"P04653-2\">
+  |      <begin position=\"16\"/>
+  |      <end position=\"214\"/>
+  |    </location>
+  |    <note>Allele D, with 6 phosphate groups</note>
+  |  </comment>"
+
+test cc_mass_spectrometry_line.get
+  cc_mass_spectrometry_xml = cc_mass_spectrometry_ascii_cn
+
+test cc_mass_spectrometry_line.create
+  cc_mass_spectrometry_ascii = cc_mass_spectrometry_xml 
+
+(* CC sequence caution line *)
+test "----- CC sequence caution -----" = ?
+let cc_sequence_caution_xml : lens = 
+  ins cc_tag . ins cc_bang . 
+  ins "SEQUENCE CAUTION:" . nl . 
+  ins cc_long_tag . 
+  Xml.attr1_elt NL1 "comment" "type" (del "sequence caution") 
+    begin
+      ( (space . 
+         ins "Type=" . 
+         Xml.attr1_elt_open NL2 "conflict" 
+           "type" ( "frameshift" <-> "Frameshift"
+                  | "erroneous initiation" <-> "Erroneous initiation"             
+                  | "erroneous termination" <-> "Erroneous termination" 
+                  | "erroneous gene model prediction" <-> "Erroneous gene model prediction"
+                  | "erroneous translation" <-> "Erroneous translation"
+                  | "miscellaneous discrepancy" <-> "Miscellaneous discrepancy") . 
+         semi) ~
+        (ins "Sequence=" . 
+         Xml.attr3_elt_no_kids NL3 "sequence"
+           "resource" (del ("EMBL-CDS" | "EMBL"))
+           "id" esc_dq
+           "version" (dot . NUMBER) . 
+         semi) ) . 
+     Xml.close_tag NL2 "conflict" . 
+     ( qins (WSP . "Positions=Several;")? ""
+     | space . ins "Positions=" . 
+       Xml.elt NL2 "location"
+       begin           
+           iter_with_sep 
+             (Xml.attr1_elt_no_kids NL3 "position" "position" NUMBER) 
+             (comma . space)
+         end . 
+       semi ) . 
+     (space . ins "Note=" . 
+     Xml.simple_elt NL2 "note" esc_s . 
+     semi)?
+  end
+
+(* NB: CC sequence caution lines are not wrapped *)
+let cc_sequence_caution_line : lens = 
+  terminate cc_sequence_caution_xml
+
+(* unit tests for CC sequence caution *)
+let cc_sequence_caution_xml : string = 
+  NL . 
+  "  <comment type=\"sequence caution\">
+  |    <conflict type=\"erroneous termination\">
+  |      <sequence resource=\"EMBL\" id=\"AAN42076\" version=\"1\"/>
+  |    </conflict>
+  |    <location>
+  |      <position position=\"273\"/>
+  |    </location>
+  |    <note>Translated as Gln.</note>
+  |  </comment>" 
+
+let cc_sequence_caution_ascii : string = 
+  "CC   -!- SEQUENCE CAUTION:
+  |CC       Sequence=AAN42076.1; Type=Erroneous termination; Positions=273; Note=Translated as Gln.;" . 
+  NL
+  
+test cc_sequence_caution_line.get
+  cc_sequence_caution_xml = cc_sequence_caution_ascii
+
+test cc_sequence_caution_line.create
+  cc_sequence_caution_ascii = cc_sequence_caution_xml
+
+(* CC web resource line *)
+test "----- CC web resource -----" = ?
+let cc_web_resource_xml : lens = 
+  ins cc_tag . ins cc_bang . 
+  ins "WEB RESOURCE:" . space . 
+  Xml.slow_attr2_elt NL1 "comment" 
+    "type" (del "online information") 
+    "name" (ins "Name=" . esc_s . semi . space)
+    begin
+      let url : lens = 
+        ins "URL=" . 
+        Xml.attr1_elt_no_kids NL2 "link" "uri" (quotes esc_q) . 
+        semi in 
+      let note : lens = 
+        ins "Note=" . 
+        Xml.simple_elt NL2 "note" esc_s . 
+        semi . space in 
+      url ~ note
+    end
+
+let cc_web_resource_line : lens = 
+  terminate (cc_fix cc_web_resource_xml)
+
+(* unit tests for CC web resource *)
+let cc_web_resource_xml : string = 
+  NL . 
+  "  <comment type=\"online information\" name=\"IARC TP53 mutation database\">
+  |    <link uri=\"http://www-p53.iarc.fr/\"/>
+  |    <note>Somatic and germline TP53 mutations in human cancers</note>
+  |  </comment>" 
+
+let cc_web_resource_ascii : string = 
+  "CC   -!- WEB RESOURCE: Name=IARC TP53 mutation database; Note=Somatic and
+  |CC         germline TP53 mutations in human cancers;
+  |CC         URL=\"http://www-p53.iarc.fr/\";" .
+  NL
+
+test cc_web_resource_line.get 
+  cc_web_resource_xml = cc_web_resource_ascii
+
+test cc_web_resource_line.create 
+  cc_web_resource_ascii = cc_web_resource_xml
+
+(* CC Block *)
+test "----- CC block -----" = ?
+let cc_copyright : string = 
+  "CC   -----------------------------------------------------------------------
+  |CC   Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms
+  |CC   Distributed under the Creative Commons Attribution-NoDerivs License
+  |CC   -----------------------------------------------------------------------" . 
+  NL
+
+let cc_block : lens = 
+  let non_interaction : lens = 
+      ( cc_unstructured_line 
+      | cc_biophysicochemical_properties_line
+      | cc_alternative_products_line
+      | cc_mass_spectrometry_line
+      | cc_sequence_caution_line
+      | cc_web_resource_line) in
+  let non_interaction_s = non_interaction* in 
+  let non_interaction_p = non_interaction_s . non_interaction in 
+  let final_cc_block_fst = 
+    ( non_interaction_p
+    | cc_interaction_block 
+    | non_interaction_s . cc_interaction_block . non_interaction_p ) in
+  let res = final_cc_block_fst . ins cc_copyright in
+  res
+
+(* unit tests for CC block *)
+let cc_block_ascii : string =
+  "CC   -!- ALTERNATIVE_PRODUCTS:
+  |CC       Event=Alternative splicing; Named isoforms=2;
+  |CC         Comment=Additional isoforms seem to exist;
+  |CC       Name=1; Synonyms=Ash-L; IsoId=P62993-1, P29354-1; Sequence=Displayed;
+  |CC       Name=GRB3-3; IsoId=P62993-2, P29354-2; Sequence=VSP_001839;
+  |CC   -!- SUBCELLULAR LOCATION: Golgi apparatus (By similarity).
+  |CC   -!- DOMAIN: The SH3 domains mediate interaction with SHB.
+  |CC   -!- SIMILARITY: Belongs to the GRB2/sem-5/DRK family.
+  |CC   -----------------------------------------------------------------------
+  |CC   Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms
+  |CC   Distributed under the Creative Commons Attribution-NoDerivs License
+  |CC   -----------------------------------------------------------------------" . 
+  NL
+
+let cc_block_xml : string = 
+  NL . 
+  "  <comment type=\"alternative products\">
+  |    <event type=\"alternative splicing\"/>
+  |    <comment>Additional isoforms seem to exist</comment>
+  |    <isoform>
+  |      <id>P62993-1</id>
+  |      <id>P29354-1</id>
+  |      <name>1</name>
+  |      <name>Ash-L</name>
+  |      <sequence type=\"displayed\"/>
+  |    </isoform>
+  |    <isoform>
+  |      <id>P62993-2</id>
+  |      <id>P29354-2</id>
+  |      <name>GRB3-3</name>
+  |      <sequence type=\"described\" ref=\"VSP_001839\"/>
+  |    </isoform>
+  |  </comment>
+  |  <comment type=\"subcellular location\" status=\"by similarity\">
+  |    <text>Golgi apparatus</text>
+  |  </comment>
+  |  <comment type=\"domain\">
+  |    <text>The SH3 domains mediate interaction with SHB.</text>
+  |  </comment>
+  |  <comment type=\"similarity\">
+  |    <text>Belongs to the GRB2/sem-5/DRK family.</text>
+  |  </comment>"
+
+(* test cc_block.get *)
+(*   cc_block_xml = cc_block_ascii  *)
+
+(* test cc_block.create *)
+(*   cc_block_ascii = cc_block_xml *)
+
+let P12544_cc_block_ascii : string = 
+  "CC   -!- FUNCTION: This enzyme is necessary for target cell lysis in cell-
+  |CC       mediated immune responses. It cleaves after Lys or Arg. May be
+  |CC       involved in apoptosis.
+  |CC   -!- CATALYTIC ACTIVITY: Hydrolysis of proteins, including fibronectin,
+  |CC       type IV collagen and nucleolin. Preferential cleavage:
+  |CC       -Arg-|-Xaa-, -Lys-|-Xaa- >> -Phe-|-Xaa- in small molecule
+  |CC       substrates.
+  |CC   -!- SUBUNIT: Homodimer; disulfide-linked.
+  |CC   -!- INTERACTION:
+  |CC       Self; NbExp=1; IntAct=EBI-519800, EBI-519800;
+  |CC   -!- SUBCELLULAR LOCATION: Secreted. Cytoplasmic granule.
+  |CC   -!- SIMILARITY: Belongs to the peptidase S1 family. Granzyme
+  |CC       subfamily.
+  |CC   -!- SIMILARITY: Contains 1 peptidase S1 domain.
+  |CC   -----------------------------------------------------------------------
+  |CC   Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms
+  |CC   Distributed under the Creative Commons Attribution-NoDerivs License
+  |CC   -----------------------------------------------------------------------" . 
+  NL
+
+let P12544_cc_block_xml : string = 
+  NL . 
+  "  <comment type=\"function\">
+  |    <text>This enzyme is necessary for target cell lysis in cell- mediated immune responses. It cleaves after Lys or Arg. May be involved in apoptosis.</text>
+  |  </comment>
+  |  <comment type=\"catalytic activity\">
+  |    <text>Hydrolysis of proteins, including fibronectin, type IV collagen and nucleolin. Preferential cleavage: -Arg-|-Xaa-, -Lys-|-Xaa- &gt;&gt; -Phe-|-Xaa- in small molecule substrates.</text>
+  |  </comment>
+  |  <comment type=\"subunit\">
+  |    <text>Homodimer; disulfide-linked.</text>
+  |  </comment>
+  |  <comment type=\"interaction\">
+  |    <interactant intactId=\"EBI-519800\"/>
+  |    <interactant intactId=\"EBI-519800\"/>
+  |    <organismsDiffer>false</organismsDiffer>
+  |    <experiments>1</experiments>
+  |  </comment>
+  |  <comment type=\"subcellular location\">
+  |    <text>Secreted. Cytoplasmic granule.</text>
+  |  </comment>
+  |  <comment type=\"similarity\">
+  |    <text>Belongs to the peptidase S1 family. Granzyme subfamily.</text>
+  |  </comment>
+  |  <comment type=\"similarity\">
+  |    <text>Contains 1 peptidase S1 domain.</text>
+  |  </comment>"
+
+(* test cc_block.get *)
+(*   P12544_cc_block_xml = P12544_cc_block_ascii *)
+
+(* test cc_block.create  *)
+(*   P12544_cc_block_ascii = P12544_cc_block_xml *)
+
+(* --------------------------------------------------------------------------- *)
+(* DR block *)
+test "----- DR block -----" = ?
+
+let semi_space_dash : lens = semi . space . dash 
+
+let start_dr (db:regexp) : lens = 
+  Sort.perm_sort_concat
+    #{lens}[(Xml.attr "type" (db . semi . space));
+	    (Xml.attr "key" (del NUMBER));
+	    (Xml.attr "id" (esc_sq))]
+
+let property (ty:string) : lens = 
+  semi . space . 
+  Xml.slow_attr2_elt_no_kids NL2 "property" 
+    "value" esc_sq
+    "type" (del ty)
+
+let optional_dr2 (db:regexp) (ty:string) : lens = 
+    start_dr db . 
+      ( (Xml.slash_close . semi_space_dash)
+      || (Xml.close . 
+         property ty . 
+         Xml.close_tag NL1 "dbReference") )
+
+let optional_dr3 (db:regexp) (ty1:string) (ty2:string) : lens = 
+  start_dr db . 
+    ( (Xml.slash_close . semi_space_dash{2})
+    || (Xml.close . 
+         ( (property ty1 . (property ty2 || semi_space_dash))
+         || (semi_space_dash || property ty2) ) . 
+       Xml.close_tag NL1 "dbReference") )
+
+let optional_dr4_a (db:regexp) (ty1:string) (ty2:string) (ty3:string) : lens = 
+  let a : lens = space . ins "A" in 
+  start_dr db . 
+    ( (Xml.slash_close . semi_space_dash{3})
+    || (Xml.close . 
+         ( (property ty1 . (property ty2 . a || semi_space_dash) . (property ty3 || semi_space_dash))
+         || (semi_space_dash . property ty2 . a . (property ty3 || semi_space_dash))
+         || (semi_space_dash{2} . property ty3) ) . 
+       Xml.close_tag NL1 "dbReference") )
+
+let optional_dr4 (db:regexp) (ty1:string) (ty2:string) (ty3:string) : lens = 
+  start_dr db . 
+    ( (Xml.slash_close . semi_space_dash{3})
+    || (Xml.close . 
+         ( (property ty1 . (property ty2 || semi_space_dash) . (property ty3 || semi_space_dash))
+         || (semi_space_dash . property ty2 . (property ty3 || semi_space_dash))
+         || (semi_space_dash{2} . property ty3) ) . 
+       Xml.close_tag NL1 "dbReference") )
+
+let dr_2_1 =
+  optional_dr2 ( "HIV" | "InterPro" | "PIR" | "PRINTS" | "REBASE" | "HGNC")
+    "entry name"
+
+let dr_2_1_3_1 =
+  optional_dr3 
+    ("Gene3D" | "PANTHER" | "Pfam" | "ProDom" | "SMART" | "TIGRFAMs") 
+    "entry name" "match status"
+
+let dr_2_2_3_3_4_1 = 
+  optional_dr4_a "PDB" "method" "resolution" "chains"
+
+let dr_2_3 =
+  optional_dr2 ("DictyBase" | "EcoGene" | "FlyBase" | "MGI" | "RGD" | "SGD" 
+        | "StyGene" | "SubtiList" | "WormBase" | "ZFIN" ) "gene designation"
+
+let dr_2_4_3_2 = 
+  optional_dr3 "GO" "term" "evidence"
+
+(* look at dr   HAMAP; MF_01546; atypical; 1. *)
+let dr_2_5_3_1 = 
+  optional_dr3 "HAMAP" "flag" "match status"
+
+let dr_2_6 = 
+  optional_dr2 "ECO2DBASE" "edition"
+
+let dr_2_7 = 
+  optional_dr2 ("Cornea-2DPAGE" | "DOSAC-COBS-2DPAGE" | "HSC-2DPAGE" | "REPRODUCTION-2DPAGE" 
+        | "SWISS-2DPAGE") "organism name"
+
+let dr_2_8 = 
+  optional_dr2 "Ensembl" "organism name"
+
+let dr_2_9_3_1 = 
+  optional_dr3 "PIRSF" "entry name" "match status"
+  
+
+(* no AARHUS exemple found *)
+(*let DR_2_10 = 
+  optional_dr2 "AARHUS/GHENT-2DPAGE" "" *)
+  
+let dr_2_11 = 
+  optional_dr2 "WormPep" "accession"
+  
+let dr_2_12 = 
+  start_dr 
+    ("AGD" | "ANU-2DPAGE" | "ArrayExpress" | "BioCyc" | "CleanEx" 
+    | "COMPLUYEAST-2DPAGE" | "CYGD" | "DIP" | "DisProt" | "EchoBASE" 
+    | "GeneDB_Spombe" | "GeneID" | "GlycoSuiteDB" | "Gramene" | "H-InvDB" 
+    | "HPA" | "IntAct" | "KEGG" | "LegioList" | "Leproma" | "LinkHub" 
+    | "ListiList" | "MaizeGDB" | "MEROPS" | "MypuList" | "OGP" | "PeptideAtlas" 
+    | "PDBsum" | "PharmGKB" | "PHCI-2DPAGE" | "PhosSite" | "PhotoList" | "PMMA-2DPAGE" 
+    | "PptaseDB" | "PseudoCAP" | "Rat-heart-2DPAGE" | "RefSeq" | "SagaList" 
+    | "Siena-2DPAGE" | "TAIR" | "TIGR" | "TRANSFAC" | "TubercuList" | "UniGene") .
+  Xml.slash_close . 
+  semi_space_dash
+
+let dr_2_13 = 
+  optional_dr2 "HSSP" "PDB accession"
+    
+let dr_2_14 = 
+  optional_dr2 "GeneFarm" "family number"
+    
+let dr_2_15 = 
+  optional_dr2 "SMR" "residue range"
+  
+let dr_2_16 = 
+  optional_dr2 "MIM" "type"
+  
+(* for now, the second identifier seems to be dropped away. I'm waiting for an answer of the uniprot help list *)
+(*let dr_2_17 = 
+  optional_dr2 "Orphanet" ""*)
+  
+let dr_2_18 = 
+  optional_dr2 "GenomeReviews" "gene designation"
+  
+let dr_2_19 = 
+  optional_dr2 "GermOnline" "organism name"
+  
+let dr_2_20 = 
+  optional_dr2 "PeroxiBase" "entry name"
+  
+let dr_2_21 = 
+  optional_dr2 "Reactome" "pathway name"
+  
+let dr_2_22 = 
+  optional_dr2 "DrugBank" "generic name"
+  
+let dr_EMBL = 
+  optional_dr4 "EMBL" "protein sequence ID" "status" "molecule type"
+
+let dr_PROSITE = 
+  optional_dr3 "PROSITE" "entry name" "match status"
+
+let dr_tag : string = tag "DR" 
+
+let dr_xml = 
+  ins dr_tag . 
+  Xml.raw_open NL1 "dbReference" . 
+  ( dr_2_1 | dr_2_1_3_1 | dr_2_2_3_3_4_1 | dr_2_3 | dr_2_4_3_2 | dr_2_5_3_1 
+  | dr_2_6 | dr_2_7 | dr_2_8 | dr_2_9_3_1 | dr_2_11 | dr_2_12 | dr_2_13
+  | dr_2_14 | dr_2_15 | dr_2_16 | dr_2_18 | dr_2_19 | dr_2_20 | dr_2_21 
+  | dr_2_22 | dr_EMBL | dr_PROSITE) .
+  dot
+
+let dr_block : lens = (terminate dr_xml)*
+
+(* unit tests for DR block *)
+test dr_block.get 
+  "  <dbReference type=\"EMBL\" key=\"0\" id=\"X83468\">
+  |    <property value=\"CAA58470.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"JOINED\" type=\"status\"/>
+  |    <property value=\"Genomic_DNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PROSITE\" key=\"0\" id=\"PS00940\">
+  |    <property value=\"GAMMA_THIONIN\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>
+  |  <dbReference type=\"EMBL\" key=\"0\" id=\"CR940353\">
+  |    <property value=\"CAI76474.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"Genomic_DNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"KEGG\" key=\"0\" id=\"tan:TA08425\"/>
+  |  <dbReference type=\"InterPro\" key=\"0\" id=\"IPR007480\">
+  |    <property value=\"DUF529\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"Pfam\" key=\"0\" id=\"PF04385\">
+  |    <property value=\"FAINT\" type=\"entry name\"/>
+  |    <property value=\"4\" type=\"match status\"/>
+  |  </dbReference>" 
+= 
+  ( "DR   EMBL; X83468; CAA58470.1; JOINED; Genomic_DNA.
+    |DR   PROSITE; PS00940; GAMMA_THIONIN; 1.
+    |DR   EMBL; CR940353; CAI76474.1; -; Genomic_DNA.
+    |DR   KEGG; tan:TA08425; -.
+    |DR   InterPro; IPR007480; DUF529.
+    |DR   Pfam; PF04385; FAINT; 4." . 
+    NL )
+
+test dr_block.create 
+  ("DR   EMBL; X83467; CAA58470.1; -; Genomic_DNA." . 
+   NL)
+= 
+  "
+  |  <dbReference type=\"EMBL\" key=\"0\" id=\"X83467\">
+  |    <property value=\"CAA58470.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"-\" type=\"status\"/>
+  |    <property value=\"Genomic_DNA\" type=\"molecule type\"/>
+  |  </dbReference>"
+
+let P12544_dr_block_ascii : string =   
+  "DR   EMBL; M18737; AAA52647.1; -; mRNA.
+  |DR   EMBL; CR456968; CAG33249.1; -; mRNA.
+  |DR   EMBL; BC015739; AAH15739.1; -; mRNA.
+  |DR   EMBL; U40006; AAD00009.1; -; Genomic_DNA.
+  |DR   PIR; A31372; A31372.
+  |DR   RefSeq; NP_006135.1; -.
+  |DR   UniGene; Hs.90708; -.
+  |DR   PDB; 1HF1; Model; -; A=29-262.
+  |DR   PDB; 1OP8; X-ray; 2.50 A; A/B/C/D/E/F=29-262.
+  |DR   PDB; 1ORF; X-ray; 2.40 A; A=29-262.
+  |DR   PDBsum; 1HF1; -.
+  |DR   PDBsum; 1OP8; -.
+  |DR   PDBsum; 1ORF; -.
+  |DR   IntAct; P12544; -.
+  |DR   MEROPS; S01.135; -.
+  |DR   Ensembl; ENSG00000145649; Homo sapiens.
+  |DR   GeneID; 3001; -.
+  |DR   KEGG; hsa:3001; -.
+  |DR   H-InvDB; HIX0004862; -.
+  |DR   HGNC; HGNC:4708; GZMA.
+  |DR   MIM; 140050; gene.
+  |DR   PharmGKB; PA29086; -.
+  |DR   LinkHub; P12544; -.
+  |DR   ArrayExpress; P12544; -.
+  |DR   CleanEx; HS_GZMA; -.
+  |DR   GermOnline; ENSG00000145649; Homo sapiens.
+  |DR   GO; GO:0001772; C:immunological synapse; TAS:UniProtKB.
+  |DR   GO; GO:0005634; C:nucleus; TAS:UniProtKB.
+  |DR   GO; GO:0004277; F:granzyme A activity; IDA:UniProtKB.
+  |DR   GO; GO:0042803; F:protein homodimerization activity; IDA:UniProtKB.
+  |DR   GO; GO:0006922; P:cleavage of lamin; IDA:UniProtKB.
+  |DR   GO; GO:0006955; P:immune response; TAS:UniProtKB.
+  |DR   InterPro; IPR001254; Peptidase_S1_S6.
+  |DR   InterPro; IPR001314; Peptidase_S1A.
+  |DR   Pfam; PF00089; Trypsin; 1.
+  |DR   PRINTS; PR00722; CHYMOTRYPSIN.
+  |DR   SMART; SM00020; Tryp_SPc; 1.
+  |DR   PROSITE; PS50240; TRYPSIN_DOM; 1.
+  |DR   PROSITE; PS00134; TRYPSIN_HIS; 1.
+  |DR   PROSITE; PS00135; TRYPSIN_SER; 1." . 
+  NL
+
+(* differs from UniProtKB version in that: order of attrs canonized,
+   key attrs set to "0", whitepsace canonized. *)
+let P12544_dr_block_xml_cn : string = 
+  NL . 
+  "  <dbReference type=\"EMBL\" key=\"0\" id=\"M18737\">
+  |    <property value=\"AAA52647.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"-\" type=\"status\"/>
+  |    <property value=\"mRNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"EMBL\" key=\"0\" id=\"CR456968\">
+  |    <property value=\"CAG33249.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"-\" type=\"status\"/>
+  |    <property value=\"mRNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"EMBL\" key=\"0\" id=\"BC015739\">
+  |    <property value=\"AAH15739.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"-\" type=\"status\"/>
+  |    <property value=\"mRNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"EMBL\" key=\"0\" id=\"U40006\">
+  |    <property value=\"AAD00009.1\" type=\"protein sequence ID\"/>
+  |    <property value=\"-\" type=\"status\"/>
+  |    <property value=\"Genomic_DNA\" type=\"molecule type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PIR\" key=\"0\" id=\"A31372\">
+  |    <property value=\"A31372\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"RefSeq\" key=\"0\" id=\"NP_006135.1\"/>
+  |  <dbReference type=\"UniGene\" key=\"0\" id=\"Hs.90708\"/>
+  |  <dbReference type=\"PDB\" key=\"0\" id=\"1HF1\">
+  |    <property value=\"Model\" type=\"method\"/>
+  |    <property value=\"A=29-262\" type=\"chains\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PDB\" key=\"0\" id=\"1OP8\">
+  |    <property value=\"X-ray\" type=\"method\"/>
+  |    <property value=\"2.50\" type=\"resolution\"/>
+  |    <property value=\"A/B/C/D/E/F=29-262\" type=\"chains\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PDB\" key=\"0\" id=\"1ORF\">
+  |    <property value=\"X-ray\" type=\"method\"/>
+  |    <property value=\"2.40\" type=\"resolution\"/>
+  |    <property value=\"A=29-262\" type=\"chains\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PDBsum\" key=\"0\" id=\"1HF1\"/>
+  |  <dbReference type=\"PDBsum\" key=\"0\" id=\"1OP8\"/>
+  |  <dbReference type=\"PDBsum\" key=\"0\" id=\"1ORF\"/>
+  |  <dbReference type=\"IntAct\" key=\"0\" id=\"P12544\"/>
+  |  <dbReference type=\"MEROPS\" key=\"0\" id=\"S01.135\"/>
+  |  <dbReference type=\"Ensembl\" key=\"0\" id=\"ENSG00000145649\">
+  |    <property value=\"Homo sapiens\" type=\"organism name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GeneID\" key=\"0\" id=\"3001\"/>
+  |  <dbReference type=\"KEGG\" key=\"0\" id=\"hsa:3001\"/>
+  |  <dbReference type=\"H-InvDB\" key=\"0\" id=\"HIX0004862\"/>
+  |  <dbReference type=\"HGNC\" key=\"0\" id=\"HGNC:4708\">
+  |    <property value=\"GZMA\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"MIM\" key=\"0\" id=\"140050\">
+  |    <property value=\"gene\" type=\"type\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PharmGKB\" key=\"0\" id=\"PA29086\"/>
+  |  <dbReference type=\"LinkHub\" key=\"0\" id=\"P12544\"/>
+  |  <dbReference type=\"ArrayExpress\" key=\"0\" id=\"P12544\"/>
+  |  <dbReference type=\"CleanEx\" key=\"0\" id=\"HS_GZMA\"/>
+  |  <dbReference type=\"GermOnline\" key=\"0\" id=\"ENSG00000145649\">
+  |    <property value=\"Homo sapiens\" type=\"organism name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0001772\">
+  |    <property value=\"C:immunological synapse\" type=\"term\"/>
+  |    <property value=\"TAS:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0005634\">
+  |    <property value=\"C:nucleus\" type=\"term\"/>
+  |    <property value=\"TAS:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0004277\">
+  |    <property value=\"F:granzyme A activity\" type=\"term\"/>
+  |    <property value=\"IDA:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0042803\">
+  |    <property value=\"F:protein homodimerization activity\" type=\"term\"/>
+  |    <property value=\"IDA:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0006922\">
+  |    <property value=\"P:cleavage of lamin\" type=\"term\"/>
+  |    <property value=\"IDA:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"GO\" key=\"0\" id=\"GO:0006955\">
+  |    <property value=\"P:immune response\" type=\"term\"/>
+  |    <property value=\"TAS:UniProtKB\" type=\"evidence\"/>
+  |  </dbReference>
+  |  <dbReference type=\"InterPro\" key=\"0\" id=\"IPR001254\">
+  |    <property value=\"Peptidase_S1_S6\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"InterPro\" key=\"0\" id=\"IPR001314\">
+  |    <property value=\"Peptidase_S1A\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"Pfam\" key=\"0\" id=\"PF00089\">
+  |    <property value=\"Trypsin\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PRINTS\" key=\"0\" id=\"PR00722\">
+  |    <property value=\"CHYMOTRYPSIN\" type=\"entry name\"/>
+  |  </dbReference>
+  |  <dbReference type=\"SMART\" key=\"0\" id=\"SM00020\">
+  |    <property value=\"Tryp_SPc\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PROSITE\" key=\"0\" id=\"PS50240\">
+  |    <property value=\"TRYPSIN_DOM\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PROSITE\" key=\"0\" id=\"PS00134\">
+  |    <property value=\"TRYPSIN_HIS\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>
+  |  <dbReference type=\"PROSITE\" key=\"0\" id=\"PS00135\">
+  |    <property value=\"TRYPSIN_SER\" type=\"entry name\"/>
+  |    <property value=\"1\" type=\"match status\"/>
+  |  </dbReference>"
+
+    test dr_block.get 
+    P12544_dr_block_xml_cn = P12544_dr_block_ascii
+
+  test dr_block.create 
+  P12544_dr_block_ascii = P12544_dr_block_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* PE line *)
+test "----- PE line-----" = ?
+
+let pe_tag : string = tag "PE"
+
+let pe_xml : lens = 
+  ins pe_tag . 
+  Xml.attr1_elt_no_kids NL1 "proteinExistence" 
+    "type" 
+    ( "Evidence at protein level"    <-> "1: Evidence at protein level"   
+    | "Evidence at transcript level" <-> "2: Evidence at transcript level"
+    | "Inferred from homology"       <-> "3: Inferred from homology"      
+    | "Predicted"                    <-> "4: Predicted"                   
+    | "Uncertain"                    <-> "5: Uncertain"                   ) . 
+  semi 
+
+let pe_line : lens = terminate pe_xml
+
+(* unit tests for PE line *)
+let pe_ascii : string = 
+  "PE   5: Uncertain;" . NL
+
+let pe_xml : string = 
+  NL . 
+  "  <proteinExistence type=\"Uncertain\"/>"
+
+test pe_line.get 
+  pe_xml = pe_ascii
+
+test pe_line.create 
+  pe_ascii = pe_xml
+
+let P12544_pe_ascii : string = 
+  "PE   1: Evidence at protein level;" . 
+  NL
+
+let P12544_pe_xml_cn : string = 
+  NL . 
+  "  <proteinExistence type=\"Evidence at protein level\"/>" 
+
+test pe_line.get
+  P12544_pe_xml_cn = P12544_pe_ascii
+
+test pe_line.create
+  P12544_pe_ascii = P12544_pe_xml_cn
+
+(* --------------------------------------------------------------------------- *)
+(* KW line *)
+test "----- KW line-----" = ?
+
+let kw_trans : lens = 
+  let mid = del "\">" in 
+  ( del "KW-0001" . mid . "2Fe-2S"
+  | del "KW-0002" . mid . "3D-structure"
+  | del "KW-0003" . mid . "3Fe-4S"
+  | del "KW-0004" . mid . "4Fe-4S"
+  | del "KW-0937" . mid . "Abscisic acid biosynthesis"
+  | del "KW-0938" . mid . "Abscisic acid signaling pathway"
+  | del "KW-0005" . mid . "Acetoin biosynthesis"
+  | del "KW-0006" . mid . "Acetoin catabolism"
+  | del "KW-0007" . mid . "Acetylation"
+  | del "KW-0008" . mid . "Acetylcholine receptor inhibitor"
+  | del "KW-0009" . mid . "Actin-binding"
+  | del "KW-0117" . mid . "Actin capping"
+  | del "KW-0010" . mid . "Activator"
+  | del "KW-0011" . mid . "Acute phase"
+  | del "KW-0012" . mid . "Acyltransferase"
+  | del "KW-0013" . mid . "ADP-ribosylation"
+  | del "KW-0913" . mid . "Age-related macular degeneration"
+  | del "KW-0948" . mid . "Aicardi-Goutieres syndrome"
+  | del "KW-0014" . mid . "AIDS"
+  | del "KW-0015" . mid . "Albinism"
+  | del "KW-0016" . mid . "Alginate biosynthesis"
+  | del "KW-0017" . mid . "Alkaloid metabolism"
+  | del "KW-0019" . mid . "Alkylphosphonate uptake"
+  | del "KW-0020" . mid . "Allergen"
+  | del "KW-0021" . mid . "Allosteric enzyme"
+  | del "KW-0022" . mid . "Alpha-amylase inhibitor"
+  | del "KW-0023" . mid . "Alport syndrome"
+  | del "KW-0024" . mid . "Alternative initiation"
+  | del "KW-0877" . mid . "Alternative promoter usage"
+  | del "KW-0025" . mid . "Alternative splicing"
+  | del "KW-0026" . mid . "Alzheimer disease"
+  | del "KW-0027" . mid . "Amidation"
+  | del "KW-0028" . mid . "Amino-acid biosynthesis"
+  | del "KW-0029" . mid . "Amino-acid transport"
+  | del "KW-0030" . mid . "Aminoacyl-tRNA synthetase"
+  | del "KW-0031" . mid . "Aminopeptidase"
+  | del "KW-0032" . mid . "Aminotransferase"
+  | del "KW-0924" . mid . "Ammonia transport"
+  | del "KW-0878" . mid . "Amphibian defense peptide"
+  | del "KW-0034" . mid . "Amyloid"
+  | del "KW-0035" . mid . "Amyloplast"
+  | del "KW-0036" . mid . "Amyotrophic lateral sclerosis"
+  | del "KW-0037" . mid . "Angiogenesis"
+  | del "KW-0039" . mid . "Anion exchange"
+  | del "KW-0040" . mid . "ANK repeat"
+  | del "KW-0041" . mid . "Annexin"
+  | del "KW-0042" . mid . "Antenna complex"
+  | del "KW-0045" . mid . "Antibiotic biosynthesis"
+  | del "KW-0044" . mid . "Antibiotic"
+  | del "KW-0046" . mid . "Antibiotic resistance"
+  | del "KW-0047" . mid . "Antifreeze protein"
+  | del "KW-0929" . mid . "Antimicrobial"
+  | del "KW-0043" . mid . "Anti-oncogene"
+  | del "KW-0049" . mid . "Antioxidant"
+  | del "KW-0050" . mid . "Antiport"
+  | del "KW-0051" . mid . "Antiviral defense"
+  | del "KW-0930" . mid . "Antiviral protein"
+  | del "KW-0933" . mid . "Apicoplast"
+  | del "KW-0052" . mid . "Apoplast"
+  | del "KW-0053" . mid . "Apoptosis"
+  | del "KW-0054" . mid . "Arabinose catabolism"
+  | del "KW-0055" . mid . "Arginine biosynthesis"
+  | del "KW-0056" . mid . "Arginine metabolism"
+  | del "KW-0057" . mid . "Aromatic amino acid biosynthesis"
+  | del "KW-0058" . mid . "Aromatic hydrocarbons catabolism"
+  | del "KW-0059" . mid . "Arsenical resistance"
+  | del "KW-0060" . mid . "Ascorbate biosynthesis"
+  | del "KW-0061" . mid . "Asparagine biosynthesis"
+  | del "KW-0062" . mid . "Aspartic protease inhibitor"
+  | del "KW-0063" . mid . "Aspartyl esterase"
+  | del "KW-0064" . mid . "Aspartyl protease"
+  | del "KW-0065" . mid . "Atherosclerosis"
+  | del "KW-0067" . mid . "ATP-binding"
+  | del "KW-0066" . mid . "ATP synthesis"
+  | del "KW-0068" . mid . "Autocatalytic cleavage"
+  | del "KW-0069" . mid . "Autoimmune encephalomyelitis"
+  | del "KW-0070" . mid . "Autoimmune uveitis"
+  | del "KW-0071" . mid . "Autoinducer synthesis"
+  | del "KW-0072" . mid . "Autophagy"
+  | del "KW-0073" . mid . "Auxin biosynthesis"
+  | del "KW-0927" . mid . "Auxin signaling pathway"
+  | del "KW-0875" . mid . "Bacterial capsule"
+  | del "KW-0077" . mid . "Bacteriochlorophyll biosynthesis"
+  | del "KW-0076" . mid . "Bacteriochlorophyll"
+  | del "KW-0871" . mid . "Bacteriocin biosynthesis"
+  | del "KW-0079" . mid . "Bacteriocin immunity"
+  | del "KW-0078" . mid . "Bacteriocin"
+  | del "KW-0080" . mid . "Bacteriocin transport"
+  | del "KW-0081" . mid . "Bacteriolytic enzyme"
+  | del "KW-0082" . mid . "Bait region"
+  | del "KW-0083" . mid . "Bardet-Biedl syndrome"
+  | del "KW-0910" . mid . "Bartter syndrome"
+  | del "KW-0084" . mid . "Basement membrane"
+  | del "KW-0075" . mid . "B-cell activation"
+  | del "KW-0085" . mid . "Behavior"
+  | del "KW-0086" . mid . "Bence-Jones protein"
+  | del "KW-0087" . mid . "Bernard Soulier syndrome"
+  | del "KW-0088" . mid . "Bile acid catabolism"
+  | del "KW-0089" . mid . "Bile pigment"
+  | del "KW-0090" . mid . "Biological rhythms"
+  | del "KW-0091" . mid . "Biomineralization"
+  | del "KW-0093" . mid . "Biotin biosynthesis"
+  | del "KW-0092" . mid . "Biotin"
+  | del "KW-0094" . mid . "Blood coagulation"
+  | del "KW-0095" . mid . "Blood group antigen"
+  | del "KW-0100" . mid . "Branched-chain amino acid biosynthesis"
+  | del "KW-0101" . mid . "Branched-chain amino acid catabolism"
+  | del "KW-0102" . mid . "Bromination"
+  | del "KW-0103" . mid . "Bromodomain"
+  | del "KW-0104" . mid . "Cadmium"
+  | del "KW-0105" . mid . "Cadmium resistance"
+  | del "KW-0108" . mid . "Calcium channel inhibitor"
+  | del "KW-0107" . mid . "Calcium channel"
+  | del "KW-0106" . mid . "Calcium"
+  | del "KW-0111" . mid . "Calcium/phospholipid-binding"
+  | del "KW-0109" . mid . "Calcium transport"
+  | del "KW-0112" . mid . "Calmodulin-binding"
+  | del "KW-0113" . mid . "Calvin cycle"
+  | del "KW-0116" . mid . "cAMP-binding"
+  | del "KW-0115" . mid . "cAMP biosynthesis"
+  | del "KW-0114" . mid . "cAMP"
+  | del "KW-0118" . mid . "Capsid assembly"
+  | del "KW-0917" . mid . "Capsid maturation"
+  | del "KW-0167" . mid . "Capsid protein"
+  | del "KW-0119" . mid . "Carbohydrate metabolism"
+  | del "KW-0120" . mid . "Carbon dioxide fixation"
+  | del "KW-0121" . mid . "Carboxypeptidase"
+  | del "KW-0122" . mid . "Cardiomyopathy"
+  | del "KW-0123" . mid . "Cardiotoxin"
+  | del "KW-0124" . mid . "Carnitine biosynthesis"
+  | del "KW-0125" . mid . "Carotenoid biosynthesis"
+  | del "KW-0898" . mid . "Cataract"
+  | del "KW-0127" . mid . "Catecholamine biosynthesis"
+  | del "KW-0128" . mid . "Catecholamine metabolism"
+  | del "KW-0129" . mid . "CBS domain"
+  | del "KW-0130" . mid . "Cell adhesion"
+  | del "KW-0131" . mid . "Cell cycle"
+  | del "KW-0132" . mid . "Cell division"
+  | del "KW-0133" . mid . "Cell shape"
+  | del "KW-0135" . mid . "Cellulose biosynthesis"
+  | del "KW-0136" . mid . "Cellulose degradation"
+  | del "KW-0134" . mid . "Cell wall"
+  | del "KW-0137" . mid . "Centromere"
+  | del "KW-0138" . mid . "CF(0)"
+  | del "KW-0139" . mid . "CF(1)"
+  | del "KW-0142" . mid . "cGMP-binding"
+  | del "KW-0141" . mid . "cGMP biosynthesis"
+  | del "KW-0140" . mid . "cGMP"
+  | del "KW-0143" . mid . "Chaperone"
+  | del "KW-0144" . mid . "Charcot-Marie-Tooth disease"
+  | del "KW-0145" . mid . "Chemotaxis"
+  | del "KW-0147" . mid . "Chitin-binding"
+  | del "KW-0146" . mid . "Chitin degradation"
+  | del "KW-0870" . mid . "Chloride channel inhibitor"
+  | del "KW-0869" . mid . "Chloride channel"
+  | del "KW-0868" . mid . "Chloride"
+  | del "KW-0149" . mid . "Chlorophyll biosynthesis"
+  | del "KW-0881" . mid . "Chlorophyll catabolism"
+  | del "KW-0148" . mid . "Chlorophyll"
+  | del "KW-0150" . mid . "Chloroplast"
+  | del "KW-0151" . mid . "Chlorosome"
+  | del "KW-0152" . mid . "Cholesterol biosynthesis"
+  | del "KW-0153" . mid . "Cholesterol metabolism"
+  | del "KW-0891" . mid . "Chondrogenesis"
+  | del "KW-0155" . mid . "Chromate resistance"
+  | del "KW-0156" . mid . "Chromatin regulator"
+  | del "KW-0157" . mid . "Chromophore"
+  | del "KW-0957" . mid . "Chromoplast"
+  | del "KW-0158" . mid . "Chromosomal protein"
+  | del "KW-0160" . mid . "Chromosomal rearrangement"
+  | del "KW-0159" . mid . "Chromosome partition"
+  | del "KW-0161" . mid . "Chronic granulomatous disease"
+  | del "KW-0162" . mid . "Chylomicron"
+  | del "KW-0163" . mid . "Citrate utilization"
+  | del "KW-0164" . mid . "Citrullination"
+  | del "KW-0165" . mid . "Cleavage on pair of basic residues"
+  | del "KW-0168" . mid . "Coated pits"
+  | del "KW-0169" . mid . "Cobalamin biosynthesis"
+  | del "KW-0846" . mid . "Cobalamin"
+  | del "KW-0170" . mid . "Cobalt"
+  | del "KW-0171" . mid . "Cobalt transport"
+  | del "KW-0172" . mid . "Cockayne syndrome"
+  | del "KW-0173" . mid . "Coenzyme A biosynthesis"
+  | del "KW-0174" . mid . "Coenzyme M biosynthesis"
+  | del "KW-0175" . mid . "Coiled coil"
+  | del "KW-0177" . mid . "Collagen degradation"
+  | del "KW-0176" . mid . "Collagen"
+  | del "KW-0178" . mid . "Competence"
+  | del "KW-0179" . mid . "Complement alternate pathway"
+  | del "KW-0180" . mid . "Complement pathway"
+  | del "KW-0181" . mid . "Complete proteome"
+  | del "KW-0182" . mid . "Cone-rod dystrophy"
+  | del "KW-0954" . mid . "Congenital adrenal hyperplasia"
+  | del "KW-0900" . mid . "Congenital disorder of glycosylation"
+  | del "KW-0912" . mid . "Congenital muscular dystrophy"
+  | del "KW-0183" . mid . "Conidiation"
+  | del "KW-0184" . mid . "Conjugation"
+  | del "KW-0186" . mid . "Copper"
+  | del "KW-0187" . mid . "Copper transport"
+  | del "KW-0188" . mid . "Copulatory plug"
+  | del "KW-0189" . mid . "Core protein"
+  | del "KW-0190" . mid . "Covalent protein-DNA linkage"
+  | del "KW-0191" . mid . "Covalent protein-RNA linkage"
+  | del "KW-0192" . mid . "Crown gall tumor"
+  | del "KW-0885" . mid . "CTQ"
+  | del "KW-0193" . mid . "Cuticle"
+  | del "KW-0194" . mid . "Cyanelle"
+  | del "KW-0195" . mid . "Cyclin"
+  | del "KW-0196" . mid . "Cycloheximide resistance"
+  | del "KW-0197" . mid . "Cyclosporin"
+  | del "KW-0198" . mid . "Cysteine biosynthesis"
+  | del "KW-0199" . mid . "Cystinuria"
+  | del "KW-0200" . mid . "Cytadherence"
+  | del "KW-0201" . mid . "Cytochrome c-type biogenesis"
+  | del "KW-0202" . mid . "Cytokine"
+  | del "KW-0203" . mid . "Cytokinin biosynthesis"
+  | del "KW-0932" . mid . "Cytokinin signaling pathway"
+  | del "KW-0204" . mid . "Cytolysis"
+  | del "KW-0205" . mid . "Cytosine metabolism"
+  | del "KW-0206" . mid . "Cytoskeleton"
+  | del "KW-0208" . mid . "D-amino acid"
+  | del "KW-0209" . mid . "Deafness"
+  | del "KW-0210" . mid . "Decarboxylase"
+  | del "KW-0211" . mid . "Defensin"
+  | del "KW-0213" . mid . "Dejerine-Sottas syndrome"
+  | del "KW-0214" . mid . "Dental caries"
+  | del "KW-0215" . mid . "Deoxyribonucleotide synthesis"
+  | del "KW-0911" . mid . "Desmin-related myopathy"
+  | del "KW-0216" . mid . "Detoxification"
+  | del "KW-0217" . mid . "Developmental protein"
+  | del "KW-0218" . mid . "Diabetes insipidus"
+  | del "KW-0219" . mid . "Diabetes mellitus"
+  | del "KW-0220" . mid . "Diaminopimelate biosynthesis"
+  | del "KW-0221" . mid . "Differentiation"
+  | del "KW-0222" . mid . "Digestion"
+  | del "KW-0223" . mid . "Dioxygenase"
+  | del "KW-0224" . mid . "Dipeptidase"
+  | del "KW-0903" . mid . "Direct protein sequencing"
+  | del "KW-0225" . mid . "Disease mutation"
+  | del "KW-0238" . mid . "DNA-binding"
+  | del "KW-0226" . mid . "DNA condensation"
+  | del "KW-0227" . mid . "DNA damage"
+  | del "KW-0239" . mid . "DNA-directed DNA polymerase"
+  | del "KW-0240" . mid . "DNA-directed RNA polymerase"
+  | del "KW-0228" . mid . "DNA excision"
+  | del "KW-0229" . mid . "DNA integration"
+  | del "KW-0230" . mid . "DNA invertase"
+  | del "KW-0231" . mid . "DNA packaging"
+  | del "KW-0233" . mid . "DNA recombination"
+  | del "KW-0234" . mid . "DNA repair"
+  | del "KW-0236" . mid . "DNA replication inhibitor"
+  | del "KW-0235" . mid . "DNA replication"
+  | del "KW-0237" . mid . "DNA synthesis"
+  | del "KW-0241" . mid . "Down syndrome"
+  | del "KW-0242" . mid . "Dwarfism"
+  | del "KW-0243" . mid . "Dynein"
+  | del "KW-0244" . mid . "Early protein"
+  | del "KW-0038" . mid . "Ectodermal dysplasia"
+  | del "KW-0245" . mid . "EGF-like domain"
+  | del "KW-0248" . mid . "Ehlers-Danlos syndrome"
+  | del "KW-0249" . mid . "Electron transport"
+  | del "KW-0250" . mid . "Elliptocytosis"
+  | del "KW-0251" . mid . "Elongation factor"
+  | del "KW-0254" . mid . "Endocytosis"
+  | del "KW-0255" . mid . "Endonuclease"
+  | del "KW-0256" . mid . "Endoplasmic reticulum"
+  | del "KW-0257" . mid . "Endorphin"
+  | del "KW-0259" . mid . "Enterobactin biosynthesis"
+  | del "KW-0260" . mid . "Enterotoxin"
+  | del "KW-0261" . mid . "Envelope protein"
+  | del "KW-0263" . mid . "Epidermolysis bullosa"
+  | del "KW-0887" . mid . "Epilepsy"
+  | del "KW-0931" . mid . "ER-Golgi transport"
+  | del "KW-0895" . mid . "ERV"
+  | del "KW-0265" . mid . "Erythrocyte maturation"
+  | del "KW-0266" . mid . "Ethylene biosynthesis"
+  | del "KW-0936" . mid . "Ethylene signaling pathway"
+  | del "KW-0267" . mid . "Excision nuclease"
+  | del "KW-0268" . mid . "Exocytosis"
+  | del "KW-0269" . mid . "Exonuclease"
+  | del "KW-0270" . mid . "Exopolysaccharide synthesis"
+  | del "KW-0271" . mid . "Exosome"
+  | del "KW-0952" . mid . "Extinct organism protein"
+  | del "KW-0272" . mid . "Extracellular matrix"
+  | del "KW-0273" . mid . "Eye lens protein"
+  | del "KW-0274" . mid . "FAD"
+  | del "KW-0951" . mid . "Familial hemophagocytic lymphohistiocytosis"
+  | del "KW-0923" . mid . "Fanconi anemia"
+  | del "KW-0275" . mid . "Fatty acid biosynthesis"
+  | del "KW-0276" . mid . "Fatty acid metabolism"
+  | del "KW-0278" . mid . "Fertilization"
+  | del "KW-0279" . mid . "Fiber protein"
+  | del "KW-0280" . mid . "Fibrinolysis"
+  | del "KW-0281" . mid . "Fimbria"
+  | del "KW-0283" . mid . "Flagellar rotation"
+  | del "KW-0282" . mid . "Flagellum"
+  | del "KW-0284" . mid . "Flavonoid biosynthesis"
+  | del "KW-0285" . mid . "Flavoprotein"
+  | del "KW-0286" . mid . "Flight"
+  | del "KW-0287" . mid . "Flowering"
+  | del "KW-0288" . mid . "FMN"
+  | del "KW-0290" . mid . "Folate-binding"
+  | del "KW-0289" . mid . "Folate biosynthesis"
+  | del "KW-0291" . mid . "Formylation"
+  | del "KW-0293" . mid . "Fruiting body"
+  | del "KW-0292" . mid . "Fruit ripening"
+  | del "KW-0294" . mid . "Fucose metabolism"
+  | del "KW-0295" . mid . "Fungicide"
+  | del "KW-0296" . mid . "Fusion protein"
+  | del "KW-0298" . mid . "Galactitol metabolism"
+  | del "KW-0299" . mid . "Galactose metabolism"
+  | del "KW-0301" . mid . "Gamma-carboxyglutamic acid"
+  | del "KW-0303" . mid . "Gap junction"
+  | del "KW-0302" . mid . "Gap protein"
+  | del "KW-0305" . mid . "Gaseous exchange"
+  | del "KW-0306" . mid . "Gastrulation"
+  | del "KW-0304" . mid . "Gas vesicle"
+  | del "KW-0307" . mid . "Gaucher disease"
+  | del "KW-0308" . mid . "Genetically modified food"
+  | del "KW-0309" . mid . "Germination"
+  | del "KW-0939" . mid . "Gibberellin signaling pathway"
+  | del "KW-0955" . mid . "Glaucoma"
+  | del "KW-0311" . mid . "Gluconate utilization"
+  | del "KW-0312" . mid . "Gluconeogenesis"
+  | del "KW-0313" . mid . "Glucose metabolism"
+  | del "KW-0314" . mid . "Glutamate biosynthesis"
+  | del "KW-0315" . mid . "Glutamine amidotransferase"
+  | del "KW-0316" . mid . "Glutaricaciduria"
+  | del "KW-0317" . mid . "Glutathione biosynthesis"
+  | del "KW-0318" . mid . "Glutathionylation"
+  | del "KW-0319" . mid . "Glycerol metabolism"
+  | del "KW-0320" . mid . "Glycogen biosynthesis"
+  | del "KW-0321" . mid . "Glycogen metabolism"
+  | del "KW-0322" . mid . "Glycogen storage disease"
+  | del "KW-0323" . mid . "Glycolate pathway"
+  | del "KW-0324" . mid . "Glycolysis"
+  | del "KW-0325" . mid . "Glycoprotein"
+  | del "KW-0326" . mid . "Glycosidase"
+  | del "KW-0327" . mid . "Glycosome"
+  | del "KW-0328" . mid . "Glycosyltransferase"
+  | del "KW-0329" . mid . "Glyoxylate bypass"
+  | del "KW-0330" . mid . "Glyoxysome"
+  | del "KW-0331" . mid . "GM2-gangliosidosis"
+  | del "KW-0332" . mid . "GMP biosynthesis"
+  | del "KW-0333" . mid . "Golgi apparatus"
+  | del "KW-0334" . mid . "Gonadal differentiation"
+  | del "KW-0335" . mid . "Gout"
+  | del "KW-0337" . mid . "GPI-anchor biosynthesis"
+  | del "KW-0336" . mid . "GPI-anchor"
+  | del "KW-0297" . mid . "G-protein coupled receptor"
+  | del "KW-0338" . mid . "Growth arrest"
+  | del "KW-0340" . mid . "Growth factor binding"
+  | del "KW-0339" . mid . "Growth factor"
+  | del "KW-0341" . mid . "Growth regulation"
+  | del "KW-0343" . mid . "GTPase activation"
+  | del "KW-0342" . mid . "GTP-binding"
+  | del "KW-0344" . mid . "Guanine-nucleotide releasing factor"
+  | del "KW-0345" . mid . "HDL"
+  | del "KW-0347" . mid . "Helicase"
+  | del "KW-0348" . mid . "Hemagglutinin"
+  | del "KW-0350" . mid . "Heme biosynthesis"
+  | del "KW-0349" . mid . "Heme"
+  | del "KW-0351" . mid . "Hemoglobin-binding"
+  | del "KW-0353" . mid . "Hemolymph clotting"
+  | del "KW-0354" . mid . "Hemolysis"
+  | del "KW-0355" . mid . "Hemophilia"
+  | del "KW-0356" . mid . "Hemostasis"
+  | del "KW-0357" . mid . "Heparan sulfate"
+  | del "KW-0358" . mid . "Heparin-binding"
+  | del "KW-0359" . mid . "Herbicide resistance"
+  | del "KW-0360" . mid . "Hereditary hemolytic anemia"
+  | del "KW-0361" . mid . "Hereditary multiple exostoses"
+  | del "KW-0362" . mid . "Hereditary nonpolyposis colorectal cancer"
+  | del "KW-0890" . mid . "Hereditary spastic paraplegia"
+  | del "KW-0363" . mid . "Hermansky-Pudlak syndrome"
+  | del "KW-0364" . mid . "Heterocyst"
+  | del "KW-0366" . mid . "Hexon-associated protein"
+  | del "KW-0365" . mid . "Hexon protein"
+  | del "KW-0909" . mid . "Hibernation"
+  | del "KW-0367" . mid . "Hirschsprung disease"
+  | del "KW-0368" . mid . "Histidine biosynthesis"
+  | del "KW-0369" . mid . "Histidine metabolism"
+  | del "KW-0370" . mid . "Holoprosencephaly"
+  | del "KW-0371" . mid . "Homeobox"
+  | del "KW-0372" . mid . "Hormone"
+  | del "KW-0945" . mid . "Host-virus interaction"
+  | del "KW-0373" . mid . "Hyaluronic acid"
+  | del "KW-0374" . mid . "Hybridoma"
+  | del "KW-0375" . mid . "Hydrogen ion transport"
+  | del "KW-0377" . mid . "Hydrogenosome"
+  | del "KW-0376" . mid . "Hydrogen peroxide"
+  | del "KW-0378" . mid . "Hydrolase"
+  | del "KW-0379" . mid . "Hydroxylation"
+  | del "KW-0380" . mid . "Hyperlipidemia"
+  | del "KW-0928" . mid . "Hypersensitive response elicitation"
+  | del "KW-0381" . mid . "Hypersensitive response"
+  | del "KW-0382" . mid . "Hypotensive agent"
+  | del "KW-0384" . mid . "Hypothetical protein"
+  | del "KW-0386" . mid . "Hypusine biosynthesis"
+  | del "KW-0385" . mid . "Hypusine"
+  | del "KW-0387" . mid . "Ice nucleation"
+  | del "KW-0388" . mid . "IgA-binding protein"
+  | del "KW-0389" . mid . "IgE-binding protein"
+  | del "KW-0390" . mid . "IgG-binding protein"
+  | del "KW-0391" . mid . "Immune response"
+  | del "KW-0392" . mid . "Immunoglobulin C region"
+  | del "KW-0393" . mid . "Immunoglobulin domain"
+  | del "KW-0394" . mid . "Immunoglobulin V region"
+  | del "KW-0395" . mid . "Inflammatory response"
+  | del "KW-0396" . mid . "Initiation factor"
+  | del "KW-0399" . mid . "Innate immunity"
+  | del "KW-0397" . mid . "Inner membrane"
+  | del "KW-0398" . mid . "Inositol biosynthesis"
+  | del "KW-0401" . mid . "Integrin"
+  | del "KW-0922" . mid . "Interferon antiviral system evasion"
+  | del "KW-0402" . mid . "Interferon induction"
+  | del "KW-0403" . mid . "Intermediate filament"
+  | del "KW-0404" . mid . "Intron homing"
+  | del "KW-0405" . mid . "Iodination"
+  | del "KW-0872" . mid . "Ionic channel inhibitor"
+  | del "KW-0407" . mid . "Ionic channel"
+  | del "KW-0406" . mid . "Ion transport"
+  | del "KW-0408" . mid . "Iron"
+  | del "KW-0409" . mid . "Iron storage"
+  | del "KW-0411" . mid . "Iron-sulfur"
+  | del "KW-0410" . mid . "Iron transport"
+  | del "KW-0412" . mid . "Isoleucine biosynthesis"
+  | del "KW-0413" . mid . "Isomerase"
+  | del "KW-0414" . mid . "Isoprene biosynthesis"
+  | del "KW-0956" . mid . "Kallmann syndrome"
+  | del "KW-0415" . mid . "Karyogamy"
+  | del "KW-0880" . mid . "Kelch repeat"
+  | del "KW-0417" . mid . "Keratinization"
+  | del "KW-0416" . mid . "Keratin"
+  | del "KW-0418" . mid . "Kinase"
+  | del "KW-0419" . mid . "Kinetoplast"
+  | del "KW-0420" . mid . "Kringle"
+  | del "KW-0953" . mid . "Lacrimo-auriculo-dento-digital syndrome"
+  | del "KW-0421" . mid . "Lactation"
+  | del "KW-0422" . mid . "Lactose biosynthesis"
+  | del "KW-0423" . mid . "Lactose metabolism"
+  | del "KW-0424" . mid . "Laminin EGF-like domain"
+  | del "KW-0425" . mid . "Lantibiotic"
+  | del "KW-0426" . mid . "Late protein"
+  | del "KW-0427" . mid . "LDL"
+  | del "KW-0428" . mid . "Leader peptide"
+  | del "KW-0901" . mid . "Leber congenital amaurosis"
+  | del "KW-0429" . mid . "Leber hereditary optic neuropathy"
+  | del "KW-0430" . mid . "Lectin"
+  | del "KW-0431" . mid . "Leigh syndrome"
+  | del "KW-0432" . mid . "Leucine biosynthesis"
+  | del "KW-0433" . mid . "Leucine-rich repeat"
+  | del "KW-0434" . mid . "Leukotriene biosynthesis"
+  | del "KW-0435" . mid . "Li-Fraumeni syndrome"
+  | del "KW-0436" . mid . "Ligase"
+  | del "KW-0437" . mid . "Light-harvesting polypeptide"
+  | del "KW-0438" . mid . "Lignin biosynthesis"
+  | del "KW-0439" . mid . "Lignin degradation"
+  | del "KW-0947" . mid . "Limb-girdle muscular dystrophy"
+  | del "KW-0440" . mid . "LIM domain"
+  | del "KW-0441" . mid . "Lipid A biosynthesis"
+  | del "KW-0446" . mid . "Lipid-binding"
+  | del "KW-0442" . mid . "Lipid degradation"
+  | del "KW-0443" . mid . "Lipid metabolism"
+  | del "KW-0444" . mid . "Lipid synthesis"
+  | del "KW-0445" . mid . "Lipid transport"
+  | del "KW-0448" . mid . "Lipopolysaccharide biosynthesis"
+  | del "KW-0449" . mid . "Lipoprotein"
+  | del "KW-0450" . mid . "Lipoyl"
+  | del "KW-0451" . mid . "Lissencephaly"
+  | del "KW-0452" . mid . "Lithium"
+  | del "KW-0454" . mid . "Long QT syndrome"
+  | del "KW-0886" . mid . "LTQ"
+  | del "KW-0455" . mid . "Luminescence"
+  | del "KW-0456" . mid . "Lyase"
+  | del "KW-0457" . mid . "Lysine biosynthesis"
+  | del "KW-0458" . mid . "Lysosome"
+  | del "KW-0460" . mid . "Magnesium"
+  | del "KW-0461" . mid . "Malaria"
+  | del "KW-0462" . mid . "Maltose metabolism"
+  | del "KW-0463" . mid . "Mandelate pathway"
+  | del "KW-0464" . mid . "Manganese"
+  | del "KW-0465" . mid . "Mannose-binding"
+  | del "KW-0466" . mid . "Maple syrup urine disease"
+  | del "KW-0467" . mid . "Mast cell degranulation"
+  | del "KW-0469" . mid . "Meiosis"
+  | del "KW-0470" . mid . "Melanin biosynthesis"
+  | del "KW-0867" . mid . "MELAS syndrome"
+  | del "KW-0471" . mid . "Melatonin biosynthesis"
+  | del "KW-0473" . mid . "Membrane attack complex"
+  | del "KW-0472" . mid . "Membrane"
+  | del "KW-0474" . mid . "Menaquinone biosynthesis"
+  | del "KW-0475" . mid . "Mercuric resistance"
+  | del "KW-0476" . mid . "Mercury"
+  | del "KW-0477" . mid . "Merozoite"
+  | del "KW-0478" . mid . "Metachromatic leukodystrophy"
+  | del "KW-0479" . mid . "Metal-binding"
+  | del "KW-0481" . mid . "Metalloenzyme inhibitor"
+  | del "KW-0483" . mid . "Metalloprotease inhibitor"
+  | del "KW-0482" . mid . "Metalloprotease"
+  | del "KW-0480" . mid . "Metal-thiolate cluster"
+  | del "KW-0484" . mid . "Methanogenesis"
+  | del "KW-0485" . mid . "Methanol utilization"
+  | del "KW-0486" . mid . "Methionine biosynthesis"
+  | del "KW-0487" . mid . "Methotrexate resistance"
+  | del "KW-0488" . mid . "Methylation"
+  | del "KW-0489" . mid . "Methyltransferase"
+  | del "KW-0491" . mid . "MHC II"
+  | del "KW-0490" . mid . "MHC I"
+  | del "KW-0492" . mid . "Microsome"
+  | del "KW-0493" . mid . "Microtubule"
+  | del "KW-0494" . mid . "Milk protein"
+  | del "KW-0495" . mid . "Mineral balance"
+  | del "KW-0496" . mid . "Mitochondrion"
+  | del "KW-0497" . mid . "Mitogen"
+  | del "KW-0498" . mid . "Mitosis"
+  | del "KW-0499" . mid . "Mobility protein"
+  | del "KW-0501" . mid . "Molybdenum cofactor biosynthesis"
+  | del "KW-0500" . mid . "Molybdenum"
+  | del "KW-0502" . mid . "Monoclonal antibody"
+  | del "KW-0503" . mid . "Monooxygenase"
+  | del "KW-0504" . mid . "Morphogen"
+  | del "KW-0505" . mid . "Motor protein"
+  | del "KW-0506" . mid . "mRNA capping"
+  | del "KW-0507" . mid . "mRNA processing"
+  | del "KW-0508" . mid . "mRNA splicing"
+  | del "KW-0509" . mid . "mRNA transport"
+  | del "KW-0942" . mid . "Mucolipidosis"
+  | del "KW-0510" . mid . "Mucopolysaccharidosis"
+  | del "KW-0511" . mid . "Multifunctional enzyme"
+  | del "KW-0514" . mid . "Muscle protein"
+  | del "KW-0515" . mid . "Mutator protein"
+  | del "KW-0517" . mid . "Myogenesis"
+  | del "KW-0518" . mid . "Myosin"
+  | del "KW-0959" . mid . "Myotoxin"
+  | del "KW-0519" . mid . "Myristate"
+  | del "KW-0520" . mid . "NAD"
+  | del "KW-0521" . mid . "NADP"
+  | del "KW-0166" . mid . "Nematocyst"
+  | del "KW-0523" . mid . "Neurodegeneration"
+  | del "KW-0524" . mid . "Neurogenesis"
+  | del "KW-0525" . mid . "Neuronal ceroid lipofuscinosis"
+  | del "KW-0527" . mid . "Neuropeptide"
+  | del "KW-0528" . mid . "Neurotoxin"
+  | del "KW-0530" . mid . "Neurotransmitter biosynthesis"
+  | del "KW-0531" . mid . "Neurotransmitter degradation"
+  | del "KW-0529" . mid . "Neurotransmitter"
+  | del "KW-0532" . mid . "Neurotransmitter transport"
+  | del "KW-0533" . mid . "Nickel"
+  | del "KW-0921" . mid . "Nickel transport"
+  | del "KW-0534" . mid . "Nitrate assimilation"
+  | del "KW-0944" . mid . "Nitration"
+  | del "KW-0535" . mid . "Nitrogen fixation"
+  | del "KW-0536" . mid . "Nodulation"
+  | del "KW-0866" . mid . "Nonsense-mediated mRNA decay"
+  | del "KW-0914" . mid . "Notch signaling pathway"
+  | del "KW-0906" . mid . "Nuclear pore complex"
+  | del "KW-0539" . mid . "Nuclear protein"
+  | del "KW-0540" . mid . "Nuclease"
+  | del "KW-0542" . mid . "Nucleomorph"
+  | del "KW-0544" . mid . "Nucleosome core"
+  | del "KW-0547" . mid . "Nucleotide-binding"
+  | del "KW-0545" . mid . "Nucleotide biosynthesis"
+  | del "KW-0546" . mid . "Nucleotide metabolism"
+  | del "KW-0548" . mid . "Nucleotidyltransferase"
+  | del "KW-0549" . mid . "Nylon degradation"
+  | del "KW-0550" . mid . "Obesity"
+  | del "KW-0551" . mid . "Oil body"
+  | del "KW-0552" . mid . "Olfaction"
+  | del "KW-0553" . mid . "Oncogene"
+  | del "KW-0554" . mid . "One-carbon metabolism"
+  | del "KW-0896" . mid . "Oogenesis"
+  | del "KW-0555" . mid . "Opioid peptide"
+  | del "KW-0556" . mid . "Organic radical"
+  | del "KW-0892" . mid . "Osteogenesis"
+  | del "KW-0557" . mid . "Outer membrane"
+  | del "KW-0558" . mid . "Oxidation"
+  | del "KW-0560" . mid . "Oxidoreductase"
+  | del "KW-0561" . mid . "Oxygen transport"
+  | del "KW-0925" . mid . "Oxylipin biosynthesis"
+  | del "KW-0563" . mid . "Paired box"
+  | del "KW-0562" . mid . "Pair-rule protein"
+  | del "KW-0564" . mid . "Palmitate"
+  | del "KW-0566" . mid . "Pantothenate biosynthesis"
+  | del "KW-0907" . mid . "Parkinson disease"
+  | del "KW-0908" . mid . "Parkinsonism"
+  | del "KW-0568" . mid . "Pathogenesis-related protein"
+  | del "KW-0570" . mid . "Pentose shunt"
+  | del "KW-0571" . mid . "Peptide transport"
+  | del "KW-0572" . mid . "Peptidoglycan-anchor"
+  | del "KW-0573" . mid . "Peptidoglycan synthesis"
+  | del "KW-0574" . mid . "Periplasmic"
+  | del "KW-0575" . mid . "Peroxidase"
+  | del "KW-0958" . mid . "Peroxisome biogenesis disorder"
+  | del "KW-0576" . mid . "Peroxisome"
+  | del "KW-0577" . mid . "PHA biosynthesis"
+  | del "KW-0578" . mid . "Phage lysis protein"
+  | del "KW-0579" . mid . "Phage maturation"
+  | del "KW-0580" . mid . "Phage recognition"
+  | del "KW-0581" . mid . "Phagocytosis"
+  | del "KW-0582" . mid . "Pharmaceutical"
+  | del "KW-0583" . mid . "PHB biosynthesis"
+  | del "KW-0584" . mid . "Phenylalanine biosynthesis"
+  | del "KW-0585" . mid . "Phenylalanine catabolism"
+  | del "KW-0586" . mid . "Phenylketonuria"
+  | del "KW-0587" . mid . "Phenylpropanoid metabolism"
+  | del "KW-0590" . mid . "Pheromone-binding"
+  | del "KW-0588" . mid . "Pheromone"
+  | del "KW-0589" . mid . "Pheromone response"
+  | del "KW-0591" . mid . "Phorbol-ester binding"
+  | del "KW-0592" . mid . "Phosphate transport"
+  | del "KW-0593" . mid . "Phospholipase A2 inhibitor"
+  | del "KW-0594" . mid . "Phospholipid biosynthesis"
+  | del "KW-0595" . mid . "Phospholipid degradation"
+  | del "KW-0918" . mid . "Phosphonate transport"
+  | del "KW-0596" . mid . "Phosphopantetheine"
+  | del "KW-0597" . mid . "Phosphorylation"
+  | del "KW-0598" . mid . "Phosphotransferase system"
+  | del "KW-0599" . mid . "Photoprotein"
+  | del "KW-0600" . mid . "Photoreceptor protein"
+  | del "KW-0601" . mid . "Photorespiration"
+  | del "KW-0602" . mid . "Photosynthesis"
+  | del "KW-0604" . mid . "Photosystem II"
+  | del "KW-0603" . mid . "Photosystem I"
+  | del "KW-0605" . mid . "Phycobilisome"
+  | del "KW-0607" . mid . "Phytochrome signaling pathway"
+  | del "KW-0608" . mid . "Pigment"
+  | del "KW-0611" . mid . "Plant defense"
+  | del "KW-0612" . mid . "Plant toxin"
+  | del "KW-0615" . mid . "Plasmid copy control"
+  | del "KW-0614" . mid . "Plasmid"
+  | del "KW-0616" . mid . "Plasmid partition"
+  | del "KW-0617" . mid . "Plasminogen activation"
+  | del "KW-0934" . mid . "Plastid"
+  | del "KW-0618" . mid . "Plastoquinone"
+  | del "KW-0620" . mid . "Polyamine biosynthesis"
+  | del "KW-0621" . mid . "Polymorphism"
+  | del "KW-0622" . mid . "Polyneuropathy"
+  | del "KW-0624" . mid . "Polysaccharide degradation"
+  | del "KW-0625" . mid . "Polysaccharide transport"
+  | del "KW-0626" . mid . "Porin"
+  | del "KW-0627" . mid . "Porphyrin biosynthesis"
+  | del "KW-0628" . mid . "Postsynaptic membrane"
+  | del "KW-0629" . mid . "Postsynaptic neurotoxin"
+  | del "KW-0632" . mid . "Potassium channel inhibitor"
+  | del "KW-0631" . mid . "Potassium channel"
+  | del "KW-0630" . mid . "Potassium"
+  | del "KW-0633" . mid . "Potassium transport"
+  | del "KW-0884" . mid . "PQQ biosynthesis"
+  | del "KW-0634" . mid . "PQQ"
+  | del "KW-0635" . mid . "Pregnancy"
+  | del "KW-0636" . mid . "Prenylation"
+  | del "KW-0637" . mid . "Prenyltransferase"
+  | del "KW-0638" . mid . "Presynaptic neurotoxin"
+  | del "KW-0905" . mid . "Primary microcephaly"
+  | del "KW-0639" . mid . "Primosome"
+  | del "KW-0640" . mid . "Prion"
+  | del "KW-0935" . mid . "Progressive external ophthalmoplegia"
+  | del "KW-0641" . mid . "Proline biosynthesis"
+  | del "KW-0642" . mid . "Proline metabolism"
+  | del "KW-0643" . mid . "Prostaglandin biosynthesis"
+  | del "KW-0644" . mid . "Prostaglandin metabolism"
+  | del "KW-0646" . mid . "Protease inhibitor"
+  | del "KW-0645" . mid . "Protease"
+  | del "KW-0647" . mid . "Proteasome"
+  | del "KW-0648" . mid . "Protein biosynthesis"
+  | del "KW-0649" . mid . "Protein kinase inhibitor"
+  | del "KW-0650" . mid . "Protein phosphatase inhibitor"
+  | del "KW-0904" . mid . "Protein phosphatase"
+  | del "KW-0651" . mid . "Protein splicing"
+  | del "KW-0652" . mid . "Protein synthesis inhibitor"
+  | del "KW-0653" . mid . "Protein transport"
+  | del "KW-0654" . mid . "Proteoglycan"
+  | del "KW-0655" . mid . "Prothrombin activator"
+  | del "KW-0656" . mid . "Proto-oncogene"
+  | del "KW-0657" . mid . "Pseudohermaphroditism"
+  | del "KW-0658" . mid . "Purine biosynthesis"
+  | del "KW-0659" . mid . "Purine metabolism"
+  | del "KW-0660" . mid . "Purine salvage"
+  | del "KW-0661" . mid . "Putrescine biosynthesis"
+  | del "KW-0662" . mid . "Pyridine nucleotide biosynthesis"
+  | del "KW-0663" . mid . "Pyridoxal phosphate"
+  | del "KW-0664" . mid . "Pyridoxine biosynthesis"
+  | del "KW-0665" . mid . "Pyrimidine biosynthesis"
+  | del "KW-0666" . mid . "Pyrogen"
+  | del "KW-0668" . mid . "Pyropoikilocytosis"
+  | del "KW-0873" . mid . "Pyrrolidone carboxylic acid"
+  | del "KW-0669" . mid . "Pyrrolysine"
+  | del "KW-0670" . mid . "Pyruvate"
+  | del "KW-0671" . mid . "Queuosine biosynthesis"
+  | del "KW-0672" . mid . "Quinate metabolism"
+  | del "KW-0874" . mid . "Quinone"
+  | del "KW-0673" . mid . "Quorum sensing"
+  | del "KW-0674" . mid . "Reaction center"
+  | del "KW-0675" . mid . "Receptor"
+  | del "KW-0676" . mid . "Redox-active center"
+  | del "KW-0677" . mid . "Repeat"
+  | del "KW-0678" . mid . "Repressor"
+  | del "KW-0679" . mid . "Respiratory chain"
+  | del "KW-0680" . mid . "Restriction system"
+  | del "KW-0681" . mid . "Retinal protein"
+  | del "KW-0682" . mid . "Retinitis pigmentosa"
+  | del "KW-0683" . mid . "Retinol-binding"
+  | del "KW-0684" . mid . "Rhamnose metabolism"
+  | del "KW-0685" . mid . "Rhizomelic chondrodysplasia punctata"
+  | del "KW-0686" . mid . "Riboflavin biosynthesis"
+  | del "KW-0687" . mid . "Ribonucleoprotein"
+  | del "KW-0688" . mid . "Ribosomal frameshift"
+  | del "KW-0689" . mid . "Ribosomal protein"
+  | del "KW-0690" . mid . "Ribosome biogenesis"
+  | del "KW-0694" . mid . "RNA-binding"
+  | del "KW-0695" . mid . "RNA-directed DNA polymerase"
+  | del "KW-0696" . mid . "RNA-directed RNA polymerase"
+  | del "KW-0691" . mid . "RNA editing"
+  | del "KW-0943" . mid . "RNA-mediated gene silencing"
+  | del "KW-0692" . mid . "RNA repair"
+  | del "KW-0693" . mid . "RNA replication"
+  | del "KW-0697" . mid . "Rotamase"
+  | del "KW-0699" . mid . "rRNA-binding"
+  | del "KW-0698" . mid . "rRNA processing"
+  | del "KW-0949" . mid . "S-adenosyl-L-methionine"
+  | del "KW-0703" . mid . "Sarcoplasmic reticulum"
+  | del "KW-0704" . mid . "Schiff base"
+  | del "KW-0705" . mid . "SCID"
+  | del "KW-0964" . mid . "Secreted"
+  | del "KW-0708" . mid . "Seed storage protein"
+  | del "KW-0709" . mid . "Segmentation polarity protein"
+  | del "KW-0711" . mid . "Selenium"
+  | del "KW-0712" . mid . "Selenocysteine"
+  | del "KW-0713" . mid . "Self-incompatibility"
+  | del "KW-0716" . mid . "Sensory transduction"
+  | del "KW-0717" . mid . "Septation"
+  | del "KW-0718" . mid . "Serine biosynthesis"
+  | del "KW-0719" . mid . "Serine esterase"
+  | del "KW-0721" . mid . "Serine protease homolog"
+  | del "KW-0722" . mid . "Serine protease inhibitor"
+  | del "KW-0720" . mid . "Serine protease"
+  | del "KW-0723" . mid . "Serine/threonine-protein kinase"
+  | del "KW-0724" . mid . "Serotonin biosynthesis"
+  | del "KW-0726" . mid . "Sexual differentiation"
+  | del "KW-0727" . mid . "SH2 domain"
+  | del "KW-0729" . mid . "SH3-binding"
+  | del "KW-0728" . mid . "SH3 domain"
+  | del "KW-0940" . mid . "Short QT syndrome"
+  | del "KW-0730" . mid . "Sialic acid"
+  | del "KW-0731" . mid . "Sigma factor"
+  | del "KW-0735" . mid . "Signal-anchor"
+  | del "KW-0732" . mid . "Signal"
+  | del "KW-0736" . mid . "Signalosome"
+  | del "KW-0733" . mid . "Signal recognition particle"
+  | del "KW-0734" . mid . "Signal transduction inhibitor"
+  | del "KW-0737" . mid . "Silk protein"
+  | del "KW-0701" . mid . "S-layer"
+  | del "KW-0702" . mid . "S-nitrosylation"
+  | del "KW-0738" . mid . "Sodium channel inhibitor"
+  | del "KW-0894" . mid . "Sodium channel"
+  | del "KW-0915" . mid . "Sodium"
+  | del "KW-0740" . mid . "Sodium/potassium transport"
+  | del "KW-0739" . mid . "Sodium transport"
+  | del "KW-0741" . mid . "SOS mutagenesis"
+  | del "KW-0742" . mid . "SOS response"
+  | del "KW-0744" . mid . "Spermatogenesis"
+  | del "KW-0745" . mid . "Spermidine biosynthesis"
+  | del "KW-0746" . mid . "Sphingolipid metabolism"
+  | del "KW-0950" . mid . "Spinocerebellar ataxia"
+  | del "KW-0747" . mid . "Spliceosome"
+  | del "KW-0748" . mid . "Sporozoite"
+  | del "KW-0749" . mid . "Sporulation"
+  | del "KW-0750" . mid . "Starch biosynthesis"
+  | del "KW-0751" . mid . "Stargardt disease"
+  | del "KW-0754" . mid . "Steroid-binding"
+  | del "KW-0752" . mid . "Steroid biosynthesis"
+  | del "KW-0753" . mid . "Steroid metabolism"
+  | del "KW-0755" . mid . "Steroidogenesis"
+  | del "KW-0756" . mid . "Sterol biosynthesis"
+  | del "KW-0757" . mid . "Stickler syndrome"
+  | del "KW-0758" . mid . "Storage protein"
+  | del "KW-0759" . mid . "Streptomycin biosynthesis"
+  | del "KW-0346" . mid . "Stress response"
+  | del "KW-0760" . mid . "Structural protein"
+  | del "KW-0762" . mid . "Sugar transport"
+  | del "KW-0763" . mid . "Sulfate respiration"
+  | del "KW-0764" . mid . "Sulfate transport"
+  | del "KW-0765" . mid . "Sulfation"
+  | del "KW-0766" . mid . "Superantigen"
+  | del "KW-0941" . mid . "Suppressor of RNA silencing"
+  | del "KW-0767" . mid . "Surface film"
+  | del "KW-0768" . mid . "Sushi"
+  | del "KW-0769" . mid . "Symport"
+  | del "KW-0770" . mid . "Synapse"
+  | del "KW-0771" . mid . "Synaptosome"
+  | del "KW-0772" . mid . "Systemic lupus erythematosus"
+  | del "KW-0919" . mid . "Taste"
+  | del "KW-0776" . mid . "Taste-modifying protein"
+  | del "KW-0876" . mid . "Taxol biosynthesis"
+  | del "KW-0920" . mid . "Tegument protein"
+  | del "KW-0777" . mid . "Teichoic acid biosynthesis"
+  | del "KW-0778" . mid . "Tellurium resistance"
+  | del "KW-0779" . mid . "Telomere"
+  | del "KW-0780" . mid . "Terminal addition"
+  | del "KW-0783" . mid . "Tetrahydrobiopterin biosynthesis"
+  | del "KW-0784" . mid . "Thiamine biosynthesis"
+  | del "KW-0785" . mid . "Thiamine catabolism"
+  | del "KW-0786" . mid . "Thiamine pyrophosphate"
+  | del "KW-0787" . mid . "Thick filament"
+  | del "KW-0882" . mid . "Thioester bond"
+  | del "KW-0883" . mid . "Thioether bond"
+  | del "KW-0789" . mid . "Thiol protease inhibitor"
+  | del "KW-0788" . mid . "Thiol protease"
+  | del "KW-0791" . mid . "Threonine biosynthesis"
+  | del "KW-0888" . mid . "Threonine protease"
+  | del "KW-0792" . mid . "Thrombophilia"
+  | del "KW-0793" . mid . "Thylakoid"
+  | del "KW-0795" . mid . "Thyroid hormone"
+  | del "KW-0893" . mid . "Thyroid hormones biosynthesis"
+  | del "KW-0796" . mid . "Tight junction"
+  | del "KW-0797" . mid . "Tissue remodeling"
+  | del "KW-0798" . mid . "TonB box"
+  | del "KW-0799" . mid . "Topoisomerase"
+  | del "KW-0800" . mid . "Toxin"
+  | del "KW-0801" . mid . "TPQ"
+  | del "KW-0802" . mid . "TPR repeat"
+  | del "KW-0889" . mid . "Transcription antitermination"
+  | del "KW-0804" . mid . "Transcription"
+  | del "KW-0805" . mid . "Transcription regulation"
+  | del "KW-0806" . mid . "Transcription termination"
+  | del "KW-0807" . mid . "Transducer"
+  | del "KW-0808" . mid . "Transferase"
+  | del "KW-0809" . mid . "Transit peptide"
+  | del "KW-0810" . mid . "Translation regulation"
+  | del "KW-0811" . mid . "Translocation"
+  | del "KW-0812" . mid . "Transmembrane"
+  | del "KW-0813" . mid . "Transport"
+  | del "KW-0814" . mid . "Transposable element"
+  | del "KW-0815" . mid . "Transposition"
+  | del "KW-0816" . mid . "Tricarboxylic acid cycle"
+  | del "KW-0817" . mid . "Trimethoprim resistance"
+  | del "KW-0818" . mid . "Triplet repeat expansion"
+  | del "KW-0820" . mid . "tRNA-binding"
+  | del "KW-0819" . mid . "tRNA processing"
+  | del "KW-0821" . mid . "Trypanosomiasis"
+  | del "KW-0822" . mid . "Tryptophan biosynthesis"
+  | del "KW-0823" . mid . "Tryptophan catabolism"
+  | del "KW-0824" . mid . "TTQ"
+  | del "KW-0825" . mid . "Tumor antigen"
+  | del "KW-0826" . mid . "Tungsten"
+  | del "KW-0902" . mid . "Two-component regulatory system"
+  | del "KW-0827" . mid . "Tyrosine biosynthesis"
+  | del "KW-0828" . mid . "Tyrosine catabolism"
+  | del "KW-0829" . mid . "Tyrosine-protein kinase"
+  | del "KW-0831" . mid . "Ubiquinone biosynthesis"
+  | del "KW-0830" . mid . "Ubiquinone"
+  | del "KW-0832" . mid . "Ubl conjugation"
+  | del "KW-0833" . mid . "Ubl conjugation pathway"
+  | del "KW-0834" . mid . "Unfolded protein response"
+  | del "KW-0835" . mid . "Urea cycle"
+  | del "KW-0836" . mid . "Usher syndrome"
+  | del "KW-0926" . mid . "Vacuole"
+  | del "KW-0837" . mid . "Vanadium"
+  | del "KW-0838" . mid . "Vasoactive"
+  | del "KW-0839" . mid . "Vasoconstrictor"
+  | del "KW-0840" . mid . "Vasodilator"
+  | del "KW-0899" . mid . "Viral immunoevasion"
+  | del "KW-0468" . mid . "Viral matrix protein"
+  | del "KW-0916" . mid . "Viral movement protein"
+  | del "KW-0543" . mid . "Viral nucleoprotein"
+  | del "KW-0842" . mid . "Viral occlusion body"
+  | del "KW-0946" . mid . "Virion protein"
+  | del "KW-0843" . mid . "Virulence"
+  | del "KW-0844" . mid . "Vision"
+  | del "KW-0845" . mid . "Vitamin A"
+  | del "KW-0847" . mid . "Vitamin C"
+  | del "KW-0848" . mid . "Vitamin D"
+  | del "KW-0850" . mid . "VLDL"
+  | del "KW-0851" . mid . "Voltage-gated channel"
+  | del "KW-0852" . mid . "von Willebrand disease"
+  | del "KW-0897" . mid . "Waardenburg syndrome"
+  | del "KW-0853" . mid . "WD repeat"
+  | del "KW-0855" . mid . "Whooping cough"
+  | del "KW-0856" . mid . "Williams-Beuren syndrome"
+  | del "KW-0879" . mid . "Wnt signaling pathway"
+  | del "KW-0857" . mid . "Xeroderma pigmentosum"
+  | del "KW-0858" . mid . "Xylan degradation"
+  | del "KW-0859" . mid . "Xylose metabolism"
+  | del "KW-0861" . mid . "Zellweger syndrome"
+  | del "KW-0863" . mid . "Zinc-finger"
+  | del "KW-0862" . mid . "Zinc"
+  | del "KW-0864" . mid . "Zinc transport"
+  | del "KW-0865" . mid . "Zymogen" )
+
+let kw_tag : string = tag "KW" 
+
+let kw_xml : lens = 
+  let kw : lens = 
+    Xml.raw_open NL1 "keyword" . 
+    qdel SP " " . 
+    del "id=\"" . kw_trans . 
+    Xml.simple_close_tag "keyword" in
+  ins kw_tag . 
+  iter_with_sqsp kw . 
+  dot 
+
+let kw_line : lens = split_terminate kw_tag kw_xml
+
+(* unit tests for KW line *)
+let kw_ascii : string = 
+  "KW   Complete proteome; Differentiation; Viral movement protein; Zymogen;
+  |KW   2Fe-2S." . 
+  NL
+
+let kw_xml : string = 
+  NL . 
+  "  <keyword id=\"KW-0181\">Complete proteome</keyword>
+  |  <keyword id=\"KW-0221\">Differentiation</keyword>
+  |  <keyword id=\"KW-0916\">Viral movement protein</keyword>
+  |  <keyword id=\"KW-0865\">Zymogen</keyword>
+  |  <keyword id=\"KW-0001\">2Fe-2S</keyword>"
+
+test kw_line.get 
+  kw_xml = kw_ascii
+
+test kw_line.create 
+  kw_ascii = kw_xml
+
+let P12544_kw_ascii : string = 
+  "KW   3D-structure; Apoptosis; Cytolysis; Direct protein sequencing;
+  |KW   Glycoprotein; Hydrolase; Polymorphism; Protease; Secreted; Serine
+  |KW   protease; Signal; Zymogen." . 
+  NL
+
+let P12544_kw_xml : string = 
+  NL . 
+  "  <keyword id=\"KW-0002\">3D-structure</keyword>
+  |  <keyword id=\"KW-0053\">Apoptosis</keyword>
+  |  <keyword id=\"KW-0204\">Cytolysis</keyword>
+  |  <keyword id=\"KW-0903\">Direct protein sequencing</keyword>
+  |  <keyword id=\"KW-0325\">Glycoprotein</keyword>
+  |  <keyword id=\"KW-0378\">Hydrolase</keyword>
+  |  <keyword id=\"KW-0621\">Polymorphism</keyword>
+  |  <keyword id=\"KW-0645\">Protease</keyword>
+  |  <keyword id=\"KW-0964\">Secreted</keyword>
+  |  <keyword id=\"KW-0720\">Serine protease</keyword>
+  |  <keyword id=\"KW-0732\">Signal</keyword>
+  |  <keyword id=\"KW-0865\">Zymogen</keyword>"
+
+test kw_line.get 
+  P12544_kw_xml = P12544_kw_ascii
+
+test kw_line.create 
+  P12544_kw_ascii = P12544_kw_xml
+
+(* --------------------------------------------------------------------------- *)
+(* FT line *)
+(*** START 
+
+test "----- FT line-----" = ?
+
+let ft_tag : string = tag "FT" 
+
+let num (sym:string) : lens = 
+  ( space{4} . ins sym . DIGIT
+  || space{3} . ins sym . DIGIT{2}
+  || space{2} . ins sym . DIGIT{3}
+  || space{1} . ins sym . DIGIT{4}
+  ||            ins sym . DIGIT{5} ) 
+
+let ft_bound (name:string) : lens = 
+  Xml.attrs_elt_no_kids NL3 name
+    ( Sort.perm_sort
+        #{lens}[(Xml.attr "status" (del "less than"));
+                (Xml.attr "position" (num "<"))]
+    || Sort.perm_sort
+        #{lens}[(Xml.attr "status" (del "greater than"));
+                (Xml.attr "position" (num ">"))]
+    || Sort.perm_sort
+        #{lens}[(Xml.attr "status" (del "uncertain"));
+                (Xml.attr "position" (num "?"))]
+    || Xml.attr "position" (num " ") )
+
+let single_pos_cn : canonizer = 
+  let NUM : regexp = stype (num " ") in
+  canonizer_of_lens
+    begin
+      WS . 
+      ("<position" <-> "<begin").
+      WSP . 
+      "position=\"" . 
+      dup1 NUM 
+        ("\"/><end position=\"" . NUM)
+        (fun (s:string) -> "\"/><end position=\"" . s) . 
+      "\"/>" 
+    end
+
+(* clever position canonizer :-) *)
+let double_pos : lens = ( ft_bound "begin" . space . ft_bound "end" )  
+
+let pos_cn : canonizer = (canonizer_of_lens (stype double_pos)) | (single_pos_cn)
+
+let ft_bounds : lens = 
+  Xml.elt NL2 "location" 
+    (left_quot pos_cn double_pos)
+
+test ft_bounds.get
+  "    <location>
+  |      <begin position=\"243\"/>
+  |      <end position=\"244\"/>
+  |    </location>" 
+= "   243    244"
+
+test ft_bounds.get
+  "    <location>
+  |       <position position=\"243\"/>
+  |    </location>" 
+= "   243    243"
+
+let s7 : lens = ins "       "
+
+let ft_original_variation : lens = 
+  s7 . 
+  ( Xml.simple_elt NL2 "original" UALPHANUMCHAR . 
+    ins " -> " . 
+    Xml.simple_elt NL2 "variation" UALPHANUMCHAR 
+  | ins "Missing" ) . 
+  space 
+
+let ft_normal_type : lens = 
+  ( "active site"                         <-> "ACT_SITE" 
+  | "binding site"                        <-> "BINDING " 
+  | "calcium-binding region"              <-> "CA_BIND " 
+  | "chain"                               <-> "CHAIN   " 
+  | "coiled-coil region"                  <-> "COILED  " 
+  | "compositionally biased region"       <-> "COMPBIAS" 
+  | "cross-link"                          <-> "CROSSLNK" 
+  | "disulfide bond"                      <-> "DISULFID" 
+  | "DNA-binding region"                  <-> "DNA_BIND" 
+  | "domain"                              <-> "DOMAIN  " 
+  | "glycosylation site"                  <-> "CARBOHYD" 
+  | "helix"                               <-> "HELIX   " 
+  | "initiator methionine"                <-> "INIT_MET" 
+  | "lipid moiety-binding region"         <-> "LIPID   " 
+  | "metal ion-binding site"              <-> "METAL   " 
+  | "modified residue"                    <-> "MOD_RES " 
+  | "non-consecutive residues"            <-> "NON_CONS" 
+  | "non-terminal residue"                <-> "NON_TER " 
+  | "nucleotide phosphate-binding region" <-> "NP_BIND " 
+  | "peptide"                             <-> "PEPTIDE " 
+  | "propeptide"                          <-> "PROPEP  " 
+  | "region of interest"                  <-> "REGION  " 
+  | "repeat"                              <-> "REPEAT  " 
+  | "selenocysteine"                      <-> "SE_CYS  " 
+  | "short sequence motif"                <-> "MOTIF   " 
+  | "signal peptide"                      <-> "SIGNAL  " 
+  | "site"                                <-> "SITE    " 
+  | "strand"                              <-> "STRAND  " 
+  | "topological domain"                  <-> "TOPO_DOM" 
+  | "transit peptide"                     <-> "TRANSIT " 
+  | "transmembrane region"                <-> "TRANSMEM" 
+  | "turn"                                <-> "TURN    " 
+  | "unsure residue"                      <-> "UNSURE  " 
+  | "zinc finger region"                  <-> "ZN_FING ") . 
+  space
+
+let ft_variation_type : lens = 
+  ( "mutagenesis site"  <-> "MUTAGEN " 
+  | "sequence conflict" <-> "CONFLICT" 
+  | "sequence variant"  <-> "VARIANT " 
+  | "splice variant"    <-> "VAR_SEQ ") . 
+  space
+
+let s29 : lens = ins "                             "
+
+let ft_id : lens = 
+  nl . ins ft_tag . s29 . 
+  ins "/FTId=" . 
+  [A-Z]{3} . "_" . [0-9]{6,10} . 
+  dot
+
+let ft_status : lens = 
+    qualifiers . dot
+
+let ft_description : lens =   
+  (* HACK !*)
+  [^<>"".&\n]+ - (containing (vtype qualifiers))
+
+let ft_aux (l:lens) (ty:lens) (body:lens) :  lens = 
+  ( Xml.slow_attr4_elt_swap2 NL1 "feature"
+      "type" ty 
+      "description" (l . ft_description)
+      "status" ft_status
+      "id" ft_id 
+      body
+  | Xml.slow_attr3_elt_swap2 NL1 "feature"
+      "type" ty
+      "description" (l . ft_description . dot)
+      "id" ft_id
+      body
+  | Xml.slow_attr3_elt_swap2 NL1 "feature"
+      "type" ty
+      "description" (l . ft_description)
+      "status" ft_status
+      body
+  | Xml.slow_attr2_elt_swap2 NL1 "feature"
+      "type" ty
+      "description" (l . ft_description . dot)
+      body
+  | Xml.slow_attr2_elt_swap2 NL1 "feature"
+      "type" ty
+      "id" ft_id
+      body
+  | Xml.attr1_elt NL1 "feature"
+      "type" ty
+      body
+  )
+
+let ft_xml : lens = 
+  ins ft_tag . 
+  ( ft_aux s7 ft_normal_type ft_bounds 
+  | ft_aux "" ft_variation_type (ft_original_variation ~ ft_bounds) )
+
+let ft_line : lens = terminate ft_xml 
+
+let ft_block : lens = ft_line*
+
+(* unit tests for FT line *)
+let ft_ascii1 : string = 
+  "FT   CONFLICT     27     27       S -> E (in Ref 2).
+  |FT                                /FTId=VSP_123456." . 
+  NL
+
+let ft_ascii2 : string = 
+  "FT   VAR_SEQ     243    244       Missing (in isoform 2).
+  |FT                                /FTId=VSP_008971." . 
+  NL
+
+let ft_xml1 : string = 
+  NL . 
+  "  <feature type=\"sequence conflict\" description=\"(in Ref 2)\" id=\"VSP_123456\">
+  |    <original>S</original>
+  |    <variation>E</variation>
+  |    <location>
+  |      <begin position=\"27\"/>
+  |      <end position=\"27\"/>
+  |    </location>
+  |  </feature>"
+
+let ft_xml2 : string = 
+  NL . 
+  "  <feature type=\"splice variant\" description=\"(in isoform 2)\" id=\"VSP_008971\">
+  |    <location>
+  |      <begin position=\"243\"/>
+  |      <end position=\"244\"/>
+  |    </location>
+  |  </feature>" 
+
+test ft_line.get 
+  ft_xml1 = ft_ascii1
+
+test ft_line.get 
+  ft_xml2 = ft_ascii2
+
+test ft_line.create 
+  ft_ascii1 = ft_xml1
+
+test ft_line.create 
+  ft_ascii2 = ft_xml2
+
+let P12544_ft_ascii : string = 
+  "FT   SIGNAL        1     26
+  |FT   PROPEP       27     28       Activation peptide.
+  |FT                                /FTId=PRO_0000027393.
+  |FT   CHAIN        29    262       Granzyme A.
+  |FT                                /FTId=PRO_0000027394.
+  |FT   DOMAIN       29    259       Peptidase S1.
+  |FT   ACT_SITE     69     69       Charge relay system.
+  |FT   ACT_SITE    114    114       Charge relay system.
+  |FT   ACT_SITE    212    212       Charge relay system.
+  |FT   CARBOHYD    170    170       N-linked (GlcNAc,,,) (Potential).
+  |FT   DISULFID     54     70
+  |FT   DISULFID    148    218
+  |FT   DISULFID    179    197
+  |FT   DISULFID    208    234
+  |FT   VARIANT     121    121       T -> M In dbSNP:rs3104233.
+  |FT                                /FTId=VAR_024291.
+  |FT   STRAND       43     47
+  |FT   STRAND       49     51
+  |FT   STRAND       53     60
+  |FT   STRAND       63     66
+  |FT   STRAND       77     81
+  |FT   STRAND       83     87
+  |FT   STRAND       93     95
+  |FT   STRAND       97    102
+  |FT   TURN        108    110
+  |FT   STRAND      116    122
+  |FT   STRAND      127    130
+  |FT   STRAND      147    154
+  |FT   STRAND      156    160
+  |FT   STRAND      167    174
+  |FT   HELIX       176    179
+  |FT   TURN        186    189
+  |FT   STRAND      195    199
+  |FT   STRAND      215    218
+  |FT   STRAND      221    228
+  |FT   STRAND      241    245
+  |FT   HELIX       251    258" . 
+  NL
+
+let P12544_ft_xml : string = 
+  NL . 
+  "  <feature type=\"signal peptide\">
+  |    <location>
+  |      <begin position=\"1\"/>
+  |      <end position=\"26\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"propeptide\" description=\"Activation peptide\" id=\"PRO_0000027393\">
+  |    <location>
+  |      <begin position=\"27\"/>
+  |      <end position=\"28\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"chain\" description=\"Granzyme A\" id=\"PRO_0000027394\">
+  |    <location>
+  |      <begin position=\"29\"/>
+  |      <end position=\"262\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"domain\" description=\"Peptidase S1\">
+  |    <location>
+  |      <begin position=\"29\"/>
+  |      <end position=\"259\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |  <position position=\"69\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |  <position position=\"114\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |  <position position=\"212\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"glycosylation site\" description=\"N-linked (GlcNAc,,,)\" status=\"potential\">
+  |    <location>
+  |  <position position=\"170\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"54\"/>
+  |      <end position=\"70\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"148\"/>
+  |      <end position=\"218\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"179\"/>
+  |      <end position=\"197\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"208\"/>
+  |      <end position=\"234\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"sequence variant\" description=\"In dbSNP:rs3104233\" id=\"VAR_024291\">
+  |  <original>T</original>
+  |  <variation>M</variation>
+  |    <location>
+  |  <position position=\"121\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"43\"/>
+  |      <end position=\"47\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"49\"/>
+  |      <end position=\"51\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"53\"/>
+  |      <end position=\"60\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"63\"/>
+  |      <end position=\"66\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"77\"/>
+  |      <end position=\"81\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"83\"/>
+  |      <end position=\"87\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"93\"/>
+  |      <end position=\"95\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"97\"/>
+  |      <end position=\"102\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"turn\">
+  |    <location>
+  |      <begin position=\"108\"/>
+  |      <end position=\"110\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"116\"/>
+  |      <end position=\"122\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"127\"/>
+  |      <end position=\"130\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"147\"/>
+  |      <end position=\"154\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"156\"/>
+  |      <end position=\"160\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"167\"/>
+  |      <end position=\"174\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"helix\">
+  |    <location>
+  |      <begin position=\"176\"/>
+  |      <end position=\"179\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"turn\">
+  |    <location>
+  |      <begin position=\"186\"/>
+  |      <end position=\"189\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"195\"/>
+  |      <end position=\"199\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"215\"/>
+  |      <end position=\"218\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"221\"/>
+  |      <end position=\"228\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"241\"/>
+  |      <end position=\"245\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"helix\">
+  |    <location>
+  |      <begin position=\"251\"/>
+  |      <end position=\"258\"/>
+  |    </location>
+  |  </feature>"
+
+let P12544_ft_xml_cn : string = 
+  NL . 
+  "  <feature type=\"signal peptide\">
+  |    <location>
+  |      <begin position=\"1\"/>
+  |      <end position=\"26\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"propeptide\" description=\"Activation peptide\" id=\"PRO_0000027393\">
+  |    <location>
+  |      <begin position=\"27\"/>
+  |      <end position=\"28\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"chain\" description=\"Granzyme A\" id=\"PRO_0000027394\">
+  |    <location>
+  |      <begin position=\"29\"/>
+  |      <end position=\"262\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"domain\" description=\"Peptidase S1\">
+  |    <location>
+  |      <begin position=\"29\"/>
+  |      <end position=\"259\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |      <begin position=\"69\"/>
+  |      <end position=\"69\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |      <begin position=\"114\"/>
+  |      <end position=\"114\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"active site\" description=\"Charge relay system\">
+  |    <location>
+  |      <begin position=\"212\"/>
+  |      <end position=\"212\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"glycosylation site\" description=\"N-linked (GlcNAc,,,)\" status=\"potential\">
+  |    <location>
+  |      <begin position=\"170\"/>
+  |      <end position=\"170\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"54\"/>
+  |      <end position=\"70\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"148\"/>
+  |      <end position=\"218\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"179\"/>
+  |      <end position=\"197\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"disulfide bond\">
+  |    <location>
+  |      <begin position=\"208\"/>
+  |      <end position=\"234\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"sequence variant\" description=\"In dbSNP:rs3104233\" id=\"VAR_024291\">
+  |    <original>T</original>
+  |    <variation>M</variation>
+  |    <location>
+  |      <begin position=\"121\"/>
+  |      <end position=\"121\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"43\"/>
+  |      <end position=\"47\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"49\"/>
+  |      <end position=\"51\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"53\"/>
+  |      <end position=\"60\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"63\"/>
+  |      <end position=\"66\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"77\"/>
+  |      <end position=\"81\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"83\"/>
+  |      <end position=\"87\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"93\"/>
+  |      <end position=\"95\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"97\"/>
+  |      <end position=\"102\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"turn\">
+  |    <location>
+  |      <begin position=\"108\"/>
+  |      <end position=\"110\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"116\"/>
+  |      <end position=\"122\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"127\"/>
+  |      <end position=\"130\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"147\"/>
+  |      <end position=\"154\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"156\"/>
+  |      <end position=\"160\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"167\"/>
+  |      <end position=\"174\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"helix\">
+  |    <location>
+  |      <begin position=\"176\"/>
+  |      <end position=\"179\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"turn\">
+  |    <location>
+  |      <begin position=\"186\"/>
+  |      <end position=\"189\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"195\"/>
+  |      <end position=\"199\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"215\"/>
+  |      <end position=\"218\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"221\"/>
+  |      <end position=\"228\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"strand\">
+  |    <location>
+  |      <begin position=\"241\"/>
+  |      <end position=\"245\"/>
+  |    </location>
+  |  </feature>
+  |  <feature type=\"helix\">
+  |    <location>
+  |      <begin position=\"251\"/>
+  |      <end position=\"258\"/>
+  |    </location>
+  |  </feature>"
+
+test ft_block.get 
+  P12544_ft_xml = P12544_ft_ascii
+test ft_block.create
+  P12544_ft_ascii = P12544_ft_xml_cn
+
+***)
+
+(* --------------------------------------------------------------------------- *)
+(* SQ line *)
+test "----- SQ line-----" = ?
+
+let sq_tag : string = tag "SQ" 
+
+let sq_start_xml (flen:regexp -> lens) (fmass:regexp -> lens) (fcheck:regexp -> lens) : lens = 
+  ins sq_tag . 
+  ins "SEQUENCE   " . 
+  Xml.raw_open NL1 "sequence" . 
+    Sort.sort_concat #{lens}[(Xml.attr "length" (flen NUMBER));
+			     (Xml.attr "mass" (fmass NUMBER));
+			     (Xml.attr "checksum" (fcheck UALPHANUMCHAR+))]
+
+let dt_tag : string = tag "DT" 
+
+let sq_mid_xml : lens = 
+  let l : lens = 
+    ins dt_tag . 
+    Sort.sort_concat #{lens}[(Xml.attr "modified" (date . comma . space));
+			     (Xml.attr "version" (ins "sequence version" . space . NUMBER . dot)) . 
+			       Xml.close] in 
+  terminate l 
+
+
+let R1 = (UALPHACHAR{10}){0,5}
+let R2 = (UALPHACHAR{1,10})
+
+let sq_rest_xml : lens = 
+  let block : lens = space . UALPHACHAR{10} in 
+  let full_line : lens = ins "    " . block{6} . ins "\n" in 
+  let part_line : lens = 
+    ins "    " . block{0,5} . 
+    (space . UALPHACHAR{1,10}) . 
+    nl in
+  let l : lens = 
+    full_line* . part_line . 
+    ins "//" . 
+    Xml.simple_close_tag "sequence" in 
+  terminate l 
+
+let sq_block : lens = 
+  sq_start_xml 
+    (fun (l:regexp) -> l . ins " AA;  ")
+    (fun (l:regexp) -> l . ins " MW;  ") 
+    (fun (l:regexp) -> l . ins " CRC64;\n") . 
+  sq_mid_xml . 
+  sq_rest_xml
+
+(* unit tests for SQ block *)
+let sq_ascii : string = 
+  "SQ   SEQUENCE   893 AA;  101921 MW;  2F67CEB3B02E7AC1 CRC64;
+  |DT   01-JAN-2007, sequence version 15.
+  |     MKFLVLLFNI LCLFPILGAD ELVMSPIPTT DVQPKVTFDI NSEVSSGPLY LNPVEMAGVK
+  |     YLQLQRQPGV QVHKVVEGDI VIWENEEMPL YTCAIVTQNE VPYMAYVELL EDPDLIFFLK
+  |     EGDQWAPIPE DQYLARLQQL RQQIHTESFF SLNLSFQHEN YKYEMVSSFQ HSIKMVVFTP
+  |     KNGHICKMVY DKNIRIFKAL YNEYVTSVIG FFRGLKLLLL NIFVIDDRGM IGNKYFQLLD
+  |     DKYAPISVQG YVATIPKLKD FAEPYHPIIL DISDIDYVNF YLGDATYHDP GFKIVPKTPQ
+  |     CITKVVDGNE VIYESSNPSV ECVYKVTYYD KKNESMLRLD LNHSPPSYTS YYAKREGVWV
+  |     TSTYIDLEEK IEELQDHRST ELDVMFMSDK DLNVVPLTNG NLEYFMVTPK PHRDIIIVFD
+  |     GSEVLWYYEG LENHLVCTWI YVTEGAPRLV HLRVKDRIPQ NTDIYMVKFG EYWVRISKTQ
+  |     YTQEIKKLIK KSKKKLPSIE EEDSDKHGGP PKGPEPPTGP GHSSSESKEH EDSKESKEPK
+  |     EHGSPKETKE GEVTKKPGPA KEHKPSKIPV YTKRPEFPKK SKSPKRPESP KSPKRPVSPQ
+  |     RPVSPKSPKR PESLDIPKSP KRPESPKSPK RPVSPQRPVS PRRPESPKSP KSPKSPKSPK
+  |     VPFDPKFKEK LYDSYLDKAA KTKETVTLPP VLPTDESFTH TPIGEPTAEQ PDDIEPIEES
+  |     VFIKETGILT EEVKTEDIHS ETGEPEEPKR PDSPTKHSPK PTGTHPSMPK KRRRSDGLAL
+  |     STTDLESEAG RILRDPTGKI VTMKRSKSFD DLTTVREKEH MGAEIRKIVV DDDGTEADDE
+  |     DTHPSKEKHL STVRRRRPRP KKSSKSSKPR KPDSAFVPSI IFIFLVSLIV GIL
+  |//" . 
+  NL
+
+let sq_xml : string = 
+  NL . 
+  "  <sequence mass=\"101921\" length=\"893\" checksum=\"2F67CEB3B02E7AC1\" modified=\"2007-01-01\" version=\"15\">MKFLVLLFNILCLFPILGADELVMSPIPTTDVQPKVTFDINSEVSSGPLYLNPVEMAGVKYLQLQRQPGVQVHKVVEGDIVIWENEEMPLYTCAIVTQNEVPYMAYVELLEDPDLIFFLKEGDQWAPIPEDQYLARLQQLRQQIHTESFFSLNLSFQHENYKYEMVSSFQHSIKMVVFTPKNGHICKMVYDKNIRIFKALYNEYVTSVIGFFRGLKLLLLNIFVIDDRGMIGNKYFQLLDDKYAPISVQGYVATIPKLKDFAEPYHPIILDISDIDYVNFYLGDATYHDPGFKIVPKTPQCITKVVDGNEVIYESSNPSVECVYKVTYYDKKNESMLRLDLNHSPPSYTSYYAKREGVWVTSTYIDLEEKIEELQDHRSTELDVMFMSDKDLNVVPLTNGNLEYFMVTPKPHRDIIIVFDGSEVLWYYEGLENHLVCTWIYVTEGAPRLVHLRVKDRIPQNTDIYMVKFGEYWVRISKTQYTQEIKKLIKKSKKKLPSIEEEDSDKHGGPPKGPEPPTGPGHSSSESKEHEDSKESKEPKEHGSPKETKEGEVTKKPGPAKEHKPSKIPVYTKRPEFPKKSKSPKRPESPKSPKRPVSPQRPVSPKSPKRPESLDIPKSPKRPESPKSPKRPVSPQRPVSPRRPESPKSPKSPKSPKSPKVPFDPKFKEKLYDSYLDKAAKTKETVTLPPVLPTDESFTHTPIGEPTAEQPDDIEPIEESVFIKETGILTEEVKTEDIHSETGEPEEPKRPDSPTKHSPKPTGTHPSMPKKRRRSDGLALSTTDLESEAGRILRDPTGKIVTMKRSKSFDDLTTVREKEHMGAEIRKIVVDDDGTEADDEDTHPSKEKHLSTVRRRRPRPKKSSKSSKPRKPDSAFVPSIIFIFLVSLIVGIL</sequence>"
+
+test sq_block.get sq_xml = sq_ascii 
+
+(* (\* --------------------------------------------------------------------------- *\) *)
+(* (\* UniProtKB entry *\) *)
+
+(* let id_rest : lens =  *)
+(*   sq_start_xml  *)
+(*     (fun (l:regexp) -> l . ins " AA; ") *)
+(*     (fun (l:regexp) -> del l) *)
+(*     (fun (l:regexp) -> del l) *)
+
+(* let sq_start : lens =  *)
+(*   sq_start_xml  *)
+(*     (fun (l:regexp) -> l . ins " AA;  ") *)
+(*     (fun (l:regexp) -> l . ins " MW;  ") *)
+(*     (fun (l:regexp) -> l . ins " CRC64;\n")  *)
+
+(* let uniprot_entry : lens =  *)
+(*   let pass1 : lens =  *)
+(*     ( (dt_lines SwissProt .  *)
+(*        ac_line?) ~ *)
+(*       (id_xml_start SwissProt) ) .  *)
+(*     de_line .  *)
+(*     gn_line .  *)
+(*     organism_block .  *)
+(*     reference_block .  *)
+(*     cc_block .  *)
+(*     dr_block .  *)
+(*     pe_line? .  *)
+(*     kw_line? .  *)
+(*     ft_block .  *)
+(*     dup_snd id_rest sq_start .  *)
+(*     sq_mid_xml .  *)
+(*     sq_rest_xml in  *)
+(*   pass1 *)

@@ -1,0 +1,129 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2009                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/prefs.boom                                                         *)
+(* Handle arguments for the main function                                     *)
+(* $Id: prefs.boom 4624 2009-08-12 16:13:36Z cretin $ *)
+(******************************************************************************)
+
+module Prefs =
+
+#{@}
+
+\section{Command line parsing}
+
+#* let get_prog_name : unit -> string
+## = Native.Prelude.prefs_get_prog_name
+
+\LENSSECTION{@create_bool@} @create_bool name default doc fulldoc@
+creates a preference such that if @-name@ is present in the command
+line, then the value will be @true@.  If @-name=false@ is present in
+the command line then the value will be @false@.
+
+#* let create_bool (name:string) (default:bool) (doc:string) : bool_prefs
+## = Native.Prelude.prefs_create_bool name default doc
+
+#* let alias_bool : bool_prefs -> string -> unit
+## = Native.Prelude.prefs_alias_bool
+
+#* let read_bool : bool_prefs -> bool
+## = Native.Prelude.prefs_read_bool
+
+#* let create_int (name:string) (default:int) (doc:string) : int_prefs
+## = Native.Prelude.prefs_create_int name default doc
+
+#* let alias_int : int_prefs -> string -> unit
+## = Native.Prelude.prefs_alias_int
+
+#* let read_int : int_prefs -> int
+## = Native.Prelude.prefs_read_int
+
+#* let create_string (name:string) (default:string) (doc:string) : string_prefs
+## = Native.Prelude.prefs_create_string name default doc
+
+#* let alias_string : string_prefs -> string -> unit
+## = Native.Prelude.prefs_alias_string
+
+#* let read_string : string_prefs -> string
+## = Native.Prelude.prefs_read_string
+
+#* let create_string_list (name:string) (doc:string) : string_list_prefs
+## = Native.Prelude.prefs_create_string_list name doc
+
+#* let alias_string_list : string_list_prefs -> string -> unit
+## = Native.Prelude.prefs_alias_string_list
+
+#* let read_string_list : string_list_prefs -> string List.t
+## = Native.Prelude.prefs_read_string_list
+
+#* let print_usage : string -> unit
+## = Native.Prelude.prefs_print_usage
+
+\LENSSECTION{@extern_rest@} @extern_rest ()@ returns the preference
+for anonymous arguments.
+
+#* let extern_rest : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_rest
+
+#* let extern_output : unit -> string_prefs
+## = Native.Prelude.prefs_extern_output
+
+#* let extern_lens : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_lens
+
+#* let extern_source : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_source
+
+#* let extern_view : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_view
+
+#* let extern_expression : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_expression
+
+#* let extern_check : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_check
+
+#* let extern_include : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_include
+
+#* let extern_test : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_test
+
+#* let extern_testall : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_testall
+
+#* let extern_debug : unit -> string_list_prefs
+## = Native.Prelude.prefs_extern_debug
+
+#* let extern_debugtimes : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_debugtimes
+
+#* let extern_log : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_log
+
+#* let extern_logfile : unit -> string_prefs
+## = Native.Prelude.prefs_extern_logfile
+
+#* let extern_terse : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_terse
+
+#* let extern_timers : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_timers
+
+#* let extern_colorize : unit -> bool_prefs
+## = Native.Prelude.prefs_extern_colorize
+

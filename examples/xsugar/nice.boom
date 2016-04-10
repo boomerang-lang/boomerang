@@ -1,0 +1,46 @@
+module Nice = 
+
+  let l (l:string) (u:string) : lens = 
+    ins l . 
+    Xml.simple_elt_no_kids NL1 u 
+  
+  let xs : lens = (l "x" "X")*
+  
+  let ys : lens = (l "y" "Y")*
+
+  let n : lens = 
+    Xml.elt NL0 "A"
+      begin
+        ys ~ xs
+      end
+
+test n.get 
+<<
+  <A>
+    <Y></Y><Y></Y>
+    <X></X><X></X><X></X><X></X>
+  </A>
+>> 
+=
+<<
+  xxxxyy
+>>
+
+test n.create 
+<<
+  xxxxyy
+>>
+=
+<<
+ 
+ <A>
+  <Y/>
+  <Y/>
+  <X/>
+  <X/>
+  <X/>
+  <X/>
+ </A>
+>> 
+
+ 

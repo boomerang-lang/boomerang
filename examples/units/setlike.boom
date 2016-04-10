@@ -1,0 +1,244 @@
+module Setlike =
+
+let set (name:string) = Tag (Setlike, Threshold 0, Key, name)
+
+
+let main =
+  let word = copy [a-z]+ . " " in
+  let line = <set "w":word>* in
+    line
+
+test put main "" "" = ""
+test put main "asdf " "" = "asdf "
+test put main "" "asdf " = ""
+
+
+let sep_list (a:lens) (b:lens) = (a . (b . a)* )
+
+let main = (* b *)
+  let word = copy [a-z]+ . del [A-Z]* in
+  let line = sep_list <set "w":word> " " in
+  line
+
+test put main "a b c d e" "aA bB cC dD eE" = "aA bB cC dD eE"
+test put main "a c b e d" "aA bB cC dD eE" = "aA cC bB eE dD"
+test put main "bbb aaa ccg dh xyz" "aaaA bbbB cccC dddD eeeE" = "bbbB aaaA ccgC dhD xyz"
+
+(* greedy vs. hungarian *)
+
+let gmain = (* greedy *)
+  let word = copy [a-z]+ . del [A-Z]* in
+  let line = sep_list <greedy 0 "w":key word> " " in
+  line
+
+test put  main "abd acdefg" "xyzabdXX acdYY" = "abdXX acdefgYY"
+test put gmain "abd acdefg" "xyzabdXX acdYY" = "abdYY acdefgXX"
+test put  main "abcd a" "abcgXX abcdghYY" = "abcdYY aXX"
+test put gmain "abcd a" "abcgXX abcdghYY" = "abcdXX aYY"
+
+(* back to hungarian *)
+
+let main =
+  let word = (copy [a-z] . del [A-Z]* )+ in
+  let line = sep_list <set "w":word> " " in
+  let file = sep_list <set "l":line> "\n" in
+  file
+
+test get main "aRobASe" = "aobe"
+test get main <<
+  worDonE woRDTwo
+  linETwo loETne lOteE
+  omTEo mENToe o nto
+  aoOEEU thoeu nOEUA
+>> = <<
+  woron wowo
+  linwo lone lte
+  omo moe o nto
+  ao thoeu n
+>>
+
+test create main "aoeu" = "aoeu"
+test create main <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>> = <<
+  sntoh sanose ate
+  san asnta to
+  snt aoe nst
+>>
+
+test put main "a b c" "aA bB cC" = "aA bB cC"
+test put main "a b c" "bB cC aA" = "aA bB cC"
+test put main "a b c" "cC aA bB" = "aA bB cC"
+
+test put main "a b c d f" "aA cC dD eE fF" = "aA b cC dD fF"
+
+test put main "a b c" "aX aY aZ" = "aZ b c"
+test put main "a a a" "bB aA cC" = "aC aA aB"
+
+test put main "b c" "aA bB cC" = "bB cC"
+test put main "a c" "aA bB cC" = "aA cC"
+test put main "a b" "aA bB cC" = "aA bB"
+
+test put main "a" "aA"                = "aA"
+test put main "a" "aA aAA"            = "aAA"
+test put main "a" "aA aAA aAAA"       = "aAAA"
+test put main "a" "aA aAA aAAA aAAAA" = "aAAAA"
+
+test put main "a"         "aA" = "aA"
+test put main "a a"       "aA" = "a aA"
+test put main "a a a"     "aA" = "a a aA"
+test put main "a a a a"   "aA" = "a a a aA"
+test put main "a a a a a" "aA" = "a a a a aA"
+
+(* imprevisible answers when the costs are the same *)
+test put main "b"         "bB bBB bBBB" = "bBBB"
+test put main "b b"       "bB bBB bBBB" = "bBBB bBB"
+test put main "b b b"     "bB bBB bBBB" = "bB bBB bBBB"
+test put main "b b b b"   "bB bBB bBBB" = "b bBB bBBB bB"
+test put main "b b b b b" "bB bBB bBBB" = "b b bBBB bBB bB"
+
+test put main "b a" "aA bB" = "bB aA"
+
+test put main "b c a y" "aA bB cC dD" = "bB cC aA y"
+test put main "x y z" "aA bB cC" = "x y z"
+
+test put main "xxx yy z" "aA bBbBB cCcCCcCCC" = "xxx yy z"
+
+test put main <<
+  a a a a a
+  z
+  b c a y
+>> <<
+  aA bB cC dD
+  aAAA aAA aA
+  xXXX
+>> = <<
+  a a aA aAA aAAA
+  z
+  bB cC aA y
+>>
+
+test put main <<
+  ooo ooo o
+  nn nnn
+  aaa a aa
+  uu u
+  ddd dd d
+>> <<
+  oooOOoO oOOooO oO
+  aaAAa aAaa aAA aAAa
+  eeEeEE eE
+  uUUuuU uuUU
+>> = <<
+  oOOooO oooOO oO
+  nn nnn
+  aAaa aAA aAAa
+  uuUU uUU
+  ddd dd d
+>>
+
+test put main <<
+cursed eua lorem acumsam vitae
+ator idfk ipsum naquele
+nulla adipiscing lorem
+cum sociss ipsum
+lorem ip summation dollar sit meat
+consectetur lorem adipiscing ipsum lite
+lorem ipsum integer pirus nibh
+>> <<
+loremA ipsumB dolorC sitD ametE
+consecteturF adipiscingG elitH
+integerI purusJ nibhK
+cursusL euM accumsanN vitaeO
+auctorP idQ nequeR
+cumS sociisT
+>> = <<
+cursedL euMa lorem acumsam vitaeO
+ator idQfk ipsum naqueRle
+nulla adipiscing lorem
+cumS socissT ipsum
+loremA ip summaBtion dollaCr sitD meatE
+consecteturF lorem adipiscingG ipsum liteH
+lorem ipsum integerI pirusJ nibhK
+>>
+
+let main =
+  let word = ([a-m] . del [A-Z]* | [n-z] . del [A-Z]* )+ in
+  sep_list ("+" . <set "w":word> | "-" . <set "w":word>) " "
+
+test get main "+aA -bB" = "+a -b"
+test put main "+a -b +c -d" "+aA -bB +cC -dD" = "+aA -bB +cC -dD"
+test put main "-a +b -c +d" "+aA -bB +cC -dD" = "-aA +bB -cC +dD"
+test put main "+c -d +a -b" "+aA -bB +cC -dD" = "+cC -dD +aA -bB"
+test put main "-c -d +a +b" "+aA -bB +cC -dD" = "-cC -dD +aA +bB"
+
+test put main "+a +c -d" "+aA -bB +cC" = "+aA +cC -d"
+test put main "-a +m +d -e" "+aA -bB +cC -dD" = "-aA +m +dD -e"
+test put main "-a +n +d -e" "+aA -bB +cC -dD" = "-aA +n +dD -e"
+
+(* compose *)
+
+let main =
+  let word1 = ([a-z] . [A-Z]* . del [0-9]* )+ in
+  let line1 = sep_list <set "w":word1> " " in
+  let file1 = sep_list <set "l":line1> "\n" in
+  let word2 = ([a-z] . del [A-Z]* )+ in
+  let line2 = sep_list <set "w":word2> " " in
+  let file2 = sep_list <set "l":line2> "\n" in
+  file1 ; file2
+
+test get main "aA0 bB1 cC2" = "a b c"
+test create main "a b c" = "a b c"
+test put main "a b c" "aA0 bB1 cC2" = "aA0 bB1 cC2"
+test put main "b a" "aA0 bB1 cC2" = "bB1 aA0"
+test put main "a c d" "aA0 bB1 cC2" = "aA0 cC2 d"
+
+let main =
+  let sep_iter (a:lens) (b:lens) (n:int) = a . lens_iter (b . a) n n in
+  let cn = [a-z] . [A-Z]* in
+  let wn = <set "c":cn>+ in
+  let wnc = <set "w":wn> in
+  let c = [a-z] . del [A-Z]* in
+  let w = <set "c":c>+ in
+  let wc = <set "w":w> in
+  ( sep_iter   wnc " " 3 . '1' <-> '2'
+  ; sep_iter   wnc " " 3 . '2' <-> '3')
+  ; ( sep_iter wnc " " 3 . '3' <-> '4'
+    ; sep_iter wc " " 3 . '4' <-> '5')
+
+test get main "aAbB cCdD eE fF1" = "ab cd e f5"
+test create main "a b c e5" = "a b c e1"
+test put main "b de ge h5" "aAbB cC dDeE fFgG1" = "bB dDeE gGe h1"
+
+(* invert *)
+
+let main =
+  let l = invert (copy [a-z] . del "B") . del [ 0-9]
+  in <set "":l>*
+
+test get main "a1b2" = "aBbB"
+test create main "aBbB" = "a b "
+test put main "aBbBcBeB" "a1c3d4e5" = "a1b4c3e5"
+
+
+let setlikedict (l:lens) = <Tag (Setlike, Threshold 100, NoKey, ""):l>
+
+let main =
+  let word = key [a-z]+ . [A-Z]* . del [0-9]* . " " in
+  let line = (setlikedict word)* in
+    line
+
+test get main "" = ""
+test get main "aA9 " = "aA "
+test put main "aC aBB aAAA aDDD " "aAAA1 aBBB2 aCCC3 aDDD4 " = "aC1 aBB2 aAAA3 aDDD4 "
+let str = "aA1 aX9 aY8 bB2 bZ7 "
+test put main "" str = ""
+test put main "a a a " str = "a1 a9 a8 "
+test put main "a a " str = "a8 a9 "
+test put main "a " str = "a8 "
+test put main "aF aG aH aJ " str = "aF aG9 aH8 aJ1 "
+test put main "x y z " str = "x y z "
+
+test put main "aaa aab aba abb " "baa4 bab3 bba2 bbb1 " = "aaa aab aba abb "

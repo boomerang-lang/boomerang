@@ -1,0 +1,11 @@
+module Poly =
+
+let pred_app ('a) ('b) 
+  (p : 'a -> bool) (f : 'a -> 'b) (v : 'a where p v) : 'b 
+  = f v
+
+test (pred_app{int}{int} (fun (x:int) -> x = 0)) : ?
+test (pred_app{int}{int} (fun (f:int) -> f = 0)) : ?
+
+(* correctly, the following does not work -- p cannot be captured *)
+(* test (pred_app{int}{(x:int where p x)} (fun (f:int) -> f = 0)) : ? *)

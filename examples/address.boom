@@ -1,0 +1,730 @@
+(*******************************************************************************)
+(* The Harmony Project                                                         *)
+(* harmony@lists.seas.upenn.edu                                                *)
+(*******************************************************************************)
+(* Copyright (C) 2008                                                          *)
+(* J. Nathan Foster and Benjamin C. Pierce                                     *)
+(*                                                                             *)
+(* This library is free software; you can redistribute it and/or               *)
+(* modify it under the terms of the GNU Lesser General Public                  *)
+(* License as published by the Free Software Foundation; either                *)
+(* version 2.1 of the License, or (at your option) any later version.          *)
+(*                                                                             *)
+(* This library is distributed in the hope that it will be useful,             *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of              *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU           *)
+(* Lesser General Public License for more details.                             *)
+(*******************************************************************************)
+(* /examples/address.boom                                                      *)
+(* VCard, XCard, CSV address books lens                                        *)
+(* $Id: address.boom 4607 2009-08-03 16:53:28Z ddavi $ *)
+(*******************************************************************************)
+
+module Address = 
+open Sys
+open Exception
+
+(* This module contains lenses for mapping between vCard, CSV, and a
+   simple XML format (based on XCard). Most of the complexity is
+   related to escaping / unescaping of the special characters in
+   each format. We use sequential composition to build lenses that
+   make multiple passes over each string--escaping / unescaping the
+   raw strings, and then processing the tidied data. 
+
+   In going from vCard to CSV, entire fields (e.g., addresses) and
+   the formatting details of specific lines (e.g, item1, item2,
+   item3, and abemail vs. email) are discarded. 
+
+   In going from XML to CSV whitespace is discarded. 
+
+   In each case, each entry is a chunk and the name serves as a key.
+*)
+
+(* -------------------------------------------------------------------- *)
+(* GENERIC DEFINITIONS *)
+
+(* NL: portable newline *)
+let NL : regexp = "\r"? . "\n"
+
+(* NonNL: any string not containing a newline *)
+let NonNL : regexp = not_containing [\n\r]
+
+(* filterwith: derived lens that removes characters in [both], then
+   runs [l]*)
+let filterwith (BOTH: regexp) (l: lens where lens_iterable l && 
+                                             iterable_cex (stype l | BOTH)) 
+  : lens 
+  = filter (BOTH - (stype l)) (stype l) ; l*
+
+(* -------------------------------------------------------------------- *)
+(* ESCAPING *)
+
+let base_escs = #{char * string}['\n',"\\n";
+				 '\r',"\\r";
+				 '\\',"\\\\"]
+
+let escs_of_chars (chars:char List.t where disjoint (union_regexps chars) [\n\r]) =
+  let ext_escs = List.map{char}{char * string} 
+    (fun (c:char) -> (c,'\\' . c)) 
+    chars in
+  List.append{char * string} base_escs ext_escs
+
+let escaped_char (escs:(char * string) List.t) = Escaping.char_or_escaped ANYCHAR escs
+
+let escaped (chars : char List.t) = (escaped_char (escs_of_chars chars))*
+
+let escapedP (chars : char List.t) = (escaped_char (escs_of_chars chars))+
+
+(* escchar: escape characters in [c], which should be a character
+ class. *)
+let escchar (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in ANYCHAR <=> escaped_char (escs_of_chars chars))
+  = Escaping.escape_char ANYCHAR (escs_of_chars chars)
+
+(* unescchar: inverse of (the bijective lens) escchar *)
+let unescchar (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in escaped_char (escs_of_chars chars) <=> ANYCHAR)
+  = Escaping.unescape_char ANYCHAR (escs_of_chars chars)
+
+(* escstr: escape a string using [escchar] *)
+let escstr (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in ANY <=> escaped chars)
+  = (escchar chars)*
+
+(* escstrP: escape a non-empty string using [escchar] *)
+let escstrP (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in ANYP <=> escapedP chars)
+  = (escchar chars)+
+
+(* unescstr: unescape a string using [unescchar] *)
+let unescstr (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in (escaped_char (escs_of_chars chars))* <=> ANY)
+  = (unescchar chars)*
+
+(* unescstrP: unescape a non-empty string using [unescchar] *)
+let unescstrP (chars:char List.t where disjoint (union_regexps chars) [\n\r])
+  : (lens in (escaped_char (escs_of_chars chars))* <=> ANYP)
+  = (unescchar chars)+
+
+(* unit tests for escaping lenses *)
+test (escchar #{char}[])*.get "a\nb\\c" = "a\\nb\\\\c"
+test (unescchar #{char}[])*.get "\n" = error
+test (unescchar #{char}[])*.get "abc" = "abc"
+test (unescchar #{char}[])*.get "\\\\" = "\\"
+test (unescchar #{char}[])*.get "\\n" = "\n"
+test (escchar #{char}[','])*.get "a,b" = "a\\,b"
+test (unescchar #{char}[','])*.get "\\," = ","
+
+(* -------------------------------------------------------------------- *)
+(* TELEPHONE AND NAME FIELDS *)
+
+(* TelTags: strings used in markers for tel fields in CSV *)
+let TelTags : regexp = [hwce] | "note"
+
+(* TelMarker: strings used to mark tel fields in CSV *)
+let TelMarker : regexp = " (" . TelTags . ")"
+
+(* Tel: a single, escaped tel field *)
+let Tel : regexp = ", " . (escaped #{char}[',']) . TelMarker
+
+(* Name: a single, escaped name field. Cannot end with a TelMarker *)
+let Name : regexp = (escapedP #{char}[',']) - ( ANY . TelMarker )
+
+(* NameP: a single, non-empty name *)
+let NameP : regexp = Name - EPSILON
+
+(* Family and Given: just non-empty names *)
+let Family,Given : regexp * regexp = NameP,NameP
+
+(* GlobalName: a single name in CSV *)
+let GlobalName : regexp = Family . (", " . Given)?
+  
+(* AbsAddr: type for CSV address book entry *) 
+let AbsAddr = GlobalName . Tel* 
+
+
+let suffix (mk_suffix : regexp -> lens) : lens =
+    (mk_suffix [)])
+  | (mk_suffix [hwce]) . copy ")"
+  | (mk_suffix [t(])   . copy "e)"
+  | (mk_suffix [(])    . copy ( [hwc] . [)] | "note)" )
+  | (mk_suffix [ ])    . copy ([(] . TelTags . [)])
+  | (mk_suffix [o])    . copy "te)"
+  | (mk_suffix [n])    . copy "ote)"
+
+let escape_ignore =
+  ( copy ")" 
+  | copy ([hwce] . ")")
+  | copy "te)" 
+  | copy "ote)"
+  | copy "note)"
+  | copy "(note)" 
+  | copy ( "(" . [hwce] . ")" ) )
+
+let escaper (chars:char List.t) = 
+  let mk_suffix (R:regexp) : lens = 
+    Escaping.escape_char (ANYCHAR - R) (escs_of_chars chars) in
+  ( escstr chars . suffix mk_suffix
+  | escape_ignore )
+
+let unescaper (chars:char List.t) =
+  let mk_suffix (R:regexp) : lens = 
+    Escaping.unescape_char (ANYCHAR - R) (escs_of_chars chars) in
+  ( unescstr chars . suffix mk_suffix
+  | escape_ignore )
+
+            
+(* formatnotemptyname: escape string to Name *)
+let formatnotemptyname : lens = 
+  escaper #{char}[',']
+
+(* unformatnotemptyname: unescape string from Name *)
+let unformatnotemptyname : lens = 
+  unescaper #{char}[',';';';':']
+  
+(* name: handles escaping and formatting of a Name. We do this in two 
+   passes. First, we unformat to put everything in a canonical "raw" form, 
+   Then we format to escape characters and render the name *)
+
+let name : lens =  
+  let escNameP = unformatnotemptyname ; formatnotemptyname in 
+  let familyname = del "N:" . escNameP in
+  familyname . (del ";" | (";" <-> ", ") . escNameP) . del ";;;"
+
+(* unit test for name *)
+test name.get "N:Pierce;Benjamin C.;;;" = "Pierce, Benjamin C."
+
+(* formattel: lens for escaping tel data *)
+let formattel : lens = escstr #{char}[',']
+
+(* field': helper for handling a field. The arguments are as follows:
+     o w0: first tag in vCard source
+     o w1: second tag in vCard source
+     o w2: tag in CSV view
+*)
+let field' (w0:string) (w1:string) (w2:string) =
+  ((w0 . ";") <-> ", ") . 
+  del "type=" . del w1 . 
+  del (";type=" . [A-Z]+)* . 
+  del ";type=pref"? .
+  del ":" . 
+  (unescstr #{char}[';';',';':']; formattel) .
+  ins " (" . ins w2 . ins ")" .
+  del NL
+
+(* tel': helper lens for handling telephone fields *)
+let tel' : string -> string -> lens = field' "TEL"
+
+(* tel: lens for handling all kinds of telephone fields *)
+let tel : lens =
+    tel' "WORK" "w"
+  | tel' "HOME" "h"
+  | tel' "CELL" "c"
+
+(* formatnote: lens for escaping note data *)
+let formatnote : lens = escstr #{char}[',']
+
+(* note: lens for handling note fields. Again, we use the two-pass 
+   approach--unformatting / unescaping, and then reformatting / reescaping *)
+let note : lens =
+  ("NOTE:" <-> ", ") .
+  (unescstr #{char}[',';':';';']; formatnote) .
+  ins " (note)" .
+  del NL
+
+(* abemail: lens for Apple's special email field. Uses two-pass approach. *)
+let abemail : lens =
+  ("item.EMAIL;type=INTERNET;type=pref:" <-> ", ") .
+  (unescstr #{char}[',';':';';']; escstr #{char}[',']) .
+  del NL .
+  del "item.X-ABLabel:E-mail" . 
+  del NL .
+  ins " (e)" 
+
+(* email: lens for ordinary vCard (as in RFC) field *)
+let email : lens = field' "EMAIL" "INTERNET" "e"
+
+(* entry : lens for an individual vCard field. *)
+let entry : lens =  (abemail || email) | tel | note
+
+(* ItemLine: regexp for lines that use Apple's itemN convention *)
+let ItemLine :regexp = "item" . NonNL . NL
+
+(* Line: regexp for any line *)
+let Line : regexp = [^ ] . NonNL . NL . (" " . NonNL . NL)*
+
+(* Field: regexp for ItemLine fields: either an ordinary line or two
+   item lines *)
+let Field : regexp = 
+  ((Line - ItemLine) | (ItemLine . ItemLine))
+  - ("END:VCARD" . NL)
+
+(* numberedItem: regexp for lines with numbered items *)
+let NumberedItem (n:string) : regexp =
+  "item" . regexp_of_string n . "." . NonNL . NL . "item" . regexp_of_string n . "." . NonNL . NL
+
+(* Field_unnumbered: regexp for fields without numbered item lines *)
+let Field_unnumbered : regexp =
+  Field - (NumberedItem "1" | NumberedItem "2" | NumberedItem "3")
+
+(* remove_item_numbers: lens for deleting item numberings *)
+let remove_item_numbers : (lens in ? <-> Field_unnumbered* ) = 
+  let delItemNumber (n:string) : lens = 
+    copy "item" . 
+    del n . 
+    copy ([.] . NonNL . NL . "item") . 
+    del n . 
+    copy ([.] . NonNL . NL) in
+  let Stuff = copy (Field - ("item" . NonNL . NL . "item" . NonNL . NL) ) in 
+  ( ( Stuff* . delItemNumber "1" .
+      Stuff* . delItemNumber "2" .
+      Stuff* . delItemNumber "3" .
+      copy Field_unnumbered* )
+  || ( Stuff* . delItemNumber "1" .
+      Stuff* . delItemNumber "2" .
+      copy Field_unnumbered* )
+  || ( Stuff* . delItemNumber "1" .
+      copy Field_unnumbered* )
+  || ( copy Field_unnumbered* ) )
+
+(* chunk: lens for a vCard entry *)
+let chunk : (lens in ? <-> AbsAddr) =  
+  (* delete preamble *)
+  del "BEGIN:VCARD" . del NL . 
+  del "VERSION:3.0" . del NL .  
+  (* format name, tag it as key *)
+  (name; key (vtype name)) . del NL .
+  (* handle fields by: 
+       removing item numbers, 
+       removing unnumbered fields, 
+       evaluating entry *)
+    (remove_item_numbers ;
+     filterwith
+       Field_unnumbered
+       entry) .
+  (* del postamble *)
+  del "END:VCARD" . del NL
+
+(* vcard lens: match a chunk *)
+let vcard = <dictionary "":chunk>
+
+(* unit tests for vcard *)
+let samplevcard = 
+  <<
+    BEGIN:VCARD
+    VERSION:3.0
+    N:Andy Patroni;;;;
+    TEL;type=WORK;type=pref:6106236713
+    FN:Andy Patroni
+    X-ABUID:827704A0-38A3-4034-84BF-BADFB87EB1E2\:ABPerson
+    END:VCARD
+    
+  >>
+
+test vcard.create 
+<<
+  Foo, Jean-Paul, jean-paul.courbebaisse@education.gouv.fr (e), 1234567 (h), bar (e)
+>>
+= 
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Foo;Jean-Paul;;;
+  item1.EMAIL;type=INTERNET;type=pref:jean-paul.courbebaisse@education.gouv.fr
+  item1.X-ABLabel:E-mail
+  TEL;type=HOME:1234567
+  item2.EMAIL;type=INTERNET;type=pref:bar
+  item2.X-ABLabel:E-mail
+  END:VCARD
+
+>>
+  
+test vcard.put "Foo, Jean-Paul, bar (e)" 
+  into
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:AAAAA TEST;Jean-Paul;;;
+  item1.EMAIL;type=INTERNET;type=pref:jean-paul.courbebaisse@education.gouv.fr
+  item1.X-ABLabel:E-mail
+  TEL;type=WORK:1234567
+  item2.EMAIL;type=INTERNET;type=pref:foo
+  item2.X-ABLabel:E-mail
+  END:VCARD
+
+>> 
+= 
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Foo;Jean-Paul;;;
+  item1.EMAIL;type=INTERNET;type=pref:bar
+  item1.X-ABLabel:E-mail
+  END:VCARD
+
+>>
+
+test vcard.get samplevcard = "Andy Patroni, 6106236713 (w)"
+
+test vcard.put 
+  "Andy Patroni, 12345 (c), 67890 (h)"
+  into samplevcard = 
+  "BEGIN:VCARD
+  |VERSION:3.0
+  |N:Andy Patroni;;;;
+  |TEL;type=CELL:12345
+  |FN:Andy Patroni
+  |X-ABUID:827704A0-38A3-4034-84BF-BADFB87EB1E2\\:ABPerson
+  |TEL;type=HOME:67890
+  |END:VCARD
+  |"
+
+test vcard.put 
+  "Andy Patroni, fubar (note)" 
+  into samplevcard =
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Andy Patroni;;;;
+  NOTE:fubar
+  FN:Andy Patroni
+  X-ABUID:827704A0-38A3-4034-84BF-BADFB87EB1E2\:ABPerson
+  END:VCARD
+
+>>
+
+(* vcards: lens for a whole file of vcards *)
+let vcards : lens = (<chunk> . ins "\n") * . del WS
+
+(* unit test for vcards *)
+let samplevcards = 
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Androuet;;;;
+  FN:Androuet
+  NOTE:(01) 42 89 95 00  41 rue d'Amsterdam  M. Liege  (cheese restaurant near St. Lazare\, Paris)  rather expensive and fancy and pungent (300FF/person)
+  X-ABUID:A5695B7A-5931-4A63-8308-ANOTHERIDENT0\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:New York Restaurants;;;;
+  FN:New York Restaurants
+  NOTE:two best mexican in nyc (according to Scot\, IIRC)\n          rosa mexicana\n          zarela's
+  X-ABUID:D40A8D20-F5E8-47E1-983E-D331E92C6F8B\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Pierce;Benjamin C.;;;
+  FN:Benjamin C. Pierce
+  TEL;type=HOME;type=pref:215 732-4684
+  TEL;type=CELL:215 266-9001
+  TEL;type=WORK:215 898-6222
+  X-ABUID:87B85E7E-AB0F-4819-8647-0BD532019144\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Andy Patroni;;;;
+  FN:Andy Patroni
+  TEL;type=WORK;type=pref:6106236713
+  X-ABUID:827704A0-38A3-4034-84BF-BADFB87EB1E2\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Bistro de Vent;;;;
+  FN:Bistro de Vent
+  X-ABUID:F00ABF1D-8DC0-4C3C-98ED-2BC33FA8D90C\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Biswas;Goutam;;;
+  FN:Goutam Biswas
+  X-ABUID:5BEAD7E0-AFF8-42AB-BD38-9A741CD64E20\:ABPerson
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Black;Andrew;;;
+  FN:Andrew Black
+  X-ABUID:A9BA5924-5A64-4D46-A40F-A0BC86073232\:ABPerson
+  END:VCARD
+
+>>
+      
+test vcards.get samplevcards = 
+<<
+  Androuet, (01) 42 89 95 00  41 rue d'Amsterdam  M. Liege  (cheese restaurant near St. Lazare\, Paris)  rather expensive and fancy and pungent (300FF/person) (note)
+  New York Restaurants, two best mexican in nyc (according to Scot\, IIRC)\n          rosa mexicana\n          zarela's (note)
+  Pierce, Benjamin C., 215 732-4684 (h), 215 266-9001 (c), 215 898-6222 (w)
+  Andy Patroni, 6106236713 (w)
+  Bistro de Vent
+  Biswas, Goutam
+  Black, Andrew
+
+>>
+
+test vcards.put 
+<<
+  Andy Patroni, 6106236713 (w), fubar (note)
+  Pierce, Benjamin C., 215 898-6222 (w), 215 732-4684 (h), 215 266-9001 (c)
+
+>>
+into samplevcards = 
+<<
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Andy Patroni;;;;
+  FN:Andy Patroni
+  TEL;type=WORK;type=pref:6106236713
+  X-ABUID:827704A0-38A3-4034-84BF-BADFB87EB1E2\:ABPerson
+  NOTE:fubar
+  END:VCARD
+  BEGIN:VCARD
+  VERSION:3.0
+  N:Pierce;Benjamin C.;;;
+  FN:Benjamin C. Pierce
+  TEL;type=WORK:215 898-6222
+  TEL;type=HOME:215 732-4684
+  TEL;type=CELL:215 266-9001
+  X-ABUID:87B85E7E-AB0F-4819-8647-0BD532019144\:ABPerson
+  END:VCARD
+
+>>
+
+(* BCP's own unit test *)
+(* test vcards get (read "/home/bcpierce/Desktop/vCards.vcf") = ? *)
+
+
+(* -------------------------------------------------------------------- *)
+(* XML STUFF *)
+
+let xml_escs : (char * string) List.t =
+  #{char * string}[ ('>',"&gt;"); ('<',"&lt;"); ('&',"&amp;") ] 
+
+(* unescpcdata: regexp for unescaping raw PCDATA *)
+let unescpcdata : lens = Escaping.unescape ANYCHAR xml_escs
+  
+(* formatpcdata: lens for escaping PCDATA; excludes TelTags using escaper helper from above. *)
+let format_pcdata : lens = 
+  let mk_suffix (R:regexp) : lens = copy (ANYCHAR - R)  in
+  ( unescpcdata . suffix mk_suffix
+  | escape_ignore )
+
+(* -------------------------------------------------------------------- *)
+(* BCP's personal variant of XCard *)
+
+(* name: lens for handling name field. In XCard, a name is either a
+   single element n, or has two subelements, family and given. Also
+   handles escaping. *)
+let name : lens = 
+  let n = format_pcdata; formatnotemptyname in 
+    ( Xml.simple_elt NL4 "n" n
+      || (Xml.elt NL4 "n" 
+         (Xml.simple_elt NL6 "family" n . 
+            (copy "" | ins ", " . Xml.simple_elt NL6 "given" n))))
+
+(* tel': helper for escaping and formatting telephone data. 
+     o full: XCard tag
+     o short: CSV tag 
+*)
+let tel' (full:string) (short:string) : lens = 
+  ins ", " . 
+  Xml.simple_elt NL4 full (unescpcdata ; formattel . ins (" (" . short . ")"))
+
+(* tel: lens for handling all tags *)
+let tel : lens = 
+    tel' "tel-home" "h"
+  | tel' "tel-work" "w"
+  | tel' "tel-cell" "c"
+  | tel' "email"    "e"
+  | tel' "note"     "note"
+      
+(* chunk: lens for handling a single XCard entry *)
+let chunk :lens = 
+  Xml.elt NL2 "vcard" ((name; key (vtype name)) . tel* )
+
+(* vcard: lens for handling a single XCard vcard element *)
+let vcard : lens = <chunk>
+
+let samplevcard = 
+  "<vcard>
+      <n><family>foo</family><given>bar</given></n>
+      <tel-home>12345</tel-home>
+      <tel-cell>12345</tel-cell>
+      <note>hello world</note>
+   </vcard>"
+
+(* unit test for vcard *)
+test vcard.get samplevcard = 
+  "foo, bar, 12345 (h), 12345 (c), hello world (note)"
+
+(* xcard: lens for handling a single XCard xcard elemnet *)
+let xcard : lens = Xml.top "xcard" ((vcard . ins "\n") * )
+
+(* unit tests for xcard *)
+let samplexcards : string = 
+  "<xcard>
+     | <vcard>
+     |   <n>Charles Addams</n>
+     |   <note>goodbye world</note></vcard>
+     | <vcard>
+     |   <n><family>Doe</family><given>John</given></n>
+     |   <note>hello world</note>
+     |   <tel-home>792-8134</tel-home>
+     |   <tel-home>732-4684</tel-home></vcard>
+     | <vcard>
+     |   <n><family>Doe</family><given>Sally</given></n>
+     |   <tel-home>792-8134</tel-home>
+     |   <tel-home>732-4684</tel-home>
+     |   <note>hello, world ! Question : nice weather ? (no ?)</note>
+     | </vcard>
+     |</xcard>"
+
+test xcard.get samplexcards =
+<<
+  Charles Addams, goodbye world (note)
+  Doe, John, hello world (note), 792-8134 (h), 732-4684 (h)
+  Doe, Sally, 792-8134 (h), 732-4684 (h), hello\, world ! Question : nice weather ? (no ?) (note)
+
+>>             
+
+test xcard.create "Foster, Nate, 267.342.1099 (h)\n" = 
+<<
+  <xcard>
+    <vcard>
+      <n>
+        <family>Foster</family>
+        <given>Nate</given>
+      </n>
+      <tel-home>267.342.1099</tel-home>
+    </vcard>
+  </xcard>
+>>
+
+(* Some notes about the Apple Address Book application:
+   - \ characters do NOT round-trip: It will read a vCard containing
+     \\Manchester and write it out as \Manchester
+   - it trims blanks from the ends of fields
+   - Unknown vCard fields get dumped into NOTEs.
+   - It wants X-ABLabel fields to know how to display things, but it
+     doesn't require them
+   - It sometimes uses item1, item2, etc., instead of the EMAIL tag
+*)
+
+(* TO DO:
+
+   When processing a vCard, we might want to take *all* the fields we don't recognize
+   (except, perhaps, some that we explicitly choose to delete) and put them in the note
+   field in the abstract.  (This would mean that the lens is essentially a bijection.)
+
+   To achieve this, it seems we'd need to...
+      - use the order primitive to move the NOTE field to the end
+      - then use order again to move all the recognized fields to the beginning
+        and unrecognized fields to the end (before the NOTE)
+      - then invent some convention for smashing them together with a separator, say $
+      - escape $ everywhere it appears in the concrete vCard
+      - In other formats (e.g. xCard), disallow $ in the concrete format of notes, except
+        in situations where the whole note can be parsed as a real note plus some extra
+        fields.  (I.e., basically the abstract and concrete note formats are the same.)
+*)   
+
+test (xcard).create 
+<<
+Foster, Clare, jscef@uas.alaska.edu (e), (907) 738-0553 (c), (907) 747-5499 (h)
+Foster, Nate, jnfoster@cis.upenn.edu (e), 267 342-1099 (c)
+
+>> = ?
+
+let okfailwith 'a = ok{'a}, raise{'a}, failwith{'a}
+
+let usage = 
+  let prog = Prefs.get_prog_name () in
+  "Usage: " . prog . " {get|put} args\n"
+     . "  " . prog . " get <source> <format of the view>\n"
+     . "  " . prog . " put <view> <old source>\n"
+
+type format = VCF | XML | CSV
+
+let main () =
+  let vcf2csv = vcards in
+  let xml2csv = xcard . del WS in (* trailing whitespace *)
+  let xml2vcf = right_quot xml2csv (canonizer_of_lens vcf2csv) in
+  let vcf2xml = right_quot vcf2csv (canonizer_of_lens xml2csv) in
+  let get_type (so:string option) =
+    match so with
+      | Some "vcf" -> Some{format} VCF
+      | Some "xml" -> Some{format} XML
+      | Some "csv" -> Some{format} CSV
+      | _ -> None{format}
+  in
+  let read_file (f:string) =
+    let ok, fail, failwith = okfailwith{format * string} in
+    match get_type (String.file_ext f), file_exists f with
+      | None, _  -> failwith ("File ".f." does not have a valid extension")
+      | _, false -> failwith ("File ".f." does not exists")
+      | Some fmt, _ -> ok (fmt, read f)
+  in
+  let read_format (fmt:string) =
+    let ok, fail, failwith = okfailwith{format} in
+    match get_type (Some{string} fmt) with
+      | None -> failwith (fmt." is not a valid format")
+      | Some fmt -> ok fmt
+  in
+  let cget (view':format) (source:(format*string)) =
+    let source', source = source in
+    match view', source' with
+      | VCF, VCF -> source
+      | XML, XML -> source
+      | CSV, CSV -> source
+
+      | CSV, VCF -> get vcf2csv    source
+      | VCF, CSV -> create vcf2csv source
+
+      | CSV, XML -> get xml2csv    source
+      | XML, CSV -> create xml2csv source
+
+      | XML, VCF -> get vcf2xml    source
+      | VCF, XML -> get xml2vcf    source
+  in
+  let cput (view:format*string) (source:format*string) =
+    let source', source = source in
+    let view', view = view in
+    match view', source' with
+      | VCF, VCF -> source
+      | XML, XML -> source
+      | CSV, CSV -> source
+
+      | CSV, VCF -> put vcf2csv view source
+      | VCF, CSV -> get vcf2csv view
+
+      | CSV, XML -> put xml2csv view source
+      | XML, CSV -> get xml2csv view
+
+      | XML, VCF -> put vcf2xml view source
+      | VCF, XML -> put xml2vcf view source
+  in
+  let run (args : string List.t) =
+    let ok, fail, failwith = okfailwith{int} in
+    let bind_fmt  = bind{format}{int} in
+    let bind_file = bind{format*string}{int} in
+    let print_usage (code:int) () =
+      let _ = put_str usage in code
+    in
+    match args with
+      | "get"::source::format::[] -> 
+          (let source = read_file source in
+           let format = read_format format in
+           bind_fmt  format $ fun (view':format) ->
+           bind_file source $ fun (source:format*string) ->
+           let _ = put_str (cget view' source) in
+           ok 0)
+      | "put"::  view::source::[] ->
+          (let source = read_file source in
+           let view   = read_file view in
+           bind_file view   $ fun (view:format*string) ->
+           bind_file source $ fun (source:format*string) ->
+           let _ = put_str (cput view source) in
+           ok 0)
+      | [] -> fail (print_usage 0)
+      | _ ->  fail (print_usage 1)
+  in
+  convert_main $ run $ Prefs.read_string_list $ Prefs.extern_rest ()

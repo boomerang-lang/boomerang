@@ -1,0 +1,74 @@
+module Bcard = 
+
+  let Nl : regexp = [\n] | [\r] | "\r\n"
+  let Sp : string = " "
+  let Uri: regexp = [^""\n\r<>]*
+
+  let simple (xml:string) (ascii:string) : lens =
+    Xml.simple_elt NL2 xml 
+      begin 
+        ins ascii . 
+        ins Sp . 
+        Xml.unesc_string [\r\n] . 
+        qins Nl "\n"
+      end
+
+  let logo : lens = 
+    Xml.attr1_simple_elt NL2 "logo" "uri" 
+      begin
+        ins "L" . 
+        ins Sp . 
+        copy Uri . 
+        qins Nl "\n"
+      end
+      (copy EPSILON)
+
+  let phone : lens = simple "phone" "P"
+
+  let email : lens = simple "email" "E"
+
+  let name : lens = simple "name" "N"
+
+  let title : lens = simple "title" "T"
+
+  let card : lens = 
+    Xml.elt NL1 "card"
+      begin
+        name . 
+        title . 
+        email . 
+        phone . 
+        logo 
+      end
+
+  let cards : lens = 
+    Xml.elt NL0 "cards" 
+      begin
+        card*
+      end
+
+  let card_ascii : string = 
+<<
+  N John Doe
+  T CEO & CTO, Widget Inc.
+  E <"John Doe", john.doe@widget.com>
+  P (202) 5551414
+  L widget.gif
+
+>>
+
+  let card_xml : string = 
+<<
+<cards>
+ <card>
+  <name>John Doe</name>
+  <title>CEO &amp; CTO, Widget Inc.</title>
+  <email>&lt;&quot;John Doe&quot;, john.doe@widget.com&gt;</email>
+  <phone>(202) 5551414</phone>
+  <logo uri="widget.gif"></logo>
+ </card>
+</cards>
+>>
+
+test cards.get card_xml = card_ascii 
+test cards.create card_ascii = (newline . card_xml)

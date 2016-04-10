@@ -1,0 +1,13 @@
+module Test_alias = 
+
+let l = ((copy "ABC" . copy "DEF") . copy "GHI") . copy "JKL"
+
+test get l "ABCDEFGHIJKL" = "ABCDEFGHIJKL"
+test put l "ABCDEFGHIJKL" "ABCDEFGHIJKL" = "ABCDEFGHIJKL"
+
+let ALPHA : regexp = [A-Za-z ]+
+let YEARS : regexp = [0-9]
+let l2 = ALPHA . ", " . del YEARS . del ", " . ALPHA
+
+test get l2 "Sancho Panza, 1, La Mancha" = "Sancho Panza, La Mancha"
+test put l2 "Pancho Villa, Mexico" "Sancho Panza, 1, La Mancha" = "Pancho Villa, 1, Mexico"

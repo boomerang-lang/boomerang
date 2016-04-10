@@ -1,0 +1,208 @@
+module Demo = 
+(* Some useful regular expressions *)
+let N : regexp= [a-zA-Z ]+
+let E : regexp= [a-zA-Z@.]*
+
+(* ----------------------------------------------------------------- *)
+(* Basic lenses *)
+
+(* A basic lens that extracts just the name from a Name/Email string *)
+let del_email : lens = 
+  del "Name:" . 
+  copy N . 
+  del (", Email:" . E) 
+
+(* Extract ALL the names from a LIST of Name/Emails *)
+let del_emails = "" | del_email . ("\n" . del_email)* 
+
+(* Test the GET direction *)
+test del_emails.get
+  (* GETting from... *)
+    "Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+    |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+= 
+  (* ... yields: *)
+  "Benjamin Pierce
+  |Steve Zdancewic"
+
+(* Test the PUT direction (adding names at the end) *)
+test del_emails.put
+   (* Putting back... *)
+     "Benjamin C Pierce
+     |Steve Zdancewic
+     |Mike Hicks"
+into
+     "Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+     |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+= 
+   (* ...yields: *)
+     "Name:Benjamin C Pierce, Email:bcpierce@cis.upenn.edu
+     |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu
+     |Name:Mike Hicks, Email:"
+
+(* [break for semantics...] *)
+
+(* ----------------------------------------------------------------- *)
+(* A fly in the ointment... *)
+
+(* In general, PUT restores emails by position :-/ *)
+test del_emails.put
+   (* Putting back... *)
+     "Steve Zdancewic
+     |Benjamin Pierce
+     |Mike Hicks"
+into
+     "Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+     |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+ = 
+   (* ...yields: *)
+     "Name:Steve Zdancewic, Email:bcpierce@cis.upenn.edu
+     |Name:Benjamin Pierce, Email:stevez@cis.upenn.edu
+     |Name:Mike Hicks, Email:"
+
+(* ----------------------------------------------------------------- *)
+(* Dictionary lenses *)
+
+(* A better version where names act like keys to match up deleted emails. *)
+let keyed_del_email = 
+  del "Name:" . 
+  key N . 
+  del (", Email:" . E) 
+
+let keyed_del_emails = ""
+    | <dictionary "":keyed_del_email> . ("\n" . <dictionary "":keyed_del_email>)*
+
+(* Getting behaves the same as above. *)
+test keyed_del_emails.get
+  (* Getting from... *)
+    "Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+    |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+= 
+  (* ... yields: *)
+    "Benjamin Pierce
+    |Steve Zdancewic"
+
+(* Putback restores emails using the name as a key *)
+test keyed_del_emails.put
+   (* Putting back... *)
+     "Steve Zdancewic
+     |Benjamin Pierce
+     |Mike Hicks"
+into
+     "Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+     |Name:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+ = 
+   (* ...yields: *)
+     "Name:Steve Zdancewic, Email:stevez@cis.upenn.edu
+     |Name:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+     |Name:Mike Hicks, Email:"
+(* ----------------------------------------------------------------- *)
+
+(* Unions present a special challenge: common projected data needs to
+   flow across the union. This example shows a fragment of a lens for
+   processing bibiographic data where each entry either represents a
+   single authors of a list of co-authors with email addresses. *)
+
+let chunk = 
+  key N . 
+  del (", Email:" . E) 
+
+let author_coauthor =
+       copy ""
+     | copy "Author:" . <dictionary "":chunk>
+     | copy "CoAuthor:" . <dictionary "":chunk> . (copy "\nCoAuthor:" . <dictionary "":chunk>)*
+
+(* GET simply projects emails *)
+test author_coauthor.get
+   (* Getting from... *)
+     "CoAuthor:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+     |CoAuthor:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+  = 
+    (* ...yields: *)
+     "CoAuthor:Benjamin Pierce
+     |CoAuthor:Steve Zdancewic"
+
+(* Putting back restores email for matching author/co-author *)
+(* First, let's try two co-authors put back into a single author *)
+test author_coauthor.put
+  (* Putting back... *)
+    "CoAuthor:Steve Zdancewic
+    |CoAuthor:Benjamin Pierce"
+into
+    "Author:Benjamin Pierce, Email:bcpierce@cis.upenn.edu"
+ =
+  (* ...yields: *)
+    "CoAuthor:Steve Zdancewic, Email:
+    |CoAuthor:Benjamin Pierce, Email:bcpierce@cis.upenn.edu"
+
+(* Second, a single author put back into a list of co-authors *)    
+test author_coauthor.put
+  (* Putting back... *)
+    "Author:Steve Zdancewic"
+into
+    "CoAuthor:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+    |CoAuthor:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+ = 
+  (* ...yields: *)
+    "Author:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+
+test (author_coauthor . (";\n" . author_coauthor)* ).put
+  (* Putting back... *)
+    "Author:Steve Zdancewic;
+    |Author:Benjamin Pierce"
+into
+    "CoAuthor:Benjamin Pierce, Email:bcpierce@cis.upenn.edu
+    |CoAuthor:Steve Zdancewic, Email:stevez@cis.upenn.edu"
+  = 
+   (* yields: *)
+     "Author:Steve Zdancewic, Email:stevez@cis.upenn.edu;
+     |Author:Benjamin Pierce, Email:bcpierce@cis.upenn.edu"
+
+
+
+(* (\*** Q-lenses ***\) *)
+(* let xml_space (space:string) = qconst "" " "* space "" *)
+
+(* let xml_tag (spaces:string) (name:string) (content:lens) =  *)
+(*   xml_space spaces .ins ("<" . name . ">") . content . ins ("</" .name.">") . ins "\n" *)
+
+(* let chunk = xml_tag "  " "leaf" (key [a-z]+ . del [0-9]* ) *)
+
+(* let ql =  *)
+(*   xml_space "" . ins "<root>".  *)
+(*   <chunk>* .  *)
+(*   xml_space "" . ins "</root>" *)
+
+(* test ql.get  *)
+(* << *)
+(* foo42 *)
+(* bar51 *)
+(* >> =  *)
+(* << *)
+(* <root> *)
+(*   <leaf>foo</leaf> *)
+(*   <leaf>bar</leaf> *)
+(* </root> *)
+(* >> *)
+
+(* (\* adding extra spaces at the end of lines, removing or addind newlines, etc*\) *)
+(* test ql.put  *)
+(* << *)
+(* <root> *)
+(*     <leaf>bar</leaf>   *)
+(*   <leaf>zoo</leaf>  <leaf>foo</leaf>  *)
+(*   <leaf>barfoo</leaf>  *)
+     
+(* </root> *)
+(* >> *)
+(* into *)
+(* << *)
+(* foo42 *)
+(* bar51 *)
+(* >> =  *)
+(* << *)
+(* bar51 *)
+(* zoo *)
+(* foo42 *)
+(* barfoo *)
+(* >>  *)

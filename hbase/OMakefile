@@ -1,0 +1,23 @@
+
+RESULT = hbase
+RESULTS = $(RESULT).cmxa
+
+OCAML_LIBS += $(UBASEDIR)/ubase 
+OCAMLINCLUDES += $(UBASEDIR) 
+
+HBASE_LIBRARY_SOURCES[] = \
+  int.ml error.ml info.ml misc.ml mapplus.ml env.ml name.ml memo.ml src2fcl.mll baker.ml
+
+GENERATED_FILES = src2fcl.ml
+
+OCamlGeneratedFiles($(GENERATED_FILES))
+
+OCamlLibrary($(RESULT), $(rootname $(HBASE_LIBRARY_SOURCES)))
+
+.DEFAULT: $(RESULTS)
+
+clean: 
+	$(CLEAN) $(RESULT).cma $(RESULT) $(RESULTS) $(GENERATED_FILES)
+
+veryclean: 
+	$(CLEAN) $(RESULT).cma $(RESULT) $(RESULTS) $(GENERATED_FILES)

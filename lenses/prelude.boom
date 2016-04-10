@@ -1,0 +1,532 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2008                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/prelude.boom                                                       *)
+(* Boomerang definitions of lens primitives                                   *)
+(* $Id: prelude.boom 4995 2011-03-08 16:32:54Z jnfoster $ *)
+(******************************************************************************)
+
+module Prelude =
+
+#{@}
+
+\section{The Standard Prelude}
+
+The second module, @Prelude@, defines some common derived forms. Like
+@Core@, its values are available by default in every Boomerang
+program.
+
+\subsection{Regular Expressions}
+
+\LENSSECTION{@ANYCHAR@, @ANY@, @ANYP@}
+
+The regular expression @ANYCHAR@ denotes the set of ASCII characters, 
+@ANY@ denotes the set of all ASCII strings, and @ANYP@ denotes the 
+set of all ASCII strings except for the empty string. By 
+convention, we append a ``P'' to the name of a regular expression 
+to denote its ``positive'' variant (i.e., not containing the empty
+string).
+
+#* let ANYCHAR : regexp = [^]
+#* let ANY : regexp = ANYCHAR*
+#* let ANYP : regexp = ANYCHAR+
+
+\LENSSECTION{@containing@,@containingP@,@not_containing@,@not_containingP@}
+The function @containing@ takes a regular expression @R@ as an
+argument and produces a regular expression describing the set of all
+strings that contain a substring described by @R@.  The @-P@ variants
+require non-empty strings.
+
+#* let containing  (R:regexp) : regexp = ANY . R . ANY
+#* let containingP (R:regexp) : regexp = (ANY . R . ANY) - []
+
+The function @not_containing@ takes a regular expression @R@ and
+produces a regular expression describing the set of all strings not
+containing @R@.
+
+#* let not_containing  (R:regexp) : regexp = ANY - (containing R)
+#* let not_containingP (R:regexp) : regexp = ANYP - (containing R)
+
+\LENSSECTION{@SCHAR@, @S@, @SP@}
+
+The regular expressions @SCHAR@, @S@, and @SP@ denote sets of 
+space characters.
+
+#* let SCHAR : regexp = [ ]
+#* let S : regexp = SCHAR*
+#* let SP : regexp = SCHAR+
+
+\LENSSECTION{@WSCHAR@, @WS@, @WSP@}
+
+The regular expressions @WSCHAR@, @WS@, and @WSP@ denote sets of 
+whitespace characters.
+
+#* let WSCHAR : regexp = [ \t\r\n]
+#* let WS : regexp = WSCHAR*
+#* let WSP : regexp = WSCHAR+
+
+\LENSSECTION{@NWSCHAR@, @NWS@, @NWSP@}
+
+The regular expressions @WSCHAR@, @WS@, and @WSP@ denote sets of 
+non-whitespace characters.
+
+#* let NWSCHAR : regexp = [^ \t\r\n]
+#* let NWS : regexp = NWSCHAR*
+#* let NWSP : regexp = NWSCHAR+
+
+\LENSSECTION{@newline@, @NLn@} The string @newline@ contains 
+the newline character. The strings given by @NL@$n$ each 
+denote a newline followed by $n$ spaces. These are used for indentation, 
+for example, in the @Xml@ module.
+
+#* let newline : string = "\n"
+#* let NL0 : string= newline
+#* let NL1 : string= NL0 . " "
+#* let NL2 : string= NL1 . " "
+#* let NL3 : string= NL2 . " "
+#* let NL4 : string= NL3 . " "
+#* let NL5 : string= NL4 . " "
+#* let NL6 : string= NL5 . " "
+#* let NL7 : string= NL6 . " " 
+#* let NL8 : string= NL7 . " "
+#* let NL9 : string= NL8 . " "
+#* let NL10 : string = NL9 . " "
+
+\LENSSECTION{@DIGIT@, @NUMBER@, @FNUMBER@} The regular expressions 
+@DIGIT@, @NUMBER@, and @FNUMBER@ represent strings of decimal digits, 
+integers, and floating point numbers respectively.
+
+#* let DIGIT : regexp = [0-9]
+#* let NUMBER : regexp = [0] | [1-9] . DIGIT* 
+#* let FNUMBER : regexp = NUMBER . ([.] . DIGIT+)?
+
+\LENSSECTION{@UALPHACHAR@, @UALPHANUMCHAR@} 
+The regular expression @UALPHACHAR@ and @UALPHANUMCHAR@ 
+denote the set of upper case alphabetic and alphanumeric 
+characters respectively.
+
+#* let UALPHACHAR : regexp = [A-Z]
+#* let UALPHANUMCHAR : regexp = [A-Z0-9]
+
+\LENSSECTION{@is_cset@}
+The predicate @is_cset@ on regular expressions determines whether a
+regular expression identifies a set of characters.
+
+#* let is_cset (R:regexp) : bool = equiv_cex R (R & ANYCHAR)
+
+\LENSSECTION{@subset@}
+The binary predicate @subset@ decides whether the first regular
+expression is a subset of the second.
+
+#* let subset (R1:regexp) (R2:regexp) : bool 
+#*   = equiv_cex (R1 & R2) R1
+
+## test subset EMPTY [a-z] = true
+## test subset [a-z] [a-z] = true
+## test subset [abc] [a-z] = true
+## test subset [ab1] [a-z] = false
+
+\subsection{Lenses}
+
+\LENSSECTION{@lens_equiv@}
+The binary operator on lenses, @lens_equiv@, tests whether the
+@astype@s and @avtype@s of two lenses are equivalent regular expressions
+(according to @equiv@).
+
+#* let lens_equiv (l1:lens) (l2:lens) : bool =
+#*  (equiv_cex (stype l1) (stype l2)) &&
+#*  (equiv_cex (vtype l1) (vtype l2))
+
+\LENSSECTION{@ins@} The lens @ins@ maps the empty concrete 
+string to a fixed abstract string. It is defined straightforwardly 
+using @<->@.
+
+#* let ins (s:string) : (lens in EPSILON <=> s) = "" <-> s
+#* test get (ins "ABC") "" = "ABC"
+#* test put (ins "ABC") "ABC" "" = ""
+
+\LENSSECTION{@del@} The lens @del@ deletes a regular expression. 
+It is also defined using @<->@.
+
+#* let del (R:regexp) : (lens in R <-> EPSILON) = R <-> ""
+
+#* test get (del ANY) "Boomerang" = ""
+#* test put (del ANY) "" "Boomerang" = "Boomerang"
+#* test create (del ANY) "" = ""
+
+\LENSSECTION{@merge_with_sep@} The lens @merge_with_sep@ behaves like @merge@, 
+but allows a separator between the copied string. 
+
+#* let merge_with_sep (R:regexp) (s:string) : (lens in (R . s . R) <-> R) = 
+#*   copy (R . s . R) . ins s; 
+#*   merge (R . s); 
+#*   copy R . del s
+
+#* test (merge_with_sep [A-Z] ",").get "A,B" = "A"
+#* test (merge_with_sep [A-Z] ",").put "C" into "A,B" = "C,B"
+#* test (merge_with_sep [A-Z] ",").create "B" = "B,B"
+
+\subsection{Lens Predicates}
+
+\LENSSECTION{@lens_iterable@} This predicate is true for lenses with
+iterable stype and vtype.
+
+#* let lens_iterable (l:lens) : bool = 
+#*   iterable_cex (stype l) && iterable_cex (vtype l)
+
+\LENSSECTION{@lens_splittable@} This predicate is true for a pair of lenses
+if the stypes and vtypes are splittable.
+
+#* let lens_splittable (l1:lens) (l2:lens) : bool =
+#*   splittable_cex (stype l1) (stype l2) &&
+#*   splittable_cex (vtype l1) (vtype l2)
+
+\LENSSECTION{@lens_unionable@,@lens_disjoint@} This predicate is true
+for a pair of lenses if the astypes are disjoint and the equivalence
+relation abstract domain of the second lens is the identity relation.
+
+#* let lens_unionable (l1:lens) (l2:lens) : bool =
+#*   disjoint_cex (stype l1) (stype l2) &&
+#*   rel_is_id (vequiv l2) && is_basic l1 && is_basic l2
+
+#* let lens_disjoint (l1:lens) (l2:lens) : bool =
+#*   disjoint_cex (stype l1) (stype l2) &&
+#*   disjoint_cex (vtype l1) (vtype l2)
+
+\subsection{Quotient Lenses}
+
+\LENSSECTION{@qconst@} The lens @qconst@ is like @const@, but accepts an 
+entire regular expression on the abstract side. It is defined using quotienting 
+on the right, the lens @const@, and a canonizer built from @const@.
+
+#* let qconst (C:regexp) (A:regexp) (a:string where matches A a) (c:string where matches C c) 
+#*   : (lens in C <-> A)
+#*   = 
+#*   right_quot     
+#*     (const C a c)
+#*     (canonizer_of_lens (const A a a))
+
+#* test get (qconst [A-Z] [a-z] "a" "A") "A" = "a"
+#* test put (qconst [A-Z] [a-z] "a" "A") "b" "B" = "B"
+
+\LENSSECTION{@qset@} The lens @qconst@ is like @set@ (i.e., @<->@), 
+but takes an entire regular expression on the abstract side. It is defined 
+using @qconst@.
+
+#* let qset (C:regexp) (A:regexp) : (lens in C <-> A) = 
+#*  qconst C A (representative A) (representative C)
+
+#* test get (qset [A-Z] [a-z]) "A" = "a" 
+#* test get (qset [A-Z] [a-z]) "Z" = "a" 
+#* test put (qset [A-Z] [a-z]) "z" "A" = "A" 
+#* test put (qset [A-Z] [a-z]) "z" "Z" = "Z" 
+
+\LENSSECTION{@qins@,@qins_representative@} The lens @qins@ is like
+@ins@ but accepts a regular expression in the $\PUT$ direction. It is
+defined using right quotienting and @ins@. The lens
+@qins_representative@ is +similar, but uses an arbitrary
+representative of @E@ in the $\GET$ direction.
+
+#* let qins (E:regexp) (e:string in E) : (lens in EPSILON <-> E) = 
+#*   right_quot
+#*     (ins e)
+#*     (canonizer_of_lens (const E e e))
+
+#* test (get (qins [A-Z]+ "A") "") = "A"
+#* test (create (qins [A-Z]+ "A") "ABC") = ""
+
+#* let qins_representative (E:regexp) : (lens in EPSILON <-> E) =
+#*   qins E (representative E)
+
+#* test (get (qins_representative [A-Z]+) "") = "A"
+#* test (create (qins_representative [A-Z]+) "ABC") = ""
+
+\LENSSECTION{@qdel@} The lens @qdel@ is like @del@ 
+but produces a canonical representative in the backwards direction. 
+It is defined using left quotienting.
+
+#* let qdel (E:regexp) (e:string) : (lens in E <-> EPSILON) = 
+#*   left_quot 
+#*     (canonizer_of_lens (default (del E) e))
+#*     (copy EPSILON)
+
+#* test (get (qdel [A-Z]+ "ZZZ") "ABC") = ""
+#* test (put (qdel [A-Z]+ "ZZZ") "" "ABC") = "ZZZ"
+#* test (put (qdel [A-Z]+ "ZZZ") "1" "ABC") = error
+
+\subsection{Standard Datatypes}
+
+\LENSSECTION{@'a option@, @('a,'b) maybe@} The polymorphic datatypes @option@ and @maybe@ 
+represents optional and alternative values respectively.
+
+#* type 'a option = 
+#*     None | Some of 'a
+
+#* type ('a,'b) maybe = 
+#*     Left of 'a | Right of 'b 
+
+\subsection{Pairs}
+
+\LENSSECTION{@fst@,@snd@} 
+The polymorphic functions @fst@ and @snd@ are the standard projections on pairs.
+
+#*let fst ('a) ('b) (p:'a * 'b) : 'a = 
+#*  let x,_ = p in x
+
+#*let snd ('a) ('b) (p:'a * 'b) : 'b = 
+#*  let _,y = p in y
+
+\subsection{Lists of Lenses and Regular Expressions}
+
+\LENSSECTION{@astypes@,@avtypes@} Calculates the @astype@s and @avtype@s of lists of 
+lenses.
+
+#* let astypes (ls:lens List.t) = List.map{lens}{aregexp} astype ls
+#* let avtypes (ls:lens List.t) = List.map{lens}{aregexp} avtype ls
+#* let stypes (ls:lens List.t) = List.map{lens}{regexp} stype ls
+#* let vtypes (ls:lens List.t) = List.map{lens}{regexp} vtype ls
+
+\LENSSECTION{@concatable@} The list of regexps @Rs = #{regexp}[R1;R2;...;Rn]@ 
+are concatenable with regexp separator @S@ if the following are splittable:
+\begin{itemize}
+    \item @R1@ and @S@
+    \item @R1.S@ and @R2@
+    \item @R1.S.R2.S@ and @R3@
+    \item ...
+    \item @R1.S...SRn-1@ and @Rn@
+\end{itemize}
+
+#* let concatable (rl : regexp List.t) : bool =
+##  let (res,_) = 
+##    List.fold_left{regexp}{bool * regexp option}
+##      (fun (acc:bool * regexp option) (ri:regexp) -> match acc with
+##         | (true,None) -> (true,Some{regexp}(ri))
+##         | (true,(Some(racc))) -> 
+##            begin match splittable_cex racc ri with
+##              | true -> (true,Some{regexp}(racc . ri))
+##              | cx   -> (cx,None{regexp})
+##            end 
+##         | (cx,_) -> (cx,None{regexp}))
+##      (true,None{regexp}) rl in
+##  res
+
+#* test concatable #{regexp}["abc";"def"] = true
+#* test concatable #{regexp}["abc";"def"] = true
+#* test concatable #{regexp}["a" | "aa";"a"?] = false
+
+\LENSSECTION{@concat_regexps@,@concat_lenses@} Concatenates a list of regular 
+expressions or lenses, respectively.
+
+#* let concat_regexps (Rs:regexp List.t) : regexp =
+#*  List.fold_left{regexp}{regexp} 
+#*    (fun (acc:regexp) (R:regexp) -> acc . R) 
+#*    EPSILON Rs
+
+#* test concat_regexps #{regexp}["abc";"def"] = "abcdef"
+#* test concat_regexps #{regexp}["a"{5};"a"*] = "a"{5,}
+
+#* let concat_lenses (ls:lens List.t where (concatable (stypes ls))
+#*                                      && (concatable (vtypes ls)))
+#*   : (lens in concat_regexps (stypes ls)
+#*          <-> concat_regexps (vtypes ls))
+#*   =  List.fold_left{lens}{lens} 
+#*       (fun (l_acc:lens) (l:lens) -> l_acc . l)
+#*       (copy EPSILON) ls 
+
+#* test get (concat_lenses #{lens}[copy "a";copy "b";copy "c"]) "abc" = "abc"
+
+\LENSSECTION{@disjoint_from_regexps@,@disjoint_regexps@} The function 
+@disjoint_from_regexps@ determines whether a given regexp is disjoint from a 
+list of regular expressions.  The function @disjoint_regexps@ determines 
+whether a list of regular expressions are pairwise disjoint.
+
+#* let disjoint_from_regexps (R:regexp) (Rs:regexp List.t) =
+#*   List.fold_left{regexp}{bool}
+#*     (fun (ok:bool) (R':regexp) ->
+#*	 ok && disjoint_cex R R')
+#*     true Rs
+
+#* let disjoint_regexps (Rs:regexp List.t) : bool =
+#*   let (ok,_) = List.fold_left{regexp}{bool * regexp List.t}
+#*     (fun (acc:bool * regexp List.t) (R:regexp) ->
+#*        let (ok,Rs) = acc in
+#*        (ok && disjoint_from_regexps R Rs,List.Cons{regexp}(R,Rs)))
+#*     (true,#{regexp}[]) Rs in
+#*   ok
+
+#* test disjoint_regexps #{regexp}["a";"b";"c"] = true
+
+\LENSSECTION{@union_regexps@,@union_lenses@,@disj_union_lenses@} Takes the 
+union of a list of regular expressions or lenses, respectively. By default, 
+the non-disjoint lens union @||@ is used; use @disj_union_lenses@ for disjoint 
+union @|@.
+
+#* let union_regexps (Rs:regexp List.t) : regexp =
+#*  List.fold_left{regexp}{regexp} 
+#*    (fun (acc:regexp) (R:regexp) -> acc | R) 
+#*    EMPTY Rs
+
+#* test union_regexps #{regexp}["abc";"def"] = ("abc" | "def")
+#* test union_regexps #{regexp}["a"{5};"a"*] = ("a"{5} | "a"* )
+
+% TODO: Isn't this false?  What about the condition on the relation in the view?
+#* let union_lenses (ls:lens List.t where disjoint_regexps (stypes ls))
+#*   : (lens in union_regexps (stypes ls)
+#*          <-> union_regexps (vtypes ls))
+#*   = 
+#*   List.fold_left{lens}{lens} 
+#*   (fun (l_acc:lens) (l:lens) -> l_acc || l)
+#*   (copy EMPTY) ls
+
+#* test create (union_lenses #{lens}["z" <-> "a"; (copy [a-c])]) "a" = "z"
+#* test get (union_lenses #{lens}[copy "a";copy "b";copy "c"]) "a" = "a"
+
+#* let disj_union_lenses (ls:lens List.t where 
+#*                          disjoint_regexps (stypes ls) &&
+#*                          disjoint_regexps (vtypes ls))
+#*   : (lens in union_regexps (stypes ls)
+#*          <-> union_regexps (vtypes ls))
+#*   = List.fold_left{lens}{lens} 
+#*     (fun (l_acc:lens) (l:lens) -> 
+#*        (l_acc | l))
+#*     (copy EMPTY) ls
+
+#* test disj_union_lenses #{lens}[copy [a]; "a" <-> "b"] = error
+#* test get (disj_union_lenses #{lens}[copy "a";copy "b";copy "c"]) "a" = "a"
+
+\subsection{Lenses with List Arguments}
+
+These final two combinators take lists as arguments (and so have to be defined
+here instead of @Core@.)
+
+First, we have @permute@.
+
+\LENSSECTION{@permute@} The lens @permute@ is an $n$-ary, permuting 
+concatenation operator on lenses. Given a concrete string, it splits it 
+into $n$ pieces, applies the $\GET$ function of the corresponding lens to each 
+piece, reorders the abstract strings according to the fixed permutation 
+specified by @sigma@, and concatenates the results.  Given a permutation 
+@sigma@ and a list of lenses @l = #{lens}[l1;l2;...;ln]@ with types 
+@Ci <-> Ai@.  It produces a lens with type 
+@C1.C2...Cn <-> Asigma(1).Asigma(2)...Asigma(n)@.
+
+#* let lens_permute 
+#*   (sigma:int List.t)
+#*   (ls:lens List.t where 
+#*     (List.valid_permutation{lens} sigma ls) &&
+#*     ((concatable (stypes ls)) &&
+#*      (concatable (List.permute{regexp} sigma (vtypes ls)))))
+#*   : (lens in concat_regexps (stypes ls) <-> 
+#*              concat_regexps (List.permute{regexp} sigma (vtypes ls)))
+##   = Native.Prelude.lens_permute sigma ls
+
+#* test stype (lens_permute #{int}[1;0] #{lens}["abc";"def"]) = "abcdef"
+#* test vtype (lens_permute #{int}[1;0] #{lens}["abc";"def"]) = "defabc"
+#* test get (lens_permute #{int}[2;0;1] #{lens}["abc";"def";"ghi"]) 
+#*   "abcdefghi" = "defghiabc"
+#* test get (lens_permute 
+#*             #{int}[2;1;0]
+#*             #{lens}[(copy UALPHACHAR);
+#*                     (copy UALPHACHAR);
+#*                     (copy UALPHACHAR)]) "ABC" = "CBA"
+
+\LENSSECTION{@partition@} The @partition@ operator takes a list of regular expressions 
+@Rs@ as arguments and produces a lens whose $\GET$ function transforms a string 
+belonging to the iteration of the union of the @Rs@ by sorting the substrings 
+into substrings that belong to the elements of @Rs@. The regular expressions @Rs@ 
+must
+be disjoint and the iteration of their union must be unambiguous.
+
+#* let partition 
+#*     (Rs:regexp List.t where (disjoint_regexps Rs)
+#*            && (iterable_cex (union_regexps Rs)))
+#*   : (lens in (union_regexps Rs)* <-> concat_regexps (List.map{regexp}{regexp} regexp_star Rs))
+##   = Native.Prelude.partition Rs
+
+#* test get (partition #{regexp}[[A-Z];[0-9]]) "A1B2C3" = "ABC123"
+#* test put (partition #{regexp}[[A-Z];[0-9]]) "ABC123456" "A1B2C3" = "A1B2C3456"
+
+\LENSSECTION{@filter@} The @filter@ operator takes two regular expressions @R@ 
+and @S@ as arguments and produces a lens whose $\GET$ function
+transforms a string belonging to the iteration of the union of @R@ and @S@
+by discarding all of the substrings belonging to @R@. The regular expressions
+@R@ and @S@ must be disjoint and the iteration of their union must be 
+unambiguous.
+
+#* let filter 
+#*     (R:regexp) 
+#*     (S:regexp where (disjoint_cex R S) && (iterable_cex (R | S)))
+#*   : (lens in (R | S)* <-> S* )
+#*   = partition #{regexp}[R; S]; 
+#*     ( del R* . copy S* )
+
+#* test get (filter [A-Z] [0-9]) "A1B2C3" = "123"
+#* test put (filter [A-Z] [0-9]) "123456" "A1B2C3" = "A1B2C3456"
+
+\LENSSECTION{@sortable@, @sort@} The canonizer @sort@ puts substrings into 
+sorted order according to a list of regular expressions. An exception 
+is raised if the unsorted string does not have exactly one substring 
+belonging to each regular expression. This allows us to assign sort a type 
+that is compact (though imprecise); see~\cite{QuotientLens08} for a discussion.
+
+#* let sortable (rl:regexp List.t) : bool = 
+#*      disjoint_regexps (List.map{regexp}{regexp} (fun (r:regexp) -> r - EPSILON) rl) 
+#*   && iterable_cex ((union_regexps rl) - EPSILON)
+
+#* let sort 
+#*   (rl:aregexp List.t where sortable (List.map{aregexp}{regexp} rxdrop rl)) 
+#* : (cn:canonizer where (uncanonized_type cn = (union_regexps (List.map{aregexp}{regexp} rxdrop rl))* )
+#*                    && (canonized_type cn = concat_regexps (List.map{aregexp}{regexp} rxdrop rl)))
+## = Native.Prelude.sort rl
+
+#* test canonize (sort #{regexp}[UALPHACHAR; DIGIT]) "A1" = "A1"
+#* test canonize (sort #{regexp}[UALPHACHAR; DIGIT]) "1A" = "A1"
+#* test canonize (sort #{regexp}[UALPHACHAR; DIGIT]) "A" = error
+#* test sort #{regexp}["a";"a"] = error
+
+#* test uncanonized_type (sort #{regexp}[UALPHACHAR; DIGIT]) =
+#*   (UALPHACHAR | DIGIT)*
+
+#* test canonized_type (sort #{regexp}[UALPHACHAR; DIGIT]) = 
+#*   (UALPHACHAR . DIGIT)
+
+\subsection{Miscellaneous}
+
+\LENSSECTION{@iterate@} The operator @iterate@ compose @f@ with itself
+ @i@ times using @b@ for the first argument, i.e., @f(f(...(f b)...))@
+ where @f@ appears @i@ times.
+
+#* let iterate ('a) (i:int where (bgeq i 0)) (f:'a -> 'a) (b:'a) : 'a =
+#*   List.fold_left{int}{'a}
+#*     (fun (acc:'a) (i:int) -> f acc)
+#*     b
+#*     (List.mk_seq i)
+
+#* test (iterate{regexp} 3 (fun (x:regexp) -> x | "(".x.")") [a-z]).get "((b))" = "((b))"
+#* test (iterate{regexp} 3 (fun (x:regexp) -> x | "(".x.")") [a-z]).get "((((b))))" = error
+
+\LENSSECTION{@show@} Gives a string representation of the value. Some
+values cannot be translated in full, e.g., functions.
+
+#* let show : forall 'a => 'a -> string
+## = Native.Prelude.poly_show
+
+\LENSSECTION{@int_of_string@} The operator @int_of_string@ converts a string 
+to the corresponding integer. 
+
+#* let int_of_string : ( string in ("-"? . [0-9]+ ) ) -> int 
+## = Native.Prelude.int_of_string

@@ -1,0 +1,23 @@
+OCAMLPACKS += unix
+
+OCAML_LIBS += $(HBASEDIR)/hbase 
+OCAMLINCLUDES += $(HBASEDIR) 
+
+GENERATED_FILES = src2tex.ml
+
+OCamlGeneratedFiles($(GENERATED_FILES))
+
+SRC2TEX=src2tex
+SRC2F=src2f
+WRAP=wrap
+BAKER=baker
+
+RESULTS=$(SRC2TEX)$(EXE) $(SRC2F)$(EXE) $(WRAP)$(EXE) $(BAKER)$(EXE)
+
+OCamlProgram($(SRC2TEX), src2tex)
+OCamlProgram($(SRC2F), src2f)
+OCamlProgram($(WRAP), wrap)
+OCamlProgram($(BAKER), $(HBASEDIR)/baker)
+
+clean:
+  $(CLEAN) $(GENERATED_FILES) $(RESULTS)

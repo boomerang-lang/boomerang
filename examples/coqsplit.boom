@@ -1,0 +1,142 @@
+module Coqsplit =
+
+let TAG = [A-Z] . [A-Z ]*
+let IDENT = [a-zA-Z] . [a-zA-Z0-9_']*
+
+(* ugh...bounded polymorphism would be really nice here *)
+let com_open  = "(*"
+let com_close = "*)"
+
+let SCOM (R:regexp) : regexp = com_open . " " . R . com_close
+let scom (s:string) : string = com_open . " " . s . com_close
+
+let DCOM (R:regexp) : regexp = com_open . "* " . R . com_close
+let dcom (s:string) : string = com_open . "* " . s . com_close
+
+let COM (R:regexp) : regexp = SCOM R | DCOM R
+
+(******************************************************************************)
+(* COPYING (not used) *********************************************************)
+(******************************************************************************)
+
+let INLINE_TAG (tag:string in TAG) : regexp = 
+  let internal = (tag . ": " . not_containing com_close) in
+  COM internal
+
+let inline_tag (tag:string in TAG) 
+  : (lens in INLINE_TAG tag <=> INLINE_TAG tag) 
+  = copy (INLINE_TAG tag)
+
+test matches_cex (stype (inline_tag "HIDE")) "(* HIDE: A better beginning would be nice... *)" = true
+test matches_cex (stype (inline_tag "HIDE")) "(** HIDE: A better beginning would be nice... *)" = true
+
+let OPEN_TAG (tag:string in TAG) : regexp = SCOM (tag . " ")
+let CLOSE_TAG (tag:string in TAG) : regexp = SCOM ("/" . tag . " ")
+
+let BLOCK_TAG (tag:string in TAG) : regexp =
+  let OPEN = OPEN_TAG tag in
+  let CLOSE = CLOSE_TAG tag in
+  OPEN . (not_containing CLOSE) . CLOSE
+
+let block_tag (tag:string in TAG)
+  : (lens in BLOCK_TAG tag <=> BLOCK_TAG tag)
+  = copy (BLOCK_TAG tag)
+
+test matches_cex (stype (block_tag "FULL"))
+  <<
+   (* FULL *)
+     We will be investigating both aspects in tandem.
+   (* /FULL *)
+  >> = true
+
+(******************************************************************************)
+(* DELETING *******************************************************************)
+(******************************************************************************)
+
+let del_inline_tag (tag:string in TAG) 
+  : (lens in INLINE_TAG tag <-> "") 
+  = del (INLINE_TAG tag)
+
+test (del_inline_tag "HIDE").get "(* HIDE: A better beginning would be nice... *)" = ""
+test (del_inline_tag "HIDE").get "(** HIDE: A better beginning would be nice... *)" = ""
+
+let del_block_tag (tag:string in TAG)
+  : (lens in BLOCK_TAG tag <-> "")
+  = del (BLOCK_TAG tag)
+
+test (del_block_tag "FULL").get
+  <<
+   (* FULL *)
+     We will be investigating both aspects in tandem.
+   (* /FULL *)
+  >> = ""
+
+(******************************************************************************)
+(* TAG DROPPING ***************************************************************)
+(******************************************************************************)
+
+let drop_inline_tag (tag:string in TAG) 
+  : (lens in INLINE_TAG tag <-> COM (not_containing com_close)) 
+  = com_open . "*"? . del (" " . tag . ":") . " " . (not_containing com_close) . com_close
+
+test (drop_inline_tag "HIDE").get "(* HIDE: A better beginning would be nice... *)" = "(* A better beginning would be nice... *)"
+test (drop_inline_tag "HIDE").get "(** HIDE: A better beginning would be nice... *)" = "(** A better beginning would be nice... *)"
+
+(* TODO: allow whitespace between open tag and newline *)
+let drop_block_tag (tag:string in TAG)
+  : (lens in (OPEN_TAG tag . "\n" . not_containing (CLOSE_TAG tag) . CLOSE_TAG tag . "\n")
+         <-> not_containing (CLOSE_TAG tag))
+  = 
+  let OPEN  = (OPEN_TAG tag) in
+  let CLOSE = (CLOSE_TAG tag) in
+  del (OPEN . "\n") . not_containing CLOSE . del (CLOSE . "\n")
+
+test (drop_block_tag "FULL").get
+  <<
+   (* FULL *)
+     We will be investigating both aspects in tandem.
+   (* /FULL *)
+
+  >> = "  We will be investigating both aspects in tandem.\n"
+
+(******************************************************************************)
+(* REPLACING ******************************************************************)
+(******************************************************************************)
+
+(* TODO: contract on s? *)
+let replace_entire_block_tag (tag:string in TAG) (s:string) =
+  del_block_tag tag . ins s
+
+test (replace_entire_block_tag "ADMIT" "(* FILL IN HERE *) admit.").get
+    <<
+     (* ADMIT *)
+       match b1 with
+       | true => negb b2
+       | false => true
+       end.
+     (* /ADMIT *)
+    >>
+    = "(* FILL IN HERE *) admit."
+
+let replace_block_tag (tag:string in TAG) (rs:string) =
+  ins rs . drop_block_tag tag
+
+test (replace_block_tag "ADMIT" "(* SOLUTION: *)\n").get
+    <<
+     (* ADMIT *)
+       match b1 with
+       | true => negb b2
+       | false => true
+       end.
+     (* /ADMIT *)
+
+    >>
+    =
+    <<
+     (* SOLUTION: *)
+       match b1 with
+       | true => negb b2
+       | false => true
+       end.
+
+    >>

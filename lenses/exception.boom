@@ -1,0 +1,87 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2009                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/exception.boom                                                     *)
+(* Use monad ideas to implement exception                                     *)
+(* $Id: exception.boom 4635 2009-08-25 18:52:01Z cretin $ *)
+(******************************************************************************)
+
+module Exception =
+
+#{@}
+
+#* type ('exn,'a) t = Value of 'a | Exn of 'exn
+
+#* let generic_fmap 'exn 'a 'b (f:'a -> 'b) (x:('exn,'a) t) =
+#*   match x with
+#*   | Value v -> Value{'exn}{'b} (f v)
+#*   | Exn e -> Exn{'exn}{'b} e
+
+#* let fmap = generic_fmap{unit -> int}
+
+#* let generic_join 'exn 'a (x:('exn,('exn,'a) t) t) =
+#*   match x with
+#*   | Value (Value v) -> Value{'exn}{'a} v
+#*   | Value (Exn e) -> Exn{'exn}{'a} e
+#*   | Exn e -> Exn{'exn}{'a} e
+
+#* let join = generic_join{unit -> int}
+
+#* let generic_bind 'exn 'a 'b (x:('exn,'a) t) (f:'a -> ('exn,'b) t) =
+#*   generic_join{'exn}{'b} (generic_fmap{'exn}{'a}{('exn,'b) t} f x)
+
+#* let bind = generic_bind{unit -> int}
+
+#* let generic_rbind 'exn 'a 'b (f:'a -> ('exn,'b) t) (x:('exn,'a) t) =
+#*   generic_bind{'exn}{'a}{'b} x f
+
+#* let rbind = generic_rbind{unit -> int}
+
+#* let generic_return 'exn 'a (x:'a) = Value{'exn}{'a} x
+#* let generic_ok = generic_return
+
+#* let return = generic_return{unit -> int}
+#* let ok = generic_ok{unit -> int}
+
+
+#* let generic_raise 'exn 'a (y:'exn) = Exn{'exn}{'a} y
+
+#* let raise = generic_raise{unit -> int}
+#* let failwith 'a (message:string) =
+#*   raise{'a} (fun (u:unit) ->
+#*               let _ = Sys.put_str ("Failure: " . message . "\n") in 1)
+
+#* let generic_try 'exn 'a (x:('exn,'a) t) (catch:'exn -> ('exn,'a) t) =
+#*   match x with
+#*   | Value v -> Value{'exn}{'a} v
+#*   | Exn e -> catch e
+
+#* let try 'a (x:(unit -> int,'a) t) (catch:unit -> (unit -> int,'a) t) =
+#*   match x with
+#*   | Value v -> Value{unit -> int}{'a} v
+#*   | Exn e -> catch ()
+
+#* let generic_convert 'exn 'a (x:('exn,'a) t) (convert:'exn -> 'a) =
+#*   match x with
+#*   | Value v -> v
+#*   | Exn e -> convert e
+
+#* let convert = generic_convert{unit -> int}
+#* let convert_main (code:((unit -> int), int) t) =
+#*   match code with
+#*   | Value c -> c
+#*   | Exn e -> e ()

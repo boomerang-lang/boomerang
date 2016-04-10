@@ -1,0 +1,217 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2008                                                         *)
+(* J. Nathan Foster and Benjamin C. Pierce                                    *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /lenses/list.boom                                                          *)
+(* List module                                                                *)
+(* $Id: list.boom 4635 2009-08-25 18:52:01Z cretin $ *)
+(*******************************************************************************)
+
+module List = 
+#{@}
+
+\section{Lists}
+
+The @List@ module defines a datatype for polymorphic list structures.
+In this module we cannot use the Boomerang notation for lists because
+it is resolved using List.Nil and List.Cons, which are not valid names
+while the List module is being defined.
+
+\LENSSECTION{@'a t@} A list is either the @Nil@ list or a @Cons@ of a head 
+and a tail.
+
+#* type 'a t = Nil | Cons of 'a * 'a t
+
+\LENSSECTION{@empty@,@nonempty@} Predicates for detecting (non)empty lists.
+
+#* let empty ('a) (l:'a t) : bool =
+#*   match l with
+#*     | Nil     -> true
+#*     | Cons(_) -> false
+
+#* let nonempty ('a) (l:'a t) : bool = not (empty{'a} l)
+
+\LENSSECTION{@hd@,@tl@} The selectors @hd@ and @tl@ pull out the first and last
+parts of a @Cons@-cell, respectively.
+
+#* let hd ('a) (xs:'a t) : 'a =
+#*   let (Cons(x,_)) = xs in
+#*   x
+
+#* let tl ('a) (xs:'a t) : 'a t =
+#*   let (Cons(_,xs)) = xs in
+#*   xs
+
+\LENSSECTION{@fold_left@} Boomerang does not support recursion. However, we 
+provide the @fold_left@ function on lists via a built-in primitive.
+
+#* let fold_left ('a) ('b) (f:'b -> 'a -> 'b) (acc:'b) (l:'a t) : 'b 
+## = Native.Prelude.fold_left{'b}{'a} f acc l 
+
+\LENSSECTION{@length@} Calculates the length of a list.
+
+#* let length ('a) (l : 'a t) : int =
+#*   fold_left{'a}{int}
+#*     (fun (n:int) (v:'a) -> plus n 1)
+#*     0 l
+
+#* test length{bool} Nil{bool} = 0
+#* test length{bool} (Cons{bool}(true,Cons{bool}(false,Nil{bool}))) = 2
+
+\LENSSECTION{@mk_seq@} The function @mk_seq@ returns a list of
+integers from @0@ to @n-1@.
+
+#* let mk_seq (n:int where n geq 0) : (l:int t where length{int} l = n)
+## = Native.Prelude.mk_seq n
+
+\LENSSECTION{@reverse@} The function @reverse@ can be defined straightforwardly
+using @fold_left@.
+
+#* let reverse ('a) (l : 'a t) : 'a t =
+#*   fold_left{'a}{'a t} 
+#*     (fun (t:'a t) (h:'a) -> Cons{'a}(h,t)) 
+#*     Nil{'a} 
+#*     l
+
+\LENSSECTION{@append@} The function @append@ can be defined using
+@fold_left@ and @reverse@.
+
+#* let append ('a) (l1 : 'a t) (l2 : 'a t) : 'a t =
+#*   fold_left{'a}{'a t}
+#*     (fun (l:'a t) (x:'a) -> Cons{'a}(x,l))
+#*     l2
+#*     (reverse{'a} l1)
+
+\LENSSECTION{@map@,@rev_map@} The function @map@ can be defined
+(inefficiently) using @fold_left@ and @reverse@.  The @rev_map@ is
+more efficient, but leaves the list reversed.
+
+#* let rev_map ('a) ('b) (f:'a -> 'b) (l:'a t) : 'b t = 
+#*   fold_left{'a}{'b t}
+#*     (fun (t:'b t) (h:'a) -> Cons{'b}(f h,t)) 
+#*     Nil{'b}
+#*     l
+
+#* let map ('a) ('b) (f:'a -> 'b) (l:'a t) : 'b t = 
+#*   reverse{'b} (rev_map{'a}{'b} f l)
+
+\LENSSECTION{@exists@} The function @exists@ tests if a predicate holds of 
+some element of the list.
+
+#* let exists ('a) (t:'a -> bool) (l:'a t) : bool = 
+#*   fold_left {'a}{bool} (fun (b:bool) (h:'a) -> b || t h) 
+#*   false 
+#*   l
+
+\LENSSECTION{@for_all@} The function @for_all@ tests if a predicate holds of
+every element of the list.
+
+#* let for_all ('a) (t:'a -> bool) (l:'a t) : bool =
+#*   fold_left {'a}{bool} (fun (b:bool) (h:'a) -> b && t h) 
+#*   true
+#*   l
+
+\LENSSECTION{@member@} The function @member@ tests if an element is a
+member of the list. It is defined using @exists@.
+
+#* let member ('a) (x:'a) (l:'a t) : bool = 
+#*  exists{'a} (fun (h:'a) -> x = h) l 
+
+\subsection{Permutations}
+
+A permutation is an integer list, mapping positions to other positions: if 
+the @i@th entry of a permutation is the number @j@, then the @i@th element 
+in the original list will be the @j@th element in the permuted list.  A 
+permutation for the list @#{bool}[true;true;false;true;false]@ might be 
+@#{int}[0;1;2;3;4]@ (the identity permutation) or @#{int}[4;3;2;1;0]@ 
+(reversal).
+
+\LENSSECTION{@valid_permutation@} The predicate @valid_permutation@ is true 
+when given the given permutation can be applied to the given list.
+
+#* let valid_permutation ('a) (sigma:int t) (l:'a t) : bool
+## = Native.Prelude.valid_permutation{'a} sigma l
+
+#* test valid_permutation{bool} Nil{int} Nil{bool} = true
+#* test valid_permutation{bool} 
+#*  (Cons{int}(1,Cons{int}(0,Nil{int}))) 
+#*  (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = true
+#* test valid_permutation{bool} 
+#*   (Cons{int}(1,Cons{int}(1,Nil{int}))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = false
+#* test valid_permutation{bool} 
+#*   (Cons{int}(0 - 1,Cons{int}(1,Nil{int}))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = false
+#* test valid_permutation{bool} 
+#*   (Cons{int}(0,Cons{int}(1,Cons{int}(2,Nil{int})))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = false
+#* test valid_permutation{bool} 
+#*   (Cons{int}(1,Nil{int})) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = false
+#* test valid_permutation{bool} 
+#*   (Cons{int}(1,Cons{int}(2,Nil{int}))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) = false
+
+\LENSSECTION{@permute@} The operator @permute@ permutes a list according
+ to a given permutation.
+
+#* let permute ('a) 
+#*          (sigma:int t) 
+#*          (l:'a t where valid_permutation{'a} sigma l)
+#*   : 'a t
+##   = Native.Prelude.list_permute{'a} sigma l
+
+#* test permute{bool} Nil{int} Nil{bool} = Nil{bool}
+#* test permute{bool} 
+#*   (Cons{int}(0,Cons{int}(1,Nil{int}))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool})))
+#* = (Cons{bool}(false,Cons{bool}(true,Nil{bool})))
+#* test permute{bool} 
+#*   (Cons{int}(1,Cons{int}(0,Nil{int}))) 
+#*   (Cons{bool}(false,Cons{bool}(true,Nil{bool}))) 
+#* = (Cons{bool}(true,Cons{bool}(false,Nil{bool})))
+#* test permute{string} 
+#*   (Cons{int}(0,Cons{int}(2,Cons{int}(1,Nil{int})))) 
+#*   (Cons{string}("a",Cons{string}("b",Cons{string}("c",Nil{string})))) 
+#* = (Cons{string}("a",Cons{string}("c",Cons{string}("b",Nil{string}))))
+
+\LENSSECTION{@permutations@} The operator @permutations@ returns a list of
+all possible permutations for lists of a given length.
+
+#* let permutations : (n:int where (n geq 0)) -> (int t) t
+## = Native.Prelude.permutations
+
+#* test permutations 0 = (Cons{int t}(Nil{int},
+#*                        Nil{int t}))
+#* test permutations 1 = (Cons{int t}(Cons{int}(0,Nil{int}),
+#*                        Nil{int t}))
+#* test permutations 2 = (Cons{int t}(Cons{int}(0,Cons{int}(1,Nil{int})),
+#*                        Cons{int t}(Cons{int}(1,Cons{int}(0,Nil{int})),
+#*                        Nil{int t})))
+
+\LENSSECTION{@invert_permutation@} The operator @invert_permutation@ inverts a
+permutation @sigma@, calculating the permutation @sigma_inv@ such that
+@permute_list{'a} sigma_inv (permuate_list{'a} sigma l) = l@ for all @l@.
+
+#* let invert_permutation : int t -> int t
+## = Native.Prelude.invert_permutation
+
+#* let sort : forall 'a => ('a -> 'a -> int) -> 'a t -> 'a t
+## = Native.Prelude.list_sort
+
+#* test sort{int} minus (Cons{int}(3, Cons{int}(4, Cons{int}(1, Cons{int}(0,
+#*      Nil{int}))))) = (Cons{int}(0, Cons{int}(1, Cons{int}(3, Cons{int}(4,
+#*      Nil{int})))))

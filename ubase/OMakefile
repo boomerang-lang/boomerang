@@ -1,0 +1,17 @@
+
+RESULT = ubase
+RESULTS = $(RESULT).cmxa
+
+UBASE_LIBRARY_SOURCES[] = \
+  safelist.ml uprintf.ml util.ml uarg.ml prefs.ml trace.ml rx.ml \
+  myMap.ml
+
+OCamlLibrary($(RESULT), $(rootname $(UBASE_LIBRARY_SOURCES)))
+
+.DEFAULT: $(RESULTS)
+
+clean: 
+	$(CLEAN).cma $(RESULT) $(RESULTS)
+
+veryclean: 
+	$(CLEAN).cma $(RESULT) $(RESULTS)

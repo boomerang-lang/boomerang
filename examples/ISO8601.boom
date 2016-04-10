@@ -1,0 +1,382 @@
+module ISO8601 =
+
+  let PLUSMINUS = "+" | "-"
+
+  (* Per ISO 31-0 *)
+  let DECIMAL = "," | "." (* comma is preferred *)
+
+  (* 3.4.3 Characters used as designators *)
+
+  let P = "P" (* duration/period *)
+  let R = "R" (* recurring interval *)
+  let T = "T" (* local time/time/time duration *)
+  let W = "W" (* week *)
+  let Z = "Z" (* UTC *)
+
+  (************)
+  (* 4.1 Date *)
+  (************)
+
+  module Date =
+
+  let Y = [0-9]
+  let MM = ('0' . [1-9]) | "10" | "11" | "12"
+  let DD = ('0' . [1-9]) | ([12] . [0-9]) | "30" | "31"
+
+  let SEP = "-"
+
+  (***********************)
+  (* 4.1.2 Calendar date *)
+  (***********************)
+
+  (* 4.1.2.2 Complete representations *)
+  let DATE (sep:regexp) = Y{4} . sep . MM . sep . DD
+  let BASIC = DATE ""
+  let EXTENDED = DATE SEP
+  let COMPLETE = DATE SEP?
+
+  test "19850412"   : (string in COMPLETE)
+  test "1985-04-12" : (string in COMPLETE)
+  test "19850412"   : (string in BASIC)
+  test "1985-04-12" : (string in EXTENDED)
+
+  (* 4.1.2.3 Representations with reduced accuracy
+
+     ...two, four or six digits may be omitted, the omission starting
+     from the extreme right-hand side. The resulting representation
+     will then indicate a month, a year or a century, as set out
+     below. When only [DD] is omitted, a separator shall be inserted
+     between [YYYY] and [MM], but separators shall not be used in the
+     other representations with reduced accuracy.
+
+  *)
+  let REDUCED = Y{2} . (Y{2} . (SEP . MM)?)?
+
+  test "1984-04" : (string in REDUCED)
+  test "1984"    : (string in REDUCED)
+  test "19"      : (string in REDUCED)
+
+  (* 4.1.2.4 Expanded representations *)
+
+  let EXPAND (YS : regexp where subset YS Y+) (FMT : regexp) =
+    PLUSMINUS . YS . FMT
+
+  let EXPANDED_COMPLETE (YS : regexp where subset YS Y+) = EXPAND YS COMPLETE
+
+  let EXPANDED_REDUCED (YS : regexp where subset YS Y+) = EXPAND YS REDUCED
+
+  let EXPANDED (YS : regexp where subset YS Y+) =
+    EXPANDED_COMPLETE YS | EXPANDED_REDUCED YS
+
+  test "+0019850412"   : (string in EXPANDED Y{2})
+  test "+001985-04-12" : (string in EXPANDED Y{2})
+  test "+0019850412"   : (string in EXPANDED_COMPLETE Y{2})
+  test "+001985-04-12" : (string in EXPANDED_COMPLETE Y{2})
+  test "+001985-04"    : (string in EXPANDED Y{2})
+  test "+001985"       : (string in EXPANDED Y{2})
+  test "+0019"         : (string in EXPANDED Y{2})
+  test "+001985-04"    : (string in EXPANDED_REDUCED Y{2})
+  test "+001985"       : (string in EXPANDED_REDUCED Y{2})
+  test "+0019"         : (string in EXPANDED_REDUCED Y{2})
+
+  (**********************)
+  (* 4.1.2 Ordinal date *)
+  (**********************)
+
+  (* Table 1: Calendar months and ordinal days
+
+     Calendar month Calendar month Number of days in Ordinal dates of the days in Ordinal dates of the
+         number          name          the month           common years           days in leap years
+           01           January            31                  001-031                 001-031
+           02          February            28 (29 leap year)   032-059                 032-060
+           03            March             31                  060-090                 061-091
+           04            April             30                  091-120                 092-121
+           05             May              31                  121-151                 122-152
+           06            June              30                  152-181                 153-182
+           07             July             31                  182-212                 183-213
+           08           August             31                  213-243                 214-244
+           09         September            30                  244-273                 245-274
+           10           October            31                  274-304                 275-305
+           11          November            30                  305-334                 306-335
+           12          December            31                  335-365                 336-366
+  *)
+
+  (* ordinal days *)
+  let DDD = [0-2] . [0-9]{2} | '3' . ([0-5] . [0-9] | '6' . [0-6])
+
+  test "001" : (string in DDD)
+  test "365" : (string in DDD)
+  test "366" : (string in DDD)
+
+  let ODATE (sep:regexp) =
+    Y{4} . sep . DDD
+  let OBASIC = ODATE ""
+  let OEXTENDED = ODATE SEP
+  let OCOMPLETE = ODATE SEP?
+
+  test "1985102"  : (string in OCOMPLETE)
+  test "1985-102" : (string in OCOMPLETE)
+  test "1985102"  : (string in OBASIC)
+  test "1985-102" : (string in OEXTENDED)
+
+  (* There is no reduced represenation for ordinal dates --- they'd be
+     same as the year-only reduced representations of calendar dates. *)
+
+  (* 4.1.3.3 Expanded representations *)
+
+  let OEXPANDED (YS : regexp where subset YS Y+) = EXPAND YS OCOMPLETE
+
+  test "+001985102"  : (string in OEXPANDED Y{2})
+  test "+001985-102" : (string in OEXPANDED Y{2})
+
+  (*******************)
+  (* 4.1.4 Week date *)
+  (*******************)
+
+  (* calendar week numbers *)
+  (* years have 52 or 53 weeks *)
+  let Www = W . ([0-4] . [0-9] | '5' . [0-3])
+
+  (* Table 2: Calendar days
+  
+     Ordinal day number in  Calendar day name	  
+           the week
+               1                Monday
+               2                Tuesday
+               3                Wednesday
+               4                Thursday
+               5                Friday
+               6                Saturday
+               7                Sunday
+  
+     What a bunch of anti-Semites -- Sunday is the first day of the
+     week!
+  *)
+
+  (* ordinal day numbers *)
+  let D = [1-7]
+
+  (* 4.1.4.2 Complete representations *)
+
+  let WDATE (sep:regexp) =
+    Y{4} . sep . Www . sep . D
+  let WBASIC = WDATE ""
+  let WEXTENDED = WDATE SEP
+  let WCOMPLETE = WDATE SEP?
+
+  test "1985W155"   : (string in WCOMPLETE)
+  test "1985-W15-5" : (string in WCOMPLETE)
+  test "1985W155"   : (string in WBASIC)
+  test "1985-W15-5" : (string in WEXTENDED)
+
+  (* 4.1.4.3 Representations with reduced accuracy *)
+
+  let WREDUCED = Y{4} . SEP? . Www
+  test "1985W15"  : (string in WREDUCED)
+  test "1985-W15" : (string in WREDUCED)
+
+  (* 4.1.4.4 Expanded representations *)
+
+  let WEXPANDED_COMPLETE (YS : regexp where subset YS Y+) =
+    EXPAND YS WCOMPLETE
+
+  let WEXPANDED_REDUCED (YS : regexp where subset YS Y+) =
+    EXPAND YS WREDUCED
+
+  let WEXPANDED (YS : regexp where subset YS Y+) =
+    WEXPANDED_COMPLETE YS | WEXPANDED_REDUCED YS
+
+  test "+001985W155"   : (string in WEXPANDED Y{2})
+  test "+001985-W15-5" : (string in WEXPANDED Y{2})
+  test "+001985W155"   : (string in WEXPANDED_COMPLETE Y{2})
+  test "+001985-W15-5" : (string in WEXPANDED_COMPLETE Y{2})
+  test "+001985W15"    : (string in WEXPANDED Y{2})
+  test "+001985-W15"   : (string in WEXPANDED Y{2})
+  test "+001985W15"    : (string in WEXPANDED_REDUCED Y{2})
+  test "+001985-W15"   : (string in WEXPANDED_REDUCED Y{2})
+
+  end
+
+  (* complete, reduced, ordinal, week-complete, and week-reduced date
+     formats are all disjoint *)
+  test disjoint_regexps #{regexp}[Date.COMPLETE; Date.REDUCED; 
+				  Date.OCOMPLETE; (* no reduced form! *)
+				  Date.WCOMPLETE; Date.WREDUCED] = true
+
+  let DATE = Date.COMPLETE | Date.REDUCED 
+           | Date.OCOMPLETE 
+	   | Date.WCOMPLETE | Date.WREDUCED
+  let COMPLETE_DATE = Date.COMPLETE | Date.OCOMPLETE | Date.WCOMPLETE
+
+  (*******************)
+  (* 4.2 Time of day *)
+  (*******************)
+
+  module Time =
+
+  let hh = ([01] . [0-9]) | '2' . [0-4]
+  let mm = ([0-5] . [0-9])
+  let ss = ([0-5] . [0-9]) | "60" 
+  (* 60 is used only for leap seconds and instants within *)
+
+  let SEP = ":"
+
+  (* 4.2.2.2 Complete representations *)
+
+  let TIME (sep:regexp) = hh . sep . mm . sep . ss
+  let BASIC = TIME ""
+  let EXTENDED = TIME SEP
+  let COMPLETE = TIME SEP?
+
+  test "232050"   : (string in COMPLETE)
+  test "23:20:50" : (string in COMPLETE)
+  test "232050"   : (string in BASIC)
+  test "23:20:50" : (string in EXTENDED)
+
+  (* 4.2.2.3 Representations with reduced accuracy *)
+
+  let REDUCED = hh . (SEP? . mm)?
+
+  test "2320"  : (string in REDUCED)
+  test "23:20" : (string in REDUCED)
+  test "23"    : (string in REDUCED)
+
+  (* 4.2.2.4 Representations with decimal fraction *)
+
+  let DECIMAL_FRACTION = DECIMAL . [1-9] . [0-9]*
+
+  let FTIME (sep:regexp) = 
+    hh . sep . mm . sep . ss . DECIMAL_FRACTION
+  let FBASIC = FTIME ""
+  let FEXTENDED = FTIME SEP
+  let FCOMPLETE = FTIME SEP?
+
+  let FREDUCED =
+    hh . (DECIMAL_FRACTION | (SEP? . mm . DECIMAL_FRACTION))
+
+  test "232050,5"   : (string in FCOMPLETE)
+  test "23:20:50,5" : (string in FCOMPLETE)
+  test "2320,8"     : (string in FREDUCED)
+  test "23:20,8"    : (string in FREDUCED)
+  test "23,3"       : (string in FREDUCED)
+  test "232050,5"   : (string in FBASIC)
+  test "23:20:50,5" : (string in FEXTENDED)
+
+  (* 4.2.2.5 Representations with time designator *)
+
+  (* the time designator [T] indicates local time *)
+  let DCOMPLETE = T . COMPLETE
+  let DREDUCED = T . REDUCED
+  let DFCOMPLETE = T . FCOMPLETE
+
+  (* 4.2.3 Midnight *)
+
+  let MIDNIGHT = 
+    let sep = SEP? in
+    let zz = "00" in
+    (zz|"24") . (sep . zz . (sep . zz)?)?
+
+  (* the 24 form should only be used at the end of a time interval *)
+  let MIDNIGHT_CANONICAL : (R:regexp where subset R MIDNIGHT) = "00:00" | "24:00"
+
+  (* 4.2.4 UTC of day *)
+
+  let ZCOMPLETE = COMPLETE . Z
+  let ZREDUCED = REDUCED . Z
+  let ZFCOMPLETE = FCOMPLETE . Z
+
+  test "232030Z"   : (string in ZCOMPLETE)
+  test "2320Z"     : (string in ZREDUCED)
+  test "23Z"       : (string in ZREDUCED)
+  test "23:20:30Z" : (string in ZCOMPLETE)
+  test "23:20Z"    : (string in ZREDUCED)
+
+  (* 4.2.5 Local time and Coordinated Universal Time (UTC) *)
+
+  (* 4.2.5.1 Difference between local time and UTC of day *)
+  
+  (* not "self-standing expressions", used only in the following section... *)
+  let TZDIFF = PLUSMINUS . hh . (SEP? . mm)?
+  
+  test "+0100"  : (string in TZDIFF)
+  test "+01"    : (string in TZDIFF)
+  test "+01:00" : (string in TZDIFF)
+
+  (* 4.2.5.2 Local time and the difference from UTC *)
+
+  let TZCOMPLETE = COMPLETE . TZDIFF
+  let TZREDUCED = REDUCED . TZDIFF
+  let TZFCOMPLETE = FCOMPLETE . TZDIFF
+
+  test "152746+0100"    : (string in TZCOMPLETE)
+  test "152746-0500"    : (string in TZCOMPLETE)
+  test "152746+01"      : (string in TZCOMPLETE)
+  test "152746-05"      : (string in TZCOMPLETE)
+  test "15:27:46+01:00" : (string in TZCOMPLETE)
+  test "15:27:46-05:00" : (string in TZCOMPLETE)
+  test "15:27:46+01"    : (string in TZCOMPLETE)
+  test "15:27:46-05"    : (string in TZCOMPLETE)
+
+  (* zone designators per 4.3.2 *)
+  let ZD = "" | Z | TZDIFF
+
+  end
+
+  test disjoint_regexps #{regexp}[Time.COMPLETE; Time.REDUCED; 
+				  Time.FCOMPLETE; Time.FREDUCED] = true
+
+  let TIME = (Time.COMPLETE | Time.REDUCED | Time.FCOMPLETE | Time.FREDUCED) . Time.ZD 
+  let COMPLETE_TIME = (Time.COMPLETE | Time.FCOMPLETE) . Time.ZD
+
+  (****************************)
+  (* 4.3 Date and time of day *)
+  (****************************)
+
+  module DateTime =
+
+  (* full dates, complete time *)
+  let CALENDAR_COMPLETE = Date.COMPLETE . T . COMPLETE_TIME
+  let ORDINAL_COMPLETE  = Date.OCOMPLETE . T . COMPLETE_TIME
+  let WEEK_COMPLETE     = Date.WCOMPLETE . T . COMPLETE_TIME
+  let DATETIME_COMPLETE = COMPLETE_DATE . T . COMPLETE_TIME
+
+  test "19850412T101530"      : (string in DATETIME_COMPLETE)
+  test "19850412T101530Z"     : (string in DATETIME_COMPLETE)
+  test "19850412T101530+0400" : (string in DATETIME_COMPLETE)
+  test "19850412T101530+04"   : (string in DATETIME_COMPLETE)
+  test "19850412T101530"      : (string in CALENDAR_COMPLETE)
+  test "19850412T101530Z"     : (string in CALENDAR_COMPLETE)
+  test "19850412T101530+0400" : (string in CALENDAR_COMPLETE)
+  test "19850412T101530+04"   : (string in CALENDAR_COMPLETE)
+
+  test "1985-04-12T10:15:30"      : (string in DATETIME_COMPLETE)
+  test "1985-04-12T10:15:30Z"     : (string in DATETIME_COMPLETE)
+  test "1985-04-12T10:15:30+0400" : (string in DATETIME_COMPLETE)
+  test "1985-04-12T10:15:30+04"   : (string in DATETIME_COMPLETE)
+  test "1985-04-12T10:15:30"      : (string in CALENDAR_COMPLETE)
+  test "1985-04-12T10:15:30Z"     : (string in CALENDAR_COMPLETE)
+  test "1985-04-12T10:15:30+0400" : (string in CALENDAR_COMPLETE)
+  test "1985-04-12T10:15:30+04"   : (string in CALENDAR_COMPLETE)
+
+  (* full dates, possibly reduced time *)
+  let CALENDAR = Date.COMPLETE . T . TIME
+  let ORDINAL  = Date.OCOMPLETE . T . TIME
+  let WEEK     = Date.WCOMPLETE . T . TIME
+  let DATETIME = COMPLETE_DATE . T . TIME
+
+  test "19850412T1015"       : (string in DATETIME)
+  test "1985-04-12T10:15"    : (string in DATETIME)
+  test "19850412T1015"       : (string in CALENDAR)
+  test "1985-04-12T10:15"    : (string in CALENDAR)
+  test "1985102T1015Z"       : (string in DATETIME)
+  test "1985-102T10:15Z"     : (string in DATETIME)
+  test "1985102T1015Z"       : (string in ORDINAL)
+  test "1985-102T10:15Z"     : (string in ORDINAL)
+  test "1985155T1015+0400"   : (string in DATETIME)
+  test "1985-W15-5T10:15+04" : (string in DATETIME)
+  test "1985W155T1015+0400"  : (string in WEEK)
+  test "1985-W15-5T10:15+04" : (string in WEEK)
+
+  end
+
+  let DATETIME = DateTime.DATETIME

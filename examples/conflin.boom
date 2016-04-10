@@ -1,0 +1,887 @@
+(******************************************************************************)
+(* The Harmony Project                                                        *)
+(* harmony@lists.seas.upenn.edu                                               *)
+(******************************************************************************)
+(* Copyright (C) 2007 J. Nathan Foster and Benjamin C. Pierce                 *)
+(*                                                                            *)
+(* This library is free software; you can redistribute it and/or              *)
+(* modify it under the terms of the GNU Lesser General Public                 *)
+(* License as published by the Free Software Foundation; either               *)
+(* version 2.1 of the License, or (at your option) any later version.         *)
+(*                                                                            *)
+(* This library is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU          *)
+(* Lesser General Public License for more details.                            *)
+(******************************************************************************)
+(* /examples/conflin.boom                                                     *)
+(* management tool for multiple versions of the same file                     *)
+(* $Id:: conflin.boom 4901 2010-05-13 21:14:49Z cretin                      $ *)
+(******************************************************************************)
+(*@view: *)(*@*)
+module Conflin =
+
+(* ---------------------------------------------------------------- *)
+(*                               TODO                               *)
+(*
+
+ ! check the value (identifier in File_pref) before using it ; also
+   change the way we get this value (see writing an Arg module)
+
+ x add a --force option ; we check the date of the files to see if the
+   given file is the right one
+
+ x add a lock when doing a put, to avoid potentials simultaneous puts
+
+ - add a string_pref that returns a string option (without default)
+
+ - try to make it multi-parameter but linear
+
+ - give a better error message when doing a put with the wrong value
+   in view prefix
+
+ - add a rename lens maybe (or just with another value of format)
+
+ - check the tests in main_lens and put them in main if the user is
+   able to give a specific preference ; something better would be to
+   add a check function in File_pref
+
+ *)
+
+(* ---------------------------------------------------------------- *)
+(*                           definitions                            *)
+
+let if 'a (b:bool) (t:'a) (f:'a) =
+  match b with
+  | true -> t
+  | false -> f
+  :'a
+let id 'a (x:'a) = x
+let ambiguous_lens_concat_contract (a:lens) (b:lens) =
+  is_basic a && is_basic b && splittable_cex (stype a) (stype b)
+let ambiguous_lens_concat (a:lens) (b:lens where ambiguous_lens_concat_contract a b) =
+  Native.Prelude.lens_concat a b
+let ambiguous_lens_partition_one_contract (a:lens) (b:lens) =
+  lens_star_contract b && lens_swap_contract b* a
+  && ambiguous_lens_concat_contract (lens_swap b* a) b*
+let ambiguous_lens_partition_one (a:lens) (b:lens where ambiguous_lens_partition_one_contract a b) =
+  ambiguous_lens_concat (lens_swap b* a) b*
+let positional (name:string) = Tag (Positional, Threshold 0, Key, name)
+let diffy (first:bool) (name:string) = Tag (Diffy first, Threshold 0, Key, name)
+let show_list 'a (l:'a List.t) =
+  "[" . fst{string}{bool} (
+    List.fold_left{'a}{string * bool} (
+      fun (sb:string * bool) (x:'a) ->
+        match sb with
+        | s, b -> (s . if{string} b ";" "" . show{'a} x, true)
+            :string * bool
+    ) ("", false) l
+  ) . "]"
+let mk_error (message:string) = "Error: " . message
+let identifier = [a-zA-Z] . [ a-zA-Z0-9_\-@]*
+let is_lens (l:lens) = rel_is_id (sequiv l) && rel_is_id (vequiv l)
+let show_s = show{string}
+let if_none 'a (x:'a) (yo:'a option) =
+  match yo with
+  | None -> x
+  | Some y -> y
+  :'a
+let if_none_s = if_none{string}
+let write (file:string) (data:string) =
+  let _ = Sys.write file data in 0
+let read = Sys.read
+let file_exists = Sys.file_exists
+let put_str_ln (x:string) = Sys.put_str (x . newline)
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                         File_pref module                         *)
+
+module File_pref =
+  type t = T of regexp(*@!*)(*@*) * (string * string) * (string * string) * string
+  let make (values:regexp)(*@!*)(*@*)
+      (comment_prefix:string) (comment_suffix:string)
+      (command_prefix:string) (command_suffix:string)
+      (view_prefix:string) =
+    T (values,(*@!*)(*@*)
+       (comment_prefix, comment_suffix),
+       (command_prefix, command_suffix),
+       view_prefix)
+  let default_view_prefix = "view: "
+  let default_commands = "@", ""(*@!*)(*@*)
+  let uncuttable_prefix, uncuttable_suffix = "", "!"
+  let shell_like = T (identifier, ("#", "\n"), default_commands, default_view_prefix)
+  let c_like = T (identifier, ("//", "\n"), default_commands, default_view_prefix)
+  let cpp_like = T (identifier, ("/*", "*/"), default_commands, default_view_prefix)
+  let ocaml_like = T (identifier, ("(*", "*)"), default_commands, default_view_prefix)
+  let debug_like = T ([a-z], ("(", ")"), ("", ""), "")
+  let set_command_prefix (x:string) (t:t) =
+    match t with
+    | T (values, comments, (_, command_suffix), view_prefix) ->
+        T (values, comments, (x, command_suffix), view_prefix)
+    :t
+  let set_command_suffix (x:string) (t:t) =
+    match t with
+    | T (values, comments, (command_prefix, _), view_prefix) ->
+        T (values, comments, (command_prefix, x), view_prefix)
+    :t
+  let get_values (t:t) =
+    match t with
+    | T (values, _, _, _) -> values
+    :regexp
+  let get_comments (t:t) =
+    match t with
+    | T (_, comments, _, _) -> comments
+    :string * string
+  let get_commands (t:t) =
+    match t with
+    | T (_, _, commands, _) -> commands
+    :string * string
+  let get_view_prefix (t:t) =
+    match t with
+    | T (_, _, _, view_prefix) -> view_prefix
+    :string
+  let comment_signs (t:t) =
+    let prefix, suffix = get_comments t in
+    prefix | suffix
+  let c_prefix (t:t) =
+    let comment, _ = get_comments t in
+    let command, _ = get_commands t in
+    comment . command
+  let c_suffix (t:t) =
+    let _, comment = get_comments t in
+    let _, command = get_commands t in
+    command . comment
+  let no_comments (t:t) = not_containing (comment_signs t)
+  let commands (t:t) = c_prefix t . no_comments t . c_suffix t
+  let data (t:t) = not_containing (commands t)
+  let c_exact (t:t) (value:string):string =
+    c_prefix t . value . c_suffix t
+  let c_exact_uncuttable (t:t) (value:string):string =
+    c_exact t (uncuttable_prefix . value . uncuttable_suffix)
+  let c_other (t:t) (value:string):regexp =
+    c_prefix t . diff (get_values t) value . c_suffix t
+  let c_all (t:t):regexp = c_prefix t . get_values t . c_suffix t
+  let c_stop (t:t):string = c_exact t ""
+  let c_stop_uncuttable (t:t):string = c_exact_uncuttable t ""
+end
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                            main lens                             *)
+
+let main_lens (prefs:File_pref.t) (value:string) :(l:lens where is_lens l) =
+  (* read prefs *)
+  let view_prefix = File_pref.get_view_prefix prefs in
+  let data = File_pref.data prefs in
+  let c_exact = File_pref.c_exact prefs in
+  let c_exact_uncuttable = File_pref.c_exact_uncuttable prefs in
+  let c_other = File_pref.c_other prefs in
+  let c_all = File_pref.c_all prefs in
+  let c_stop = File_pref.c_stop prefs in
+  let c_stop_uncuttable = File_pref.c_stop_uncuttable prefs in
+  (* we check that the informations are useable *)
+(*   let _:(string where *)
+(*            is_empty (diff *)
+(*                        (view_prefix? . uncuttable_prefix? . values? . uncuttable_suffix?) *)
+(*                        no_comments)) = *)
+(*     mk_error "Your values and/or view_prefix contain comments." *)
+(*   in *)
+(*   let _:(string where *)
+(*            not (matches values "")) = *)
+(*     mk_error "Your values should NOT contain the empty string." *)
+(*   in *)
+(*   let _:(string where *)
+(*            matches values? value) = *)
+(*     mk_error ("The value " . show_s value . " does not match " . show{regexp} values? . ".") *)
+(*   in *)
+  let factor (format:bool) (value:string) =
+    match format with
+    | true ->
+        c_stop . data
+        . (
+          match value = "" with
+          | true -> copy (c_all . data)*
+          | false ->
+              ( (c_other value . data)*
+              | ambiguous_lens_partition_one (c_exact value . data) (c_other value . data)
+              )
+          :lens)
+    | false -> (
+        let data_tag = positional "data" in
+        let siblings_tag = positional "siblings" in
+        let ccsd = nokey c_stop . key data in
+        let dcsd = del c_stop . del data in
+        let ccsud = nokey (c_stop <=> c_stop_uncuttable) . key data in
+        let ccevd = nokey (c_exact value) . key data in
+        let ccevud = nokey (c_exact value <=> c_exact_uncuttable value) . key data in
+        let siblings = del (c_other value . data)+ in
+        match value = "" with
+        | true -> ( ccsd | ccsud . siblings )
+        | false ->
+            ( ( <data_tag: ccsd > | <data_tag: dcsd > . ccevd )
+            | ( <data_tag: ccsud > | <data_tag: dcsd > . ccevud) . siblings
+            )
+        :lens
+      )
+    :lens
+  in
+  (* to check the value for put *)
+  let value_check (value:string) = ins (c_exact (view_prefix . value)) in
+  let main (format:bool) =
+    data
+    . (match format with
+       | true -> (factor true value)*
+       | false -> value_check value . <diffy true "factor": factor false value >*
+       :lens
+      )
+  in
+  main true ; align ( main false )
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                          main function                           *)
+
+let okfailwith 'a =
+  (), Exception.raise{'a}, Exception.try{'a}, Exception.failwith{'a}, Exception.ok{'a}
+
+let bind = Exception.bind
+let bind_pi = bind{File_pref.t}{int}
+let bind_pp = bind{File_pref.t}{File_pref.t}
+let bind_si = bind{string}{int}
+let bind_sOi = bind{string option}{int}
+let bind_sOs = bind{string option}{string}
+let bind_ss = bind{string}{string}
+let bind_ui = bind{unit}{int}
+
+let okfailwith_i  = okfailwith{int}
+let okfailwith_p  = okfailwith{File_pref.t}
+let okfailwith_s  = okfailwith{string}
+let okfailwith_sO = okfailwith{string option}
+let okfailwith_u  = okfailwith{unit}
+
+(* definitions *)
+let list_to_option 'a (xs:'a List.t) =
+  let _, failwith, ok = okfailwith{'a option} in
+  match xs with
+  | [] -> ok None{'a}
+  | x::[] -> ok (Some{'a} x)
+  | _ -> failwith "list_to_option"
+
+let list_to_option_s = list_to_option{string}
+
+(* command line arguments *)
+let help_pref = Prefs.create_bool "-help" false "print this help"
+let _ = Prefs.alias_bool help_pref "h"
+
+let init_pref = Prefs.create_bool "-init" false "create the source file"
+let _ = Prefs.alias_bool init_pref "i"
+
+(* TODO: might consider writing an Arg module *)
+let create_string_pref (name:string) (default:string) (doc:string) =
+  let pref = Prefs.create_string_list ("-" . name) (doc . "(default: " . show_s default . ")") in
+  let read () =
+    let value = Prefs.read_string_list pref in
+    bind_sOs
+      (let _, try, failwith, _ = okfailwith_sO in
+       try (list_to_option_s value) $ fun () ->
+         failwith ("You can't define more than one " . name . "."))
+      (fun (value:string option) ->
+         let _, ok = okfailwith_s in
+         ok (if_none_s default value))
+  in
+  pref, read
+
+let extension_pref, extension_read = create_string_pref "extension" "conflin" "extension of source"
+let _ = Prefs.alias_string_list extension_pref "e"
+
+let value_pref, value_read = create_string_pref "value" "" "value of the view"
+let _ = Prefs.alias_string_list value_pref "v"
+
+let output_pref = Prefs.create_string_list "-output" "output file (default: <file> with or without <extension>)"
+let _ = Prefs.alias_string_list output_pref "o"
+
+let default_pref = Prefs.create_string_list "-default" "mandatory: shell, c, cpp or ocaml"
+let _ = Prefs.alias_string_list default_pref "d"
+
+let command_prefix_pref = Prefs.create_string_list "-command-prefix" "identify a command from a comment"
+let _ = Prefs.alias_string_list command_prefix_pref "ap"
+let command_suffix_pref = Prefs.create_string_list "-command-suffix" "identify a command from a comment"
+let _ = Prefs.alias_string_list command_suffix_pref "as"
+
+let rest_pref = Prefs.extern_rest ()
+
+(* TODO: write a --documentation *)
+
+(* usage message *)
+let usage:string = "Usage: " . Prefs.get_prog_name () . " --default <file_type> <file>"
+
+(*@*)
+(* main code *)
+let main () =
+  (* shortcuts *)
+  let print_usage (code:int) () =
+    let _ = Prefs.print_usage usage in
+    code
+  in
+  let safe_read (file:string) =
+    let _, failwith, ok = okfailwith_s in
+    match file_exists file with
+    | true -> ok (read file)
+    | false -> failwith ("File " . show_s file . " does not exist.")
+  in
+  let check_string_with (r:regexp) (s:string) (m:string) =
+    let _, failwith, ok = okfailwith_s in
+    match matches r s with
+    | true -> ok s
+    | false -> failwith m
+  in
+  let file_error (filename:string) (head:string) (advices:string List.t) =
+    let tail =
+      match advices with
+      | [] -> ""
+      | _ ->
+          List.fold_left{string}{string}
+            (fun (acc:string) (line:string) ->
+               acc . "\n* " . line)
+            "\n\nYou might want to check these:"
+            advices
+    in
+    "File " . show_s filename . " " . head . "." . tail
+  in
+  (* parsing the commandline *)
+  let init = Prefs.read_bool init_pref in
+  let value = Prefs.read_string_list value_pref in
+  let extension =
+    bind_ss (extension_read ()) $ fun (extension:string) ->
+    let _, ok = okfailwith_s in
+    ok ("." . extension)
+  in
+  let help =
+    let _, fail, _, _, ok = okfailwith_u in
+    match Prefs.read_bool help_pref with
+    | true -> fail (print_usage 0)
+    | false -> ok ()
+  in
+  let output =
+    let _, failwith, ok = okfailwith_sO in
+    match Prefs.read_string_list output_pref with
+    | [] -> ok None{string}
+    | output::[] -> ok (Some{string} output)
+    | _ -> failwith "You can define at most one output file."
+  in
+  let default =
+    let _, failwith, ok = okfailwith_p in
+    match Prefs.read_string_list default_pref with
+    | "shell"::[] -> ok File_pref.shell_like
+    | "c"::[]     -> ok File_pref.c_like
+    | "cpp"::[]   -> ok File_pref.cpp_like
+    | "ocaml"::[] -> ok File_pref.ocaml_like
+    | pref::[] -> failwith (show_s pref . " is not a valid file preference.")
+    | _ -> failwith "You need to define exactly one file preference."
+  in
+  let command_prefix (default:File_pref.t) =
+    let _, failwith, ok = okfailwith_p in
+    match Prefs.read_string_list command_prefix_pref with
+    | [] -> ok default
+    | pref::[] -> ok (File_pref.set_command_prefix pref default)
+    | _ -> failwith "You can define at most one command-prefix preference."
+  in
+  let command_suffix (default:File_pref.t) =
+    let _, failwith, ok = okfailwith_p in
+    match Prefs.read_string_list command_suffix_pref with
+    | [] -> ok default
+    | pref::[] -> ok (File_pref.set_command_suffix pref default)
+    | _ -> failwith "You can define at most one command-suffix preference."
+  in
+  let action (prefs:File_pref.t) =
+    let _, fail, _, failwith, ok = okfailwith_i in
+    match Prefs.read_string_list rest_pref with
+    | [] -> fail (print_usage 1)
+    | filename::[] -> (
+        match init with
+        | true -> (  (* create the source file *)
+            (* TODO: check if no .conflin boom is already there *)
+            bind_ui  (* check value is not defined *)
+              (let _, failwith, ok = okfailwith_u in
+               match value with
+               | [] -> ok ()
+               | _ -> failwith "You can't give a value with init.")
+              $ fun () ->
+            let c_stop = File_pref.c_stop in
+            let data = File_pref.data prefs in
+            let file =  (* read and check file *)
+              bind_ss (safe_read filename) $ fun (file:string) ->
+              check_string_with data file
+                (file_error filename "contains commands-like comments"
+                   #{string}[])
+            in
+            bind_si extension $ fun (extension:string) ->
+            bind_si file $ fun (file:string) ->
+            bind_sOi output $ fun (output:string option) ->
+            ok (
+              let output = if_none_s (filename . extension) output in
+              write output (c_stop prefs . file)))
+        | false -> (  (* get or put *)
+            bind_si extension $ fun (extension:string) ->
+            bind_si (value_read ()) $ fun (value:string) ->
+            let mlpv = main_lens prefs value in
+            match String.end_with filename extension with
+            | true -> (  (* get *)
+                let sfile = filename in
+                let vfile = String.rdrop (length extension) filename in
+                let source =
+                  bind_ss (safe_read sfile) $ fun (source:string) ->
+                  check_string_with (stype mlpv) source
+                    (file_error sfile "is not a valid source"
+                       #{string}[
+                         "The file_type is the right one";
+                         "The file does not contain mispelled commands"])
+                in
+                bind_si source $ fun (source:string) ->
+                bind_sOi output $ fun (output:string option) ->
+                ok (
+                  let output = if_none_s vfile output in
+                  write output (get mlpv source)))
+            | false -> (  (* put *)
+                let vfile = filename in
+                let sfile = filename . extension in
+                let view =
+                  bind_ss (safe_read vfile) $ fun (view:string) ->
+                  check_string_with (vtype mlpv) view
+                    (file_error vfile "is not a valid view"
+                       #{string}[
+                         "The expanding value " . show_s value . " is the one after the view prefix";
+                         "The file_type is the right one"])
+                in
+                let source =
+                  bind_ss (safe_read sfile) $ fun (source:string) ->
+                  check_string_with (stype mlpv) source
+                    (file_error sfile "is not a valid source"
+                       #{string}[
+                         "The file_type is the right one";
+                         "The extension " . show_s (String.drop 1 extension) . " is the right one"])
+                in
+                bind_si view $ fun (view:string) ->
+                bind_si source $ fun (source:string) ->
+                bind_sOi output $ fun (output:string option) ->
+                ok (
+                  let output = if_none_s sfile output in
+                  write output (put mlpv view source)))
+          )
+      )
+    | _ -> failwith "You can do an action on at most one file."
+  in
+  let prefs = bind_pp (bind_pp default command_prefix) command_suffix in
+  let result = bind_ui help $ fun () -> bind_pi prefs action in
+  Exception.convert_main result
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                            unit tests                            *)
+
+(* --- Debug --- *)
+
+let mld = main_lens File_pref.debug_like
+
+let mldv = mld ""
+test get mldv (  "(" .")d0(a)a0(b)b0(" .")d1(b)b1()d2")
+            = ("()("."!)d0"       ."("."!)d1"  ."()d2")
+test create mldv ("()()d0()d1()d2")
+               = (  "()d0()d1()d2")
+test put mldv ("()" ."("."!)D1"  ."("."!)D2"     ) (* ()    (!)D1(!)D2 *)
+              (  "()d0(" .")d1(a)a1(" .")d2(a)a2") (* ()()d0(!)d1(!)d2 *)
+            = (      "(" .")D1(a)a1(" .")D2(a)a2")
+test put mldv ("()()D0("."!)D1"  ."("."!)D2"     ) (* ()()D0(!)D1(!)D2 *)
+              (      "(" .")d1(a)a1(" .")d2(a)a2") (* ()    (!)d1(!)d2 *)
+            = (  "()D0(" .")D1(a)a1(" .")D2(a)a2")
+test put mldv ("()("."!)D0"  ."()D1("."!)D2"     ) (* ()(!)D0()D1(!)D2 *)
+              (  "(" .")d0(a)a0" ."(" .")d2(a)a2") (* ()(!)d0    (!)d2 *)
+            = (  "(" .")D0(a)a0()D1(" .")D2(a)a2")
+test put mldv ("()("."!)D0"      ."("."!)D2"     ) (* ()(!)D0    (!)D2 *)
+              (  "(" .")d0(a)a0()d1(" .")d2(a)a2") (* ()(!)d0()d1(!)d2 *)
+            = (  "(" .")D0(a)a0" ."(" .")D2(a)a2")
+test put mldv ("()("."!)D0"      ."("."!)D2"  ."()D3()D4") (* ()(!)D0    (!)D2()D3()D4 *)
+              (  "(" .")d0(a)a0()d1(" .")d2(a)a2" ."()d4") (* ()(!)d0()d1(!)d2    ()d4 *)
+            = (  "(" .")D0(a)a0" ."(" .")D2(a)a2()D3()D4")
+(* test put mldv ("()("."!)"      ."("."!)"     ) (\* ()(!)    (!) *\) *)
+(*               (  "(" .")(a)a0()d1(" .")(a)a2") (\* ()(!)()d1(!) *\) *)
+(*             = (  "(" .")(a)a0" ."(" .")(a)a2") *)
+(* test put mldv ("()("."!)"  ."()D1("."!)"     ) (\* ()(!)()D1(!) *\) *)
+(*               (  "(" .")(a)a0" ."(" .")(a)a2") (\* ()(!)    (!) *\) *)
+(*             = (  "(" .")(a)a0()D1(" .")(a)a2") *)
+test put mldv ("()" ."("."!)D1"  ."("."!)D2"  ."()D3") (* ()    (!)D1(!)D2()D3 *)
+              (  "()d0(" .")d1(a)a1(" .")d2(a)a2"    ) (* ()()d0(!)d1(!)d2     *)
+            = (      "(" .")D1(a)a1(" .")D2(a)a2()D3")
+test put mldv ("()" ."("."!)D1"  ."()D2("."!)D3"  ."()D4") (* ()    (!)D1()D2(!)D3()D4 *)
+              (  "()d0(" .")d1(a)a1("     .")d3(a)a3"    ) (* ()()d0(!)d1    (!)d3     *)
+            = (      "(" .")D1(a)a1()D2(" .")D3(a)a3()D4")
+test put mldv ("()" ."("."!)D1"      ."("."!)D3"  ."()D4") (* ()    (!)D1    (!)D3()D4 *)
+              (  "()d0(" .")d1(a)a1()d2(" .")d3(a)a3"    ) (* ()()d0(!)d1()d2(!)d3     *)
+            = (      "(" .")D1(a)a1" ."(" .")D3(a)a3()D4")
+
+let mldv = mld "a"
+test get mldv (   "()d0(a" .")a0(b)b0(" .")d1(b)b1()d2")
+            = ("(a)" ."(a"."!)a0"  ."("."!)d1"  ."()d2")
+test create mldv ("(a)"."(a)a0()d1()d2"  ."(a)a3")
+               = (    "()(a)a0()d1()d2"."()(a)a3")
+test put mldv ("(a)" ."(a)A0()D1()D2") (* (a)    (a)A0()D1()D2 *)
+              (   "()d0"  ."()d1()d2") (* (a)()d0     ()d1()d2 *)
+            = (   "()d0(a)A0()D1()D2")
+test put mldv ("(a)()D0" ."(a)A1()D2") (* (a)()D0    (a)A1()D2 *)
+              (   "()d0()d1"  ."()d2") (* (a)()d0()d1     ()d2 *)
+            = (   "()D0()d1(a)A1()D2")
+test put mldv ("(a)()D0"  ."(a)A1()D2") (* (a)()D0  (a)A1()D2 *)
+              (   "()d0()"     ."()d2") (* (a)()d0()     ()d2 *)
+            = (   "()D0()"."(a)A1()D2")
+test put mldv ("(a)("."!)D0"    ."(a)A1("."!)D2"     ) (* (a)(!)D0  (a)A1(!)D2 *)
+              (   "(" .")d0(b)b0()"  ."(" .")d2(b)b2") (* (a)(!)d0()     (!)d2 *)
+            = (   "(" .")D0(b)b0()(a)A1(" .")D2(b)b2")
+test put mldv ("(a)" ."(a"."!)A0"  ."()D1()D2") (* (a)     (a!)A0()D1()D2 *)
+              (   "()d0"      ."(b)b0()d1()d2") (* (a)(!)d0      ()d1()d2 *)
+            = (   "()d0(a" .")A0(b)b0()D1()D2")
+test put mldv ("(a)()D0" ."(a"."!)A1"  ."()D2") (* (a)()D0     (a!)A1()D2 *)
+              (   "()d0()d1"      ."(b)b1()d2") (* (a)()d0(!)d1      ()d2 *)
+            = (   "()D0()d1(a" .")A1(b)b1()D2")
+test put mldv ("(a)("."!)D0"  ."()D1("."!)D2"     ) (* (a)(!)D0()D1(!)D2 *)
+              (   "(" .")d0(b)b0" ."(" .")d2(b)b2") (* (a)(!)d0    (!)d2 *)
+            = (   "(" .")D0(b)b0()D1(" .")D2(b)b2")
+test put mldv ("(a)("."!)D0"  ."()D1"."()D2"."()D3("."!)D4"     ) (* (a)(!)D0()D1()D2()D3(!)D4 *)
+              (   "(" .")d0(b)b0()d1"  ."d2"  ."d3(" .")d4(b)b4") (* (a)(!)d0()d1  d2  d3(!)d4 *)
+            = (   "(" .")D0(b)b0()D1"."()D2"."()D3(" .")D4(b)b4")
+test put mldv ("(a)" ."(a)A0" ."()D2") (* (a)A0    ()D2 *)
+              (   "()d0"  ."()d1()d2") (* (a)a0()d1()d2 *)
+            = (   "()d0(a)A0" ."()D2")
+test put mldv ("(a)" ."(a)A0"     ."(a)A2") (* (a)A0    (a)A2 *)
+              (   "()d0"  ."()d1()d2(a)a2") (* (a)a0()d1(a)a2 *)
+            = (   "()d0(a)A0" ."()d2(a)A2")
+test put mldv ("(a)" ."(a"."!)A0"      ."()D2") (*      (a!)A0    ()D2 *)
+              (   "()d0"      ."(b)b0()d1()d2") (* (!)d0      ()d1()d2 *)
+            = (   "()d0(a" .")A0(b)b0" ."()D2")
+test put mldv ("(a)" ."(a)A0" ."(a"."!)A1"          ."(a)A3") (* (a)a0     (a!)A1    (a)A3 *)
+              (   "()d0(a)a0()d1"      ."(b)b1()d2()d3(a)a3") (* (a)a0(!)d1      ()d2(a)a3 *)
+            = (   "()d0(a)A0()d1(a" .")A1(b)b1" ."()d3(a)A3")
+(* test put mldv ("(a)"      ."(a)A1()D2") (\*         (a)A1()d2 *\) *)
+(*               (    "()d0()d1"  ."()d2") (\* ()d0()d1     ()d2 *\) *)
+(*             = (        "()d1(a)A1()D2") *)
+(* test put mldv ("(a)()D0"     ."(a)A2()D3") (\* ()D0        (a)A2()D3 *\) *)
+(*               (   "()d0()d1()d2"  ."()d3") (\* ()d0()d1()d2     ()d3 *\) *)
+(*             = (   "()D0" ."()d2(a)A2()D3") *)
+test put mldv ("(a)()D0" ."(a)A1" ."()D3") (* ()D0    (a)A1    ()D3 *)
+              (   "()d0()d1"  ."()d2()d3") (* ()d0()d1     ()d2()d3 *)
+            = (   "()D0()d1(a)A1" ."()D3")
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                          documentation                           *)
+
+#{@}
+
+\section{Description}
+
+This tool allows you to easily manage multiple versions of a file.
+For example, if you have a file which varies a little bit depending on
+some parameter, you do not need to have several files -- one for each
+value of the parameter.  That would mean that a change to a part
+shared by several versions, needs to be done for each version.  With
+this tool you only need to change it once.
+
+The main possibilities offered by this tool are:
+\begin{itemize}
+\item Retrieve an existing version
+\item Update the source file with the changes done to one version
+\item Create a new version forking the default
+\item Create the source file from a default version
+\end{itemize}
+
+The source file will be the source file for Boomerang, and the
+versions will be view files.
+
+\section{Quick usage}
+
+\subsection{Installation}
+
+Create a symbolic link named @conflin@ pointing to the @boomerang@
+binary.  If you can't create a symbolic link, copy-paste the binary
+and rename it to @conflin@.
+
+\subsection{Create the source file}
+
+If you want to start to manage versions for the file @file.conf@,
+where the comments are shell-like -- start with a hash and end with a
+newline.
+
+\begin{progeg}
+% conflin --default shell --init file.conf
+\end{progeg}
+
+This will first check if @file.conf@ does not contain comments that
+might be interpreted as commands and create a file named
+@file.conf.conflin@ being @file.conf@ preceded by a @#@@@ line.  Note:
+If you need the first line to be something else, you can move the
+@#@@@ line down, but every thing above this line will be present in
+every versions and you won't be able to specialize it.  Typically this
+is useful for the @#!@ line for scripts.
+
+\subsection{Create a new version}
+
+Now that your file is managed, you may wish to specialize a part of
+it.  So you may choose a name for this new version.  It has to be an
+identifier.  And you call @conflin@ with this name and the source
+file (the one ending with @.conflin@).
+
+\begin{progeg}
+% conflin --default shell --value myVersion file.conf.conflin
+\end{progeg}
+
+Your file @file.conf@ is now a view of the source file, ie. a
+version.  You may see it by looking at the beginning of your view.
+You will see @#@@@@view: myVersion@.
+
+\subsection{Edit a version}
+
+Now that we have our new version view, we want to edit it.  As
+Boomerang will have to understand what we want, we will write some
+additional information to explain him.
+
+\subsubsection{The view structure}
+
+The view must respect the following syntax:
+\begin{progeg}
+VIEWLINE ::= "#@@@@view: " view "\ensuremath{\backslash}n"
+COMMAND ::= "#@@@@" view? "!"? "\ensuremath{\backslash}n"
+FILE ::= data VIEWLINE (COMMAND data)*
+\end{progeg}
+where @view@ is the current version name, and @data@ is anything
+not containing lines beginning with @#@@@.
+
+@#@@@@\n@ lines are the default value for this section.  @#@@@@view\n@
+lines are specialized version for the section.  When a @!@ is present,
+it means the section is uncuttable.  We'll see the meaning later.
+
+\subsubsection{How to edit}
+
+You may:
+\begin{itemize}
+\item edit every @data@ field
+\item cut with @#@@@@\n@ a @data@ preceded by a @#@@@@\n@ command
+\item specialize a @data@ not already specialized
+\end{itemize}
+
+The first edit is straightforward, you just edit the file where you
+want, as long as it's in a @data@ field.  Here is an example for the
+second one.
+\begin{progeg}
+  #@@@@view: 
+  #@@@@
+  line1
+  line2
+\end{progeg}
+to:
+\begin{progeg}
+  #@@@@view: 
+  #@@@@
+  line1
+  #@@@@
+  line2
+\end{progeg}
+
+We may specialize the second @data@ field.
+
+\begin{progeg}
+  #@@@@view: 
+  #@@@@
+  line1
+  #@@@@myVersion
+  myline2
+\end{progeg}
+
+\subsubsection{Important warnings}
+
+Some changes may not be done together before the source file is
+updated, and you'll have to do a first bunch of changes, an update,
+and then the other changes.  This is because Boomerang has to be aware
+of what you want to do.  And you tell him so by pushing edited views.
+
+Here is a list of operations that may be done together before an
+update is necessary:
+\begin{itemize}
+\item editing any @data@ (even cutted ones)
+\item specializing a @data@ which was already there (non edited, non
+  cutted)
+\item cut any cuttable @data@ (even edited ones)
+\end{itemize}
+
+Other warnings:
+\begin{itemize}
+\item You must not edit the very first part of the view, where the
+  name of the view is present.  If you want to change to another view,
+  first push back the possible edits, then get the other view.
+\item You must never touch the @uncuttable@ symbol.  It's a hint
+  given by Boomerang for you to know the data is not cuttable.  Be
+  also aware that a specialized section is also uncuttable.
+\item Do not use @#@@@@@ for your own commentary as they will be
+  interpreted as commands.
+\end{itemize}
+
+Advices:
+\begin{itemize}
+\item When specializing a @data@, first cut the @data@ so that the
+  remaining @data@ you will specialize is atomic for the semantic of
+  your file.  Because once you specialized a @data@, you won't be
+  able to cut it later.
+\item You can read the @uncuttable@ symbol as: this section contains
+  hidden information from other versions
+\end{itemize}
+
+\subsection{Update the source file}
+
+You may only push back an existing view with it's own value.
+
+\begin{progeg}
+% conflin --default shell --value myVersion file.conf
+\end{progeg}
+
+\subsection{Retrieve another view}
+
+\begin{progeg}
+% conflin --default shell --value another file.conf.conflin
+\end{progeg}
+
+\section{For curious people}
+
+You may take a look at the source file to see how the informations are
+saved.
+
+#{#}
+
+(*@*)
+(* ---------------------------------------------------------------- *)
+(*                        bigger unit tests                         *)
+
+let mls = main_lens File_pref.shell_like
+
+let source =
+<<
+  #@
+  # Define the specific parts of PATH for each machine
+  #@
+  # This is the default
+  SPATH=""
+  #@upenn
+  # If we are in UPenn
+  SPATH="/home/harmony/bin:/home/harmony/boomerang/bin"
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>>
+
+test get (mls "") source =
+<<
+  #@view: 
+  #@
+  # Define the specific parts of PATH for each machine
+  #@!
+  # This is the default
+  SPATH=""
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>>
+
+test get (mls "upenn") source =
+<<
+  #@view: upenn
+  #@
+  # Define the specific parts of PATH for each machine
+  #@upenn
+  # If we are in UPenn
+  SPATH="/home/harmony/bin:/home/harmony/boomerang/bin"
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>>
+
+test get (mls "X") source =
+<<
+  #@view: X
+  #@
+  # Define the specific parts of PATH for each machine
+  #@!
+  # This is the default
+  SPATH=""
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>>
+
+test put (mls "X")
+<<
+  #@view: X
+  #@
+  # Define the specific parts of PATH for each machine
+  #@X!
+  # For Polytechnique
+  SPATH="$HOME/bin"
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>> source =
+<<
+  #@
+  # Define the specific parts of PATH for each machine
+  #@
+  # This is the default
+  SPATH=""
+  #@X
+  # For Polytechnique
+  SPATH="$HOME/bin"
+  #@upenn
+  # If we are in UPenn
+  SPATH="/home/harmony/bin:/home/harmony/boomerang/bin"
+  #@
+  
+  # This is the common part of PATH
+  PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+  # We concatenate both parts
+  PATH="$PATH:$SPATH"
+  
+  # We finally export the PATH
+  export PATH
+>>
+
+(*
+ * Local Variables:
+ * mode: tuareg
+ * End:
+ *)
