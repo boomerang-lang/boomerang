@@ -1,0 +1,467 @@
+module QuickStart = 
+
+#{@}
+
+\section{Installation}
+
+\begin{enumerate}
+\item Download or build the Boomerang binary:
+\begin{itemize}
+\item Pre-compiled binaries for Linux (x86), Mac OS X (x86), and
+  Windows (Cygwin) are available on the Boomerang webpage.
+\item Alternatively, to build Boomerang from source, grab the most
+  recent tarball and follow the instructions in INSTALL.txt
+\end{itemize}
+
+\item Add the directory containing trunk/bin to your @PATH@
+  environment variable.
+\begin{itemize}   
+\item In Bash:
+\begin{progeg}
+> export PATH=$PATH:/path/to/trunk/bin
+\end{progeg}
+\item In Csh
+\begin{progeg}
+> setenv PATH {$PATH}:/path/to/trunk/bin
+\end{progeg}
+\end{itemize}
+\end{enumerate}
+
+\section{Simple Lens Programming}
+
+Now let’s roll up our sleeves and write a few lenses. We will start
+with some very simple lenses that demonstrate how to interact with the
+Boomerang system. The source file we will work with is this very text
+file, which is literate Boomerang code. Every line in this file that
+begins with @#*@ marks a piece of Boomerang code, and all other lines
+are ignored by the Boomerang interpreter.
+
+You can run the Boomerang interpreter from the command line like this:
+\begin{progeg}
+> boomerang QuickStart.src
+\end{progeg}
+You should see several lines of output beginning like this
+\begin{progeg}
+Test result:
+"Hello World"
+Test result:
+"HELLO WORLD"
+...
+\end{progeg}
+\noindent Let's define the lens that was used to generate this text.
+
+#* let l : lens = copy [A-Za-z ]+
+
+This line declares a lens named 'l' using syntax based on
+explicitly-typed OCaml (for the functional parts, like the let
+declaration) and POSIX (for regular expressions). Its $\GET$ and $\PUT$
+components both copy non-empty strings of alphabetic characters or
+spaces.
+
+\subsection{Unit Tests}
+
+An easy way to interact with Boomerang is using its syntax for running
+unit tests (other modes of interaction, such as batch processing of
+files via the command line, are discussed below). For example, the
+following test:
+
+#* test l.get "Hello World" = ?
+
+instructs the Boomerang interpreter to calculate the result obtained
+by applying the $\GET$ component of @l@ to the string literal
+@Hello World@ and print the result to the terminal 
+(in fact, this unit test generated the output in the display above).
+
+\begin{example}
+  Try changing the @?@ above to @Hello World@. This changes the unit
+  test from a calculation to an assertion, which silently succeeds.
+\end{example}
+\begin{example}
+  Try changing the @?@ above to @HelloWorld@ instead. Now the
+  assertion fails. You should see:
+\begin{progeg}
+File "./quickStart.src", line 68, characters 3-42: Unit test failed  
+Expected "HelloWorld" but found "Hello World"
+\end{progeg}
+\end{example}
+\noindent When you are done with this exercise, reinsert the space to
+make the unit test succeed again.
+
+Now let's examine the behavior of @l@'s $\PUT$ component.
+
+#* test (l.put "HELLO WORLD" into "Hello World") = ?
+
+You should see the following output printed to the terminal:
+\begin{progeg}
+Test result:
+HELLO WORLD
+\end{progeg}
+which reflects the change made to the abstract string.
+
+\subsection{Type Checking}
+
+The $\GET$ and $\PUT$ components of lenses check that their arguments have
+the expected type. We can test this by passing an ill-typed string to
+@l@'s GET component:
+
+#* test (l.get "Hello World!!") = error
+
+\begin{example}
+  To see the error message that is printed by Boomerang, change the
+  @error@ above to @?@ and re-run Boomerang. You should see the
+  following message printed to the terminal:
+\begin{progeg}
+File "./QuickStart.src", line 107, characters 3-35: Unit test failed
+Test result: error
+get built-in: run-time checking
+error
+c="Hello World!!" did not satisfy
+((Core.matches_cex (Core.stype l)) c); counterexample: string does not match [ A-Za-z]+ [Hello World] AROUND HERE [!!]
+\end{progeg}
+Notice that Boomerang identifies a location in the
+string where matching failed (@HERE@). When you are
+done, change the @?@ back to @error@.
+\end{example}
+
+\section{The Composers Lens}
+
+Now let's build a larger example. We will write a lens whose GET
+function transforms newline-separated records of comma-separated data
+about classical music composers:
+
+#* let s : string = 
+## <<
+#* Jean Sibelius, 1865-1957, Finnish
+#* Aaron Copland, 1910-1990, American
+#* Benjamin Britten, 1913-1976, English
+## >>
+
+\noindent into comma-separated lines where the year data is deleted:
+  
+#* let v : string = 
+## <<
+#* Jean Sibelius, Finnish
+#* Aaron Copland, American
+#* Benjamin Britten, English
+## >>
+
+\subsection{Basic Composers Lens}
+
+\noindent The lens that maps---bidirectionally---between these
+strings is written as follows:
+
+#* let ALPHA : regexp = [A-Za-z ]+
+#* let YEARS : regexp = [0-9]{4} . "-" . [0-9]{4}
+#* let comp : lens = 
+#*            ALPHA . ", "
+#*          . del YEARS . del ", "
+#*          . ALPHA
+#* 
+#* let comps : lens = "" | comp . (newline . comp)* 
+
+We can check that @comp@ works as we expect using unit tests:
+
+#* test comps.get s = v
+#* test comps.put v into s = s
+
+There are several things to note about this program. First, we have
+use let-bindings to factor out repeated parts of programs, such as the
+regular expression named @ALPHA@. This makes programs easier to read
+and maintain. Second, operators like concatenation (@.@) automatically
+promote their arguments, according to the following subtyping
+relationships: $@string@ <: @regexp@ <: @lens@$. Thus, the string @", "@ 
+is automatically promoted to the (singleton) regular expression
+containing it, and the regular expression @ALPHA@ is automatically
+promoted to the lens @copy ALPHA@.
+
+\begin{example}
+  Edit the @comp@ lens to abstract away the separator between fields
+  and verify that your version has the same behavior on @c@ and @a@ by
+  re-running Boomerang. Your program should look roughly like the
+  following one:
+\begin{progeg}
+let comp (sep:string) : lens = ...
+let comps : lens = 
+  let comp_comma = comp ", " in
+  ...
+\end{progeg}
+or, equivalently, one that binds @comp@ to an explicit
+function:
+\begin{progeg}
+let comp : string -> lens = (fun (sep:string) -> ... )
+\end{progeg}
+\end{example}
+
+\subsection{Resourceful Composers Lenses}
+
+The behavior of @comps@ lens is not very satisfactory when the updated
+abstract view is obtained by changing the order of lines. For example
+if we swap the order of Britten and Copland, the year data from
+Britten gets associated to Copland, and vice versa (@<< ... >>@ is
+Boomerang syntax for a string literal in heredoc notation.)
+
+#* test comps.put 
+#* <<
+#*   Jean Sibelius, Finnish
+#*   Benjamin Britten, English
+#*   Aaron Copland, American
+#* >>
+#* into
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Aaron Copland, 1910-1990, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* = 
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Benjamin Britten, 1910-1990, English
+#*   Aaron Copland, 1913-1976, American
+#* >>
+
+The root of this problem is that the PUT function of the Kleene star
+operator works positionally---it divides the concrete and abstract
+strings into lines, and invokes the PUT of comp on each pair.
+
+Our solution is to add new combinators for specifying reorderable
+``chunks'', assign to them an method to match up these pieces (a
+specie) and tune it defining weights and predicates. This is explained
+in details in section~\ref{sec:alignment}.
+
+In our example we only need one useful case. We define a chunk using
+the function @dictionary@ and we define a key for each chunk
+(@key ALPHA@). The $\PUT$ function of the following lens:
+
+#* let ALPHA : regexp = [A-Za-z ]+
+#* let YEARS : regexp = [0-9]{4} . "-" . [0-9]{4}
+#* let comp : lens = 
+#*            key ALPHA . ", "
+#*          . del YEARS . del ", "
+#*          . ALPHA
+#* 
+#* let comps : lens = "" | <dictionary "":comp> . (newline . <dictionary "":comp>)* 
+
+restores lines using the name on each line as a key, rather than by
+position. To verify it on this example, try out this unit test:
+
+#* test comps.put 
+#* <<
+#*   Jean Sibelius, Finnish
+#*   Benjamin Britten, English
+#*   Aaron Copland, American
+#* >>
+#* into
+#* <<
+#*   Jean Sibelius, 1865-1957, Finnish
+#*   Aaron Copland, 1910-1990, American
+#*   Benjamin Britten, 1913-1976, English
+#* >>
+#* = ?
+
+Note that the year data is correctly restored to each composer. 
+
+\section{Grammars}
+
+Sometimes writing lenses using the core set of combinators is rather tedious,
+and we'd like a more succinct way to encode simple transformations.  For example,
+rearranging data requires counting up individual lenses and using their positions
+on both sides of a transformation to form a permutation ordering list.  Also, lenses
+don't always \textit{look} like the transformations they encode, and one cannot easily infer what
+a lens is doing without running it on an example.  Finally, we lack the ability to
+describe transformations rooted in recursive patterns using a single lens.
+
+Our solution to these problems is to express lenses using right-recursive grammars. 
+Each grammar is a set of named productions, each of which Boomerang compiles into a lens
+of the same name.  Each production in turn is a set of rules, possible transformations
+whose union forms the definition of its corresponding lens.
+
+A rule describes a transformation between a pair of sequenced expressions. 
+An expression can be a lens defined in a previous grammar, a regular expression, or a
+string literal.  Each expression present on both sides of the transformation
+is labeled as a variable.  For example, suppose we want to write a lens @swap@
+that inverts a person's first and last name.  Suppose we'd like it to rewrite
+the name ``John Smith" as ``Smith, John".
+
+Without grammars, we would have to write @swap@ using a permutation:
+
+#* let FIRST : regexp = [A-Za-z]+
+#* let LAST : regexp = [A-Za-z]+
+
+#* let swap : lens =
+#*   lens_permute #{int}[2;1;0]
+#*                #{lens}[FIRST; ins ", " . del " "; LAST]
+
+This isn't too bad, but as you can imagine, the bookkeeping gets rather difficult as
+the number of terms increases.  Using grammars, we can more easily write the lens as:
+
+#* let swap : lens =
+#*   grammar
+#*     name :: = fn:FIRST " " ln:LAST <-> ln ", " fn
+#*   end
+
+Observe that labeled terms can be reordered, and unlabeled terms are present on only
+one side of the transformation.  To verify this lens works properly, we use the unit test:
+
+#* test swap.get "John Smith" = "Smith, John"
+
+Each production also can contain multiple rules, and each rule can be right-recursive on
+the entire production.  We can modify the @swap@ lens to write a new lens @swap_many@ that 
+operates on a semi-colon separated nonempty list of names as follows:
+
+#* let swap_many : lens =
+#*   grammar
+#*     swap_many :: = fn:FIRST " " ln:LAST <-> ln ", " fn
+#*                  | fn:FIRST " " ln:LAST "; " ns:swap_many
+#*                      <-> ln ", " fn "; " ns
+#*   end
+
+Here, the first rule for @swap_many@ is precisely the same as the rule for @swap@ and
+behaves the same way: it inverts the order of a single name.  The second rule is a bit
+more interesting.  It inverts the order of a single name and concatenates the result with
+another application of the production.  The production will ultimately have to use the
+first rule to terminate, since the second rule always insists on an additional application
+of the production.  We can test it on a list of two names:
+
+#* test swap_many.get "John Smith; Jane Doe" = "Smith, John; Doe, Jane"
+
+Finally, we can rely on the previously defined lens @swap@ in order to write @swap_many@ more
+cleanly as follows:
+
+#* let swap_many' =
+#*   grammar
+#*     swap_many ::= n:swap <-> n
+#*                 | n:swap "; " ns:swap_many
+#*                     <-> n "; " ns
+#*   end
+
+and test that it behaves just as before:
+
+#* test swap_many'.get "John Smith; Jane Doe" = "Smith, John; Doe, Jane"
+
+Grammars are fully-integrated within the Boomerang system, and as such the resulting lenses
+produced behave just as an other well-formed lenses.  The @swap@ lens can be used as part
+of the definition of a subsequent lens @condense@ that removes extraneous personal
+information:
+
+#* let AGE : regexp = [0-9]+
+#* let GENDER : regexp = "M" | "F"
+#*
+#* let condense : lens =
+#*   swap . del ", " . del AGE . del ", " . del GENDER
+
+and verify the correct behavior with a couple of unit tests:
+
+#* test condense.get "John Smith, 24, M" = "Smith, John"
+#* test condense.put "Hancock, John" into "John Smith, 24, M"
+#*   = "John Hancock, 24, M"
+
+Taking this one step further, the lens @condense@ also can be used in a subsequent grammar
+@pair@ that takes a list of two newline-separated individuals and pairs them up:
+
+#* let pair : lens =
+#*   grammar
+#*     pair ::= c1:condense newline c2:condense
+#*                <-> "(" c1 " & " c2 ")"
+#*   end
+
+which in turn can be used to define the lens @pair_many@, which operates on a list
+with an even number of names and pairs them up:
+
+#* let pair_many : lens =
+#*   grammar
+#*     pair_many ::= p:pair <-> p
+#*                 | p:pair newline ps:pair_many
+#*                     <-> p newline ps 
+#*   end
+
+and verify correct behavior:
+
+#* let two_names : string =
+#* <<
+#* John Smith, 24, M
+#* Jane Doe, 23, F
+#* >>
+#*
+#* test pair.get two_names = "(Smith, John & Doe, Jane)"
+#*
+#* let many_names : string =
+#* <<
+#* John Smith, 24, M
+#* Jane Doe, 23, F
+#* Brad Pitt, 45, M
+#* Angelina Jolie, 33, F
+#* >>
+#*
+#* test pair_many.get many_names =
+#* <<
+#* (Smith, John & Doe, Jane)
+#* (Pitt, Brad & Jolie, Angelina)
+#* >>
+
+Finally, we can take the names from the output and easily rearrange them to present
+how their names would be displayed as a married couple (assuming the last name that
+appears first is used as their married name):
+
+#* let marry : lens =
+#*   grammar
+#*     marry ::= "(" ln1:LAST ", " fn1:FIRST " & " LAST ", " fn2:FIRST ")"
+#*                 <-> fn1 " and " fn2 " " ln1
+#*   end
+#* 
+
+and test it by composing the get function of @marry@ and @pair@:
+
+#* test marry.get (pair.get two_names) = "John and Jane Smith"
+
+Notice that the last name of the second person in the pair isn't labeled in the
+grammar, since it isn't copied over to the output.
+
+\subsection{Rewriting the Composers Lens with Grammars}
+
+Using right-recursive grammars, we can rewrite the basic composers lenses as follows:
+
+#* let comp : lens =
+#*   grammar
+#*     comp ::= nm:(key ALPHA) ", " YEARS ", " cntry:ALPHA
+#*                <-> nm ", " cntry
+#*   end
+#* let comps : lens =
+#*   grammar
+#*     comps ::= c:<dictionary "":comp> <-> c
+#*            |  c:<dictionary "":comp> newline cs:comps <-> c newline cs
+#*   end
+
+and verify it with the same unit tests as earlier:
+
+#* test comps.get s = v
+#* test comps.put v into s = s
+#* test comps.put <<
+#* Jean Sibelius, Finnish
+#* Aaron Copland, Yankee
+#* >> into s = <<
+#* Jean Sibelius, 1865-1957, Finnish
+#* Aaron Copland, 1910-1990, Yankee
+#* >>
+
+\subsection{Mutually-Recursive Grammars}
+
+Boomerang also supports grammars with mutually-recursive productions,
+as in the following example:
+
+#* let (pos,neg) : lens * lens =
+#*   grammar
+#*     pos ::= "positive" <-> "+" 
+#*           | "positive " n:neg <-> "+ " n
+#*     and neg ::= "negative" <-> "-"
+#*               | "negative " p:pos <-> "- " p
+#*   end
+#*
+#* test pos.get "positive" = "+"
+#* test pos.get "positive negative positive negative" = "+ - + -"
+#* test neg.create "- + -" = "negative positive negative"
+
+The behavior of these lenses is as follows:
+
+#* test pos.get "positive" = "+"
+#* test	pos.get	"positive negative positive negative" =	"+ - + -"
+#* test	neg.create "- + -" = "negative positive negative"
