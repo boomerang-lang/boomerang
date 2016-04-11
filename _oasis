@@ -74,6 +74,14 @@ Library boomerang
     Intmapa,
     Toplevel,
     Workqueue
+
+Library lenses
+  Path: lenses
+  BuildDepends:
+    hbase,
+    boomerang
+  Modules:
+    Prelude
    
 Executable boomerang
   Path: boomerang
@@ -82,7 +90,8 @@ Executable boomerang
   CompiledObject: native
   BuildDepends:
     ubase,
-    boomerang
+    boomerang,
+    lenses
 
 Executable baker
   Path: hbase

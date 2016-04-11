@@ -20,5 +20,8 @@
 (******************************************************************************)
 
 (* Trivial front end; all command-line arguments are explicit *)
-Toplevel.toplevel "boomerang";
+
+module P = Prelude
+
+let () = Toplevel.toplevel "boomerang"
     
