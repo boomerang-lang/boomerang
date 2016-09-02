@@ -82,7 +82,7 @@ Library lenses
     boomerang
   Modules:
     Prelude
-   
+
 Executable boomerang
   Path: boomerang
   MainIs: boomerang.ml
