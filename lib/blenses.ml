@@ -19,6 +19,9 @@
 (* $Id: blenses.ml 4901 2010-05-13 21:14:49Z cretin $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+       
 (* ---------------------------------------------------------------------------*)
 (* IMPORTS AND ABBREVIATIONS *)
 
@@ -247,8 +250,8 @@ module Permutations = struct
       Err.run_error (Info.M "permutation")
         (fun () -> msg "@[%s@ is@ not@ a@ valid@ permutation@ on@ {0,..,%d}@]@\n"
            (string_of_sigma sigma) (pred k)) in
-    let sigma_arr = Array.create k (-1) in
-    let sigma_inv_arr = Array.create k (-1) in
+    let sigma_arr = Array.make k (-1) in
+    let sigma_inv_arr = Array.make k (-1) in
     begin
       let k' =
         Safelist.fold_left
@@ -264,7 +267,7 @@ module Permutations = struct
 
   let invert_permutation sigma =
     let sigma_arr = Array.of_list sigma in
-    let sigma_inv_arr = Array.create (Array.length sigma_arr) (-1) in
+    let sigma_inv_arr = Array.make (Array.length sigma_arr) (-1) in
     begin
       Array.iteri
         (fun i j ->
@@ -400,7 +403,7 @@ module Canonizer = struct
         then Err.run_error (Info.M "sort.canonize") (
           fun () -> msg "@[%s@ split@ into@ more@ than@ %d@ pieces@]" (Bstring.to_string u) k
         );
-        let c_shift = Array.create k i in
+        let c_shift = Array.make k i in
         let jzl, rs' =
           Safelist.fold_left (
             fun (jzl, rs) ui ->
@@ -466,7 +469,7 @@ module Canonizer = struct
     | Sort (k, irl) ->
         (* INEFFICIENT! *)
         let ul = Bstring.star_split (uncanonized_type cn) u in
-        let u_arr = Array.create k "" in
+        let u_arr = Array.make k "" in
         if Safelist.length ul > k
         then Err.run_error (Info.M "sort.canonize") (
           fun () -> msg "@[%s@ split@ into@ more@ than@ %d@ pieces@]" (Bstring.to_string u) k
@@ -1014,7 +1017,7 @@ module MLens = struct
     | Permute (p, mls) ->
         let k, sigma, sigma_inv, cts, ats = p in
         let v_arr_v = arr_split_v k mls sigma_inv ats v in
-        let r_arr_v = Array.create k "" in
+        let r_arr_v = Array.make k "" in
         Array.iteri (
           fun i j ->
             r_arr_v.(j) <- vrep mls.(i) v_arr_v.(j)
@@ -1088,8 +1091,8 @@ module MLens = struct
           ) s_arr_s
         in
         let _, i = pi in
-        let s_shift = Array.create k i in
-        let v_shift = Array.create k i in
+        let s_shift = Array.make k i in
+        let v_shift = Array.make k i in
         for i = 0 to k - 1 do
           let (_, shift) = pi_arr_s.(i) in
           for j = i + 1 to k - 1 do
@@ -1242,7 +1245,7 @@ module MLens = struct
         let ri_arr_v = Array.map snd vcri_arr_v in
         let vc_arr_v = Array.map fst vcri_arr_v in
         let _, i = ri in
-        let v_shift = Array.create k i in
+        let v_shift = Array.make k i in
         for i = 0 to k - 1 do
           let (_, shift) = ri_arr_v.(i) in
           for j = i + 1 to k - 1 do
@@ -1428,7 +1431,7 @@ module MLens = struct
           let ss = match so with
             | Some s -> Bstring.star_split (stype ml) s
             | None -> [] in
-          let a = Array.create k [] in
+          let a = Array.make k [] in
           let rec vloop i rs vs = match rs,vs with
             | _,[] -> ()
             | (_,rh)::rt,vh::vt ->
@@ -1484,10 +1487,10 @@ module MLens = struct
         let co_arr_v =
           match co with
           | Some (C_list c) -> Array.map (fun x -> Some x) (Array.of_list c)
-          | None -> Array.create k None
+          | None -> Array.make k None
           | _ -> assert false
         in
-        let s_arr_s = Array.create k "" in
+        let s_arr_s = Array.make k "" in
         let rec loop j ri =
           if j >= k then ri
           else (
@@ -1540,7 +1543,7 @@ module MLens = struct
 
   (* helpers for permute *)
   and arr_split_v k mls sigma_inv ats v =
-    let res = Array.create k Bstring.empty in
+    let res = Array.make k Bstring.empty in
     let _ =
       Array.fold_left (
         fun (i, v) j ->
@@ -1553,7 +1556,7 @@ module MLens = struct
     in res (* in view order *)
 
   and arr_split_s k mls cts s =
-    let res = Array.create k Bstring.empty in
+    let res = Array.make k Bstring.empty in
     let _ =
       Array.fold_left (
         fun (j, s) mlj ->
@@ -1669,8 +1672,8 @@ module MLens = struct
     let ml_arr = Array.of_list mls in
     let k = Array.length ml_arr in
     let sigma, sigma_inv = Permutations.permutation is k in
-    let ats = Array.create k Rx.empty in
-    let cts = Array.create k Rx.empty in
+    let ats = Array.make k Rx.empty in
+    let cts = Array.make k Rx.empty in
     let _ =
       Array.fold_right
         (fun j (i, acc) ->

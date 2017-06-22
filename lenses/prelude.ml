@@ -20,6 +20,10 @@
 (* $Id: prelude.ml 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
 
+open Bbase
+open Hbase
+open Ubase
+
 (* ----- imports and abbreviations ----- *)
 open Bvalue 
 open Bident

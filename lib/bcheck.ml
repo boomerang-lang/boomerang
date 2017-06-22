@@ -20,6 +20,9 @@
 (* $Id: bcheck.ml 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 (* ------ module imports and abbreviations ----- *)
 open Bsyntax
 open Bident

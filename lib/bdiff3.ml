@@ -19,6 +19,8 @@
 (* $Id: bdiff3.ml 4607 2009-08-03 16:53:28Z ddavi $ *)
 (******************************************************************************)
 
+open Ubase
+
 (* ----- functor argument ----- *)
 module type Diff3Arg = sig 
   type elt
@@ -83,7 +85,7 @@ module Make(A: Diff3Arg) = struct
            lcs_oa.(i)) 
       lcs_oa;
     let rec find_matches i j l = 
-      if (i=0) or (j=0) then l
+      if (i=0) || (j=0) then l
       else match lcs_aux.(i).(j) with  
         | Diag -> find_matches (i-1) (j-1) ((i-1,j-1)::l)  
         | Top  -> find_matches (i-1) j l    

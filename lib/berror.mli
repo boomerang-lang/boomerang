@@ -19,6 +19,8 @@
 (* $Id: berror.mli 4607 2009-08-03 16:53:28Z ddavi $ *)
 (******************************************************************************)
 
+open Hbase
+
 (* static error in the interpreter *)
 val static_error : Info.t -> (unit -> unit) -> 'a
 

@@ -19,6 +19,8 @@
 (* $Id: binterp.mli 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
 
+open Ubase
+
 val test_all : bool Prefs.t
 
 val interp_module : Bsyntax.modl -> unit

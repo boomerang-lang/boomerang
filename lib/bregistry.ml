@@ -19,6 +19,9 @@
 (* $Id: bregistry.ml 5001 2015-12-05 03:05:11Z bcpierce $ *)
 (******************************************************************************)
 
+open Hbase
+open Ubase
+
 let sprintf = Printf.sprintf
 let debug = Trace.debug "registry"
 let verbose = Trace.debug "registry+"
@@ -208,7 +211,7 @@ let find_modl modl =
             then Some path
             else k ()
           in
-          try_name (String.uncapitalize modl)
+          try_name (String.uncapitalize_ascii modl)
             (fun () -> try_name modl k)
         in
         let rec inner_loop exts =
@@ -237,7 +240,7 @@ let modl_of_path path =
     try Filename.chop_extension path
     with Invalid_argument _ -> path
   in
-  String.capitalize (chop_ext (Filename.basename path))
+  String.capitalize_ascii (chop_ext (Filename.basename path))
   
 let go_load comp modl source =
   debug (fun () -> msg "[@[loading %s ...@]]@\n%!" source);
@@ -270,7 +273,7 @@ let load modl =
         let i = sprintf "<baked source for %s>" modl in  
         match (
           match safe_find modl with
-          | None -> safe_find (String.uncapitalize modl)
+          | None -> safe_find (String.uncapitalize_ascii modl)
           | x -> x
         ) with
         | None -> false

@@ -22,6 +22,8 @@
 (******************************************************************************)
 
 (* imports and abbreviations *)
+open Hbase
+open Ubase    
 open Bsyntax
 open Bident
 module L = Blenses 
@@ -190,24 +192,24 @@ let add_atom ai (i,xs,bs) = match ai with
 
 %}
 
-%token <Info.t> EOF
-%token <Info.t> MODULE OPEN OF TYPE 
-%token <Info.t> UNIT BOOL INT CHAR STRING REGEXP AREGEXP SKELETONS RESOURCES LENS CANONIZER FORALL WHERE
-%token <Info.t> BOOLPREFS INTPREFS STRINGPREFS STRINGLISTPREFS
+%token <Hbase.Info.t> EOF
+%token <Hbase.Info.t> MODULE OPEN OF TYPE 
+%token <Hbase.Info.t> UNIT BOOL INT CHAR STRING REGEXP AREGEXP SKELETONS RESOURCES LENS CANONIZER FORALL WHERE
+%token <Hbase.Info.t> BOOLPREFS INTPREFS STRINGPREFS STRINGLISTPREFS
 %token <Bident.Id.t> STR UIDENT LIDENT QUALIDENT TYVARIDENT CSET NSET
-%token <Info.t * char> CHARACTER
-%token <Info.t * int> INTEGER
-%token <Info.t * bool> BOOLEAN
-%token <Info.t> CEX
-%token <Info.t * float> FLOAT
-%token <Info.t> HASH LBRACE RBRACE LLIST LBRACK RBRACK LPAREN RPAREN LANGLE RANGLE   
-%token <Info.t> ARROW DARROW DEQARROW EQARROW
-%token <Info.t> BEGIN END GRAMMAR AND FUN LET IN TEST MATCH WITH
-%token <Info.t> SEMI COMMA DOT EQUAL COLON COLONCOLON BACKSLASH SLASH
-%token <Info.t> STAR RLUS BANG BAR BARBAR DOLLAR PLUS MINUS UNDERLINE HAT TILDE AMPERSAND QMARK
-%token <Info.t> LT GT LEQ GEQ  
-%token <Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
-%token <Info.t> ERROR
+%token <Hbase.Info.t * char> CHARACTER
+%token <Hbase.Info.t * int> INTEGER
+%token <Hbase.Info.t * bool> BOOLEAN
+%token <Hbase.Info.t> CEX
+%token <Hbase.Info.t * float> FLOAT
+%token <Hbase.Info.t> HASH LBRACE RBRACE LLIST LBRACK RBRACK LPAREN RPAREN LANGLE RANGLE   
+%token <Hbase.Info.t> ARROW DARROW DEQARROW EQARROW
+%token <Hbase.Info.t> BEGIN END GRAMMAR AND FUN LET IN TEST MATCH WITH
+%token <Hbase.Info.t> SEMI COMMA DOT EQUAL COLON COLONCOLON BACKSLASH SLASH
+%token <Hbase.Info.t> STAR RLUS BANG BAR BARBAR DOLLAR PLUS MINUS UNDERLINE HAT TILDE AMPERSAND QMARK
+%token <Hbase.Info.t> LT GT LEQ GEQ  
+%token <Hbase.Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
+%token <Hbase.Info.t> ERROR
 
 %start modl uid qid
 %type <Bsyntax.modl> modl

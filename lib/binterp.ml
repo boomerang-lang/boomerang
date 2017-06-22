@@ -19,6 +19,9 @@
 (* $Id: binterp.ml 4999 2011-03-17 12:38:28Z mgree $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+       
 (* -------------------------------------------------------------------------- *)
 (* IMPORTS AND ABBREVIATIONS *)
 
@@ -54,7 +57,7 @@ let test_all = Prefs.testallPref
    '-test-all' or '-test m' are set *)
 let check_test ms = 
   Safelist.fold_left 
-    (fun r qs -> r or (Qid.id_prefix (G.parse_qid qs) ms))
+    (fun r qs -> r || (Qid.id_prefix (G.parse_qid qs) ms))
     (Prefs.read test_all)
     (Prefs.read tests)
 

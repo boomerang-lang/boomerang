@@ -20,6 +20,9 @@
 (* $Id *)
 (******************************************************************************)
 
+open Hbase
+open Ubase
+       
 module RxImpl = Brx
 
 let msg = Util.format

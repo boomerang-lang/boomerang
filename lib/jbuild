@@ -3,7 +3,19 @@
 (ocamlyacc (bparser))
 
 (ocamllex (blexer))
-    
+
+(rule
+  ((targets (bparser.mly))
+   (deps (../tools/src2f.exe bparser.srcy))
+   (action (run ../tools/src2f.exe bparser.srcy ${@}))
+))
+
+(rule
+  ((targets (blexer.mll))
+   (deps (../tools/src2f.exe blexer.srcl))
+   (action (run ../tools/src2f.exe blexer.srcl ${@}))
+))
+               
 (library
   ((name bbase)
    (libraries (hbase ubase threads str))

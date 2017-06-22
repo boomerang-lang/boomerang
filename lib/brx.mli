@@ -19,6 +19,7 @@
 (* Boomerang RegExp engine                                                    *)
 (* $Id: brx.mli 4643 2009-09-03 18:34:32Z cretin $ *)
 (******************************************************************************)
+open Hbase
 type t
 
 (* constants *)

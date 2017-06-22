@@ -20,6 +20,9 @@
 (* $Id *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 open Bsyntax
 open Bident
 open Bprint 

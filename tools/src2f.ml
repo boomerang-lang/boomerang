@@ -1,4 +1,4 @@
-open Src2fcl
+open Hbase.Src2fcl
 
 let () =
   if Array.length Sys.argv == 3 then

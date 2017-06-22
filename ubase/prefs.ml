@@ -49,7 +49,6 @@ let addresetter f = resetters := f :: !resetters
 let resetToDefaults () = Safelist.iter (fun f -> f()) !resetters
   
 (* ------------------------------------------------------------------------- *)
-
 (* When the server starts up, we need to ship it the current state of all    *)
 (* the preference settings.  This is accomplished by dumping them on the     *)
 (* client side and loading on the server side; as each preference is         *)
@@ -283,7 +282,7 @@ let string2bool name = function
 let string2int name string =
  try
    int_of_string string
- with Failure "int_of_string" -> 
+ with Failure _ -> 
    raise (Util.Fatal (name ^ " expects an integer value, but\n" 
                  ^ string ^ " is not an integer"))
 

@@ -17,6 +17,9 @@
 (* $Id: bident.ml 4624 2009-08-12 16:13:36Z cretin $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 (* ------ imports and abbreviations ------ *)
 let sprintf = Printf.sprintf
 

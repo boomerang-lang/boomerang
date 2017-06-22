@@ -18,7 +18,8 @@
 (* Boomerang abstract syntax interface                                        *)
 (* $Id: bsyntax.mli 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
-
+open Hbase
+       
 open Bident
 
 type prefs =

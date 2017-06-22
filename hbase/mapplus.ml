@@ -1,3 +1,5 @@
+open Ubase
+
 module type SMap = sig
   type key_t
   type key_set

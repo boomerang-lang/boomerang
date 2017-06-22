@@ -6,6 +6,8 @@
 (*****************************************************)
 (* $Id: error.ml 3437 2007-12-09 22:41:31Z jnfoster $ *)
 
+open Ubase
+
 (* run-time errors carry a (unit -> unit) function that can be used to
    print a message using the Format functions *)
 exception Harmony_error of (unit -> unit)

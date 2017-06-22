@@ -6,6 +6,8 @@
 (***************************************************)
 (* $Id$ *)
 
+open Ubase
+
 let memo_off = Prefs.createBool "memo-off" false
   "no memoization"
   "no memoization"
@@ -40,7 +42,7 @@ struct
 
 (* Hash tables *)
 
-external hash_param : int -> int -> 'a -> int = "caml_hash_univ_param" "noalloc"
+external hash_param : int -> int -> 'a -> int = "caml_hash_univ_param" [@@noalloc]
 
 let hash x = hash_param 10 100 x
 
@@ -92,7 +94,7 @@ let resize hashfun tbl =
   let osize = Array.length odata in
   let nsize = min (2 * osize + 1) Sys.max_array_length in
   if nsize <> osize then begin
-    let ndata = Array.create nsize Empty in
+    let ndata = Array.make nsize Empty in
     let rec insert_bucket = function
         Empty -> ()
       | Cons(key, data, rest) ->

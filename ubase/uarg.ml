@@ -66,7 +66,7 @@ let parse speclist anonfun errmsg =
   incr current;
   while !current < l do
     let ss = Sys.argv.(!current) in
-    if String.length ss >= 1 & String.get ss 0 = '-' then begin
+    if String.length ss >= 1 && String.get ss 0 = '-' then begin
       let args = Util.splitIntoWords ss '=' in
       let s = Safelist.nth args 0 in
       let arg conv mesg =

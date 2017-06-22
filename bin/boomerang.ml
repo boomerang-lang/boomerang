@@ -21,7 +21,7 @@
 
 (* Trivial front end; all command-line arguments are explicit *)
 
-module P = Prelude
+module P = Lbase.Prelude
 
-let () = Toplevel.toplevel "boomerang"
+let () = Bbase.Toplevel.toplevel "boomerang"
     

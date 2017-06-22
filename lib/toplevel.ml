@@ -19,6 +19,9 @@
 (* $Id: toplevel.ml 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 (* imports *)
 module L = Blenses.MLens
 open Error 
@@ -330,7 +333,7 @@ let toplevel' progName () =
       let basename_len = String.length basename in
       if basename_len >= prefix_len && String.sub basename 0 prefix_len = prefix
       then None
-      else Some (String.capitalize basename)
+      else Some (String.capitalize_ascii basename)
     in
     let prog = Sys.argv.(0) in
     match modl (basename prog) with

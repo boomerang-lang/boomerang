@@ -19,6 +19,9 @@
 (* $Id: bsync.ml 4607 2009-08-03 16:53:28Z ddavi $ *)
 (*****************************************************************************)
 
+open Ubase
+open Hbase
+
 (* --- imports --- *)
 let msg = Util.format
 let sprintf = Printf.sprintf 

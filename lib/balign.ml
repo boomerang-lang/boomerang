@@ -18,7 +18,8 @@
 (* Alignment and Permutation                                                  *)
 (* $Id: balign.ml 4901 2010-05-13 21:14:49Z cretin $ *)
 (******************************************************************************)
-
+open Ubase
+       
 module Arx = Barx
 module C = Bcost
 module T = Btag

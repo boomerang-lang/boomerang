@@ -19,6 +19,9 @@
 (* $Id: berror.ml 4607 2009-08-03 16:53:28Z ddavi $ *)
 (******************************************************************************)
 
+open Hbase
+open Ubase
+       
 let msg = Util.format
 
 (* static errors in the interpreter *)

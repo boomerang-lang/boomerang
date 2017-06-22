@@ -19,6 +19,9 @@
 (* $Id: bdriver.ml 4621 2009-08-10 18:52:36Z cretin $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 (* ---------------------------------------------------------------------------*)
 (* IMPORTS AND ABBREVIATIONS *)
 
@@ -43,8 +46,8 @@ let parse_lexbuf lexbuf =
 
 (* helper to check the name of a module *)
 let m_check n m_str ast =
-  let n_base = String.uncapitalize (Bregistry.modl_of_path n) in
-  let m_low = String.uncapitalize m_str in
+  let n_base = String.uncapitalize_ascii (Bregistry.modl_of_path n) in
+  let m_low = String.uncapitalize_ascii m_str in
   if n_base = m_low then ()
   else
     Berror.static_error

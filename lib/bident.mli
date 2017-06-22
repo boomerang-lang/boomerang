@@ -17,6 +17,8 @@
 (* $Id: bident.mli 4624 2009-08-12 16:13:36Z cretin $ *)
 (******************************************************************************)
 
+open Hbase
+
 (** {2 Plain Identifiers } *)
 module Id : sig
   type t = Info.t * string

@@ -19,6 +19,9 @@
 (* $Id: bsyntax.ml 4998 2011-03-16 21:53:34Z mgree $ *)
 (******************************************************************************)
 
+open Ubase
+open Hbase
+
 (* ----- imports and abbreviations ----- *)
 let (@) = Safelist.append 
 let sprintf = Printf.sprintf

@@ -19,6 +19,8 @@
 (* $Id: blenses.mli 4901 2010-05-13 21:14:49Z cretin $ *)
 (******************************************************************************)
 
+open Hbase
+       
 module Permutations : sig
   val valid_permutation : int list -> 'a list -> bool
     (** [valid_permutation sigma ls] is true iff sigma is a valid permutation for ls,

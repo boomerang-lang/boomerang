@@ -19,6 +19,9 @@
 (* $Id: bvalue.mli 4998 2011-03-16 21:53:34Z mgree $ *)
 (*****************************************************************************)
 
+open Ubase
+open Hbase
+       
 type prefs =
   | PrBol of bool Prefs.t
   | PrInt of int Prefs.t
