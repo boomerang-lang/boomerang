@@ -12,19 +12,6 @@ module QuickStart =
 \item Alternatively, to build Boomerang from source, grab the most
   recent tarball and follow the instructions in INSTALL.txt
 \end{itemize}
-
-\item Add the directory containing trunk/bin to your @PATH@
-  environment variable.
-\begin{itemize}   
-\item In Bash:
-\begin{progeg}
-> export PATH=$PATH:/path/to/trunk/bin
-\end{progeg}
-\item In Csh
-\begin{progeg}
-> setenv PATH {$PATH}:/path/to/trunk/bin
-\end{progeg}
-\end{itemize}
 \end{enumerate}
 
 \section{Simple Lens Programming}
@@ -38,7 +25,7 @@ are ignored by the Boomerang interpreter.
 
 You can run the Boomerang interpreter from the command line like this:
 \begin{progeg}
-> boomerang QuickStart.src
+> boomerang.exe QuickStart.src
 \end{progeg}
 You should see several lines of output beginning like this
 \begin{progeg}
