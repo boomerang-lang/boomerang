@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(ocamllex (src2tex))
+    
+(executables
+  ((names (src2f src2tex wrap))
+   (libraries (hbase))
+))

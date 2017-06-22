@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(ocamlyacc (bparser))
+
+(ocamllex (blexer))
+    
+(library
+  ((name bbase)
+   (libraries (hbase ubase threads str))
+))

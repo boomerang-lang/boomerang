@@ -1,35 +1,22 @@
-all: build
+TARGETS=boomerang.exe
 
-J=4
+.PHONY: all build clean %.exe
 
-setup.ml: _oasis
-	oasis setup
+all: build link
 
-setup.data: setup.ml
-	./configure
+build:
+	jbuilder build
 
-build: setup.data setup.ml
-	ocaml setup.ml -build -j $(J)
+link: $(TARGETS)
 
-install: setup.data setup.ml
-	ocaml setup.ml -install
+%.exe:
+	if [ ! -f $@ ]; then ln -s _build/default/bin/$@ . ; fi
 
-reinstall: setup.ml
-	ocaml setup.ml -reinstall
-
-uninstall: setup.ml
-	ocaml setup.ml -uninstall
-
-test: setup.ml build
-	ocaml setup.ml -test $(TESTFLAGS)
+install:
+	jbuilder install
 
 clean:
-	ocamlbuild -clean
-	rm -f setup.data setup.log
+	rm -rf _build *.install $(TARGETS)
 
-distclean:
-	ocaml setup.ml -distclean
-	rm -f setup.data setup.log
-
-doc:
-	ocaml setup.ml -doc
+test:
+	jbuilder runtest

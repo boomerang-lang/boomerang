@@ -1,0 +1,11 @@
+opam-version: "1.2"
+version: "1.0"
+maintainer: "jnfoster@cs.cornell.edu"
+authors: ["Nate Foster" "Benjamin C. Pierce"]
+homepage: "https://github.com/boomerang-lang/boomerang"
+bug-reports: "https://github.com/boomerang-lang/boomerang"
+dev-repo: "https://github.com/boomerang-lang/boomerang"
+license: "None"
+build: [
+  ["jbuilder" "build" "--only" "boomerang" "--root" "." "-j" jobs "@install"]
+]
