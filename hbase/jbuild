@@ -6,3 +6,8 @@
   ((name hbase)
    (libraries (ubase unix))
 ))
+
+(executable
+  ((name baker)
+   (libraries (hbase))
+))    

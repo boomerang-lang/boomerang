@@ -6,16 +6,22 @@
 
 (rule
   ((targets (bparser.mly))
-   (deps (../tools/src2f.exe bparser.srcy))
-   (action (run ../tools/src2f.exe bparser.srcy ${@}))
+   (deps (${ROOT}/tools/src2f.exe bparser.srcy))
+   (action (run ${<} bparser.srcy ${@}))
 ))
 
 (rule
   ((targets (blexer.mll))
-   (deps (../tools/src2f.exe blexer.srcl))
-   (action (run ../tools/src2f.exe blexer.srcl ${@}))
+   (deps (${ROOT}/tools/src2f.exe blexer.srcl))
+   (action (run ${<} blexer.srcl ${@}))
 ))
-               
+
+(rule
+  ((targets (bakery.ml))
+   (deps (../hbase/baker.exe))    
+   (action (with-stdout-to ${@} (run ${<} .boom ../../../lenses ../../../examples)))
+))
+                   
 (library
   ((name bbase)
    (libraries (hbase ubase threads str))
