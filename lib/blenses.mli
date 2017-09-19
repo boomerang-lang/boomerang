@@ -100,7 +100,7 @@ module MLens : sig
   val invert : Info.t -> t -> t
   val copy : Info.t -> Brx.t -> t
   val weight : Info.t -> bool -> Bannot.Weight.t -> t -> t
-  val clobber : Info.t -> Brx.t -> string -> (string -> string) -> t
+  val disconnect : Info.t -> Brx.t -> Brx.t -> (string -> string) -> (string -> string) -> t
   val concat : Info.t -> t -> t -> t
   val union : Info.t -> t -> t -> t
   val star : Info.t -> t -> t
@@ -108,7 +108,7 @@ module MLens : sig
   val permute : Info.t -> int list -> t list -> t
   val compose : Info.t -> t -> t -> t
   val align : Info.t -> t -> t
-  val default : Info.t -> t -> Bstring.t -> t
+  val default : Info.t -> t -> (string -> string) -> (string -> string) -> t
   val mmatch : Info.t -> Btag.t -> t -> t
   val partition : Info.t -> Brx.t list -> t
   val merge : Info.t -> Brx.t -> t
