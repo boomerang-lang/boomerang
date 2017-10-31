@@ -21,7 +21,9 @@
 
 (* Trivial front end; all command-line arguments are explicit *)
 
-module P = Lbase.Prelude
+module P = Lbase.Prelude             
 
-let () = Bbase.Toplevel.toplevel "boomerang"
+let () =
+  P.load ();
+  Bbase.Toplevel.toplevel "boomerang"
     

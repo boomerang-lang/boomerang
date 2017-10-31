@@ -737,7 +737,7 @@ let prelude_spec =
  end
   ]
 
-let () =
+let load () =
   Safelist.iter
     (fun (x,s,v) -> Bregistry.register_native_qid x s v)
     prelude_spec
