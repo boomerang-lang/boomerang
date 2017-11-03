@@ -532,7 +532,7 @@ module MakeLater(M:MemoType) = struct
       None -> None 
     | Some t -> (try Some (H.find t a) with Not_found -> None)
 
-  let memoize f =
+  let memoize (f:M.arg -> M.res) : M.arg -> M.res = 
     if (Prefs.read memo_off || Safelist.mem M.name (Prefs.read memo_skip)) then f 
     else gen_memoize M.name M.format_arg M.format_res 
       H.find H.add get_table None f
@@ -563,7 +563,7 @@ module MakeLater2(M:MemoType2) = struct
       None -> None 
     | Some t -> (try Some (H.find t a) with Not_found -> None)
 	      
-  let memoize f = 
+  let memoize (f : M.arg -> M.res) : M.arg -> M.res = 
       if (Prefs.read memo_off || Safelist.mem M.name (Prefs.read memo_skip)) then f 
       else 
 	gen_memoize M.name M.format_arg M.format_res 
