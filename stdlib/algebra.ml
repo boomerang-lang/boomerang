@@ -545,5 +545,50 @@ module Permutation = struct
               (to_swap_concat_compose_tree l2
               ,to_swap_concat_compose_tree l1)
       end
+
 end
 
+
+module CountedPermutation =
+struct
+  type element =
+    {
+      old_index : int       ;
+      new_index : int * int ;
+    }
+  [@@deriving ord, show, hash, make]
+
+  type t = element list
+  [@@deriving ord, show, hash]
+
+  let sorting
+      ~cmp:(cmp:'a comparer)
+      (l:'a list)
+    : t * 'a list list =
+    let indexed_l =
+      List.mapi
+        ~f:(fun i x -> (x,i))
+        l
+    in
+    let sorted_partitioned_indexed_l =
+      sort_and_partition
+        ~cmp:(fun (x1,_) (x2,_) -> cmp x1 x2)
+        indexed_l
+    in
+    let (unflattened_p,sorted_partitioned_l) =
+      List.unzip
+        (List.mapi
+           ~f:(fun i xl ->
+               List.unzip
+                 (List.mapi
+                    ~f:(fun j (x,old_index) ->
+                        (make_element
+                           ~old_index:old_index
+                           ~new_index:(i,j)
+                        ,x)
+                      )
+                    xl))
+           sorted_partitioned_indexed_l)
+    in
+    (List.concat unflattened_p,sorted_partitioned_l)
+end

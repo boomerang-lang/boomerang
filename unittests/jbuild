@@ -2,10 +2,10 @@
 
 (executable
  ((name unittests)
-  (modules (unittests ounit_general_extensions))
-  (libraries (ounit stdlib))))
+  (modules (unittests ounit_general_extensions ounit_extensions))
+  (libraries (ounit stdlib symsynth))))
 
 (alias
  ((name    runtest)
-  (deps    (./unittests.exe))
-  (action  (run ${<}))))
+  (deps    (unittests.exe))
+  (action  (run ${^}))))

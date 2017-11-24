@@ -395,16 +395,40 @@ let prelude_spec =
                                           ))
   ; pmk_bill   "lens_weight"          (fun i b w -> L.weight i b (Bannot.Weight.of_int w))
   ; pmk_rzl    "partition"            (fun i rl -> L.partition i (Safelist.map get_r rl))
-  ; pmk_rl     "merge"                L.merge
+  ; pmk_rl     "merge"                (fun i r ->
+                                         let l = (L.copy i r) in
+                                         L.dup_first i
+                                           l
+                                           (fun v r1r2o ->
+                                              let vs = Bstring.of_string v in
+                                              begin match r1r2o with
+                                                | None ->
+                                                  L.rcreate l vs
+                                                | Some (s1,s2) ->
+                                                  if (s1 = s2) then
+                                                    L.rput l vs (Bstring.of_string s1)
+                                                  else
+                                                    s2
+                                              end)
+                                           r
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string ""))
   ; pmk_ll     "fiat"                 L.fiat
   ; pmk_dup1   "dup1"                 (fun i l f fat ->
-                                         L.dup1 i l
-                                           (fun s -> get_s (f (mk_s i s))) fat)
+                                         L.dup_first i
+                                           l
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string "")
+                                           (fun s _ -> get_s (f (mk_s i s)))
+                                           fat)
   ; pmk_dup2   "dup2"                 (fun i f fat l ->
-                                         L.dup2 i
-                                           (fun s -> get_s (f (mk_s i s))) fat
+                                         L.dup_second i
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string "")
+                                           (fun s _ -> get_s (f (mk_s i s)))
+                                           fat
                                            l)
-                                      
+
   (* canonizer operations *)          
   ; pmk_rq     "canonizer_copy"       C.copy
   ; pmk_qqq    "canonizer_union"      C.union

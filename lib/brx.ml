@@ -160,6 +160,7 @@ module rec M : sig
     | Rep of t * int * int option
     | Inter of t list
     | Diff of t * t
+    | Dist of t
   and t = 
       { uid                        : int;
         desc                       : d;
@@ -181,6 +182,7 @@ end = struct
     | Rep of t * int * int option
     | Inter of t list
     | Diff of t * t
+    | Dist of t
   and t = 
       { uid                        : int;
         desc                       : d;
@@ -246,7 +248,8 @@ let rank t0 = match t0.desc with
   | Seq _    -> Crnk
   | Alt _    -> Urnk 
   | Inter _  -> Irnk
-  | Diff _   -> Drnk 
+  | Diff _   -> Drnk
+  | Dist _   -> Arnk
 
 (* printing helpers *)
 let string_of_char_code n = 
@@ -353,6 +356,7 @@ let rec format_t t0 =
       | Alt ts      -> format_list "|" Urnk ts
       | Inter ts    -> format_list "&" Urnk ts
       | Diff(t1,t2) -> format_list "-" Drnk [t1;t2]
+      | Dist(t)     -> wrap "{" "}" (fun () -> format_t t)
     end;
     msg "@]"
 
@@ -472,7 +476,10 @@ let rec desc_charmap (t:t) =
         let ml = Safelist.fold_left (fun ml ti -> get_charmap ti::ml) [] tl in
         combine_charmap_list ml
     | Diff(t1,t2) ->
-        combine_charmaps (get_charmap t1) (get_charmap t2)
+      combine_charmaps (get_charmap t1) (get_charmap t2)
+    | Dist t ->
+      get_charmap t
+
 
 and get_charmap t = 
   force t.maps 
@@ -567,7 +574,9 @@ let desc_hash d =
       71 * Safelist.fold_left (fun h ti -> h + 883 * ti.hash) 0 tl
   | Diff(t1,t2)      -> 379 * t1.hash + 563 * t2.hash
   | Rep(t1,i,Some j) -> 197 * t1.hash + 137 * i + j
-  | Rep(t1,i,None)   -> 197 * t1.hash + 137 * i + 552556457 in 
+  | Rep(t1,i,None)   -> 197 * t1.hash + 137 * i + 552556457
+  | Dist t -> 491 * t.hash + 733
+  in
   abs pre_h
 
 let desc_final = function
@@ -578,6 +587,7 @@ let desc_final = function
   | Alt tl      -> Safelist.exists (fun ti -> ti.final) tl
   | Inter tl    -> Safelist.for_all (fun ti -> ti.final) tl
   | Diff(t1,t2) -> t1.final && not t2.final
+  | Dist t      -> t.final
 
 (* let desc_size = function *)
 (*   | CSet _      -> 1 *)
@@ -594,6 +604,7 @@ let desc_ascii = function
   | Alt tl      -> Safelist.for_all (fun t -> t.ascii) tl
   | Inter tl    -> Safelist.exists (fun t -> t.ascii) tl
   | Diff(t1,t2) -> t1.ascii
+  | Dist t      -> t.ascii
 
 (* --------------------- CONSTRUCTORS --------------------- *)
 (* gensym for uids *)
@@ -716,7 +727,10 @@ let rec mk_t d0 =
             (fun c -> mk_inters (Safelist.map (fun ti -> ti.derivative c) tl))
       | Diff(t1,t2) -> 
           mk_table 
-            (fun c -> mk_diff (t1.derivative c) (t2.derivative c)) in 
+            (fun c -> mk_diff (t1.derivative c) (t2.derivative c))
+      | Dist t ->
+          t.derivative
+    in
     res in
 
   (* backpatch t0 with implementation of derivative *)  
@@ -737,6 +751,7 @@ and calc_reverse t = match t.desc with
   | Rep(t1,i,jo)  -> mk_rep (get_reverse t1) i jo
   | Inter tl      -> mk_inters (Safelist.map get_reverse tl)
   | Diff(t1,t2)   -> mk_diff (get_reverse t1) (get_reverse t2)
+  | Dist(t)       -> mk_dist (get_reverse t)
 
 and get_reverse t = 
   force t.reverse 
@@ -1034,7 +1049,9 @@ and mk_diff t1 t2 =
             | Diff(t21,t22) when is_anyascii t21 -> t22
             | _ -> go t1 t2
         else go t1 t2 in 
-    res
+  res
+
+and mk_dist t = mk_t (Dist t)
         
 (* -------------------- OPERATIONS -------------------- *)
 
@@ -1070,7 +1087,9 @@ let rec mk_expand t0 c t = match t0.desc with
   | Inter tl -> 
       mk_inters (Safelist.map (fun ti -> mk_expand ti c t) tl)
   | Diff(t1,t2) -> 
-      mk_diff (mk_expand t1 c t) (mk_expand t2 c t)
+    mk_diff (mk_expand t1 c t) (mk_expand t2 c t)
+  | Dist t1 ->
+    mk_dist (mk_expand t1 c t)
 
 let mk_complement t0 = mk_diff anything t0
 

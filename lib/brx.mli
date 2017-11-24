@@ -41,6 +41,7 @@ val mk_complement: t -> t
 val mk_inter : t -> t -> t
 val mk_reverse : t -> t
 val mk_expand : t -> int -> t -> t
+val mk_dist : t -> t
 
 (* pretty printing *)
 (* ranks *)

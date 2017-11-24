@@ -197,9 +197,11 @@ end
 
 module PairOf
     (D1:Data)
-    (D2:Data)
-  : Data with type t = (D1.t * D2.t) =
+    (D2:Data) =
 struct
+  module Fst = D1
+  module Snd = D2
+
   type t = (D1.t * D2.t)
   [@@deriving ord, show, hash]
 end
@@ -617,7 +619,7 @@ let triple_partitions (n:int) : (int * int * int) list =
         end)
     list_split_partitions
 
-let rec sort_and_partition (f:'a -> 'a -> comparison) (l:'a list) : 'a list list =
+let rec sort_and_partition ~cmp:(f:'a -> 'a -> comparison) (l:'a list) : 'a list list =
   let rec merge_sorted_partitions (l1:'a list list) (l2:'a list list) : 'a list list =
     begin match (l1,l2) with
     | (h1::t1,h2::t2) ->

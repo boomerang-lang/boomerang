@@ -115,6 +115,12 @@ module MLens : sig
   val fiat : Info.t -> t -> t
   val left_quot : Info.t -> Canonizer.t -> t -> t
   val right_quot : Info.t -> t -> Canonizer.t -> t
-  val dup1 : Info.t -> t -> (string -> string) -> Brx.t -> t
-  val dup2 : Info.t -> (string -> string) -> Brx.t -> t -> t
+  val dup_first : Info.t -> t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> t
+  val dup_second : Info.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> t -> t
 end
