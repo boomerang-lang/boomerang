@@ -361,6 +361,12 @@ and interp_exp wq cev e0 =
   | ECast(i,f,t,b,e) -> 
       (interp_cast wq cev b f t)
         (interp_exp wq cev e)
+  | ESynth(i,e1,e2,exs) ->
+    let v1 = interp_exp wq cev e1 in 
+    let v2 = interp_exp wq cev e1 in
+    let r1 = V.get_r v1 in
+    let r2 = V.get_r v2 in
+    V.mk_l i (Bsynth.synth cev r1 r2 exs)
 
 and interp_binding wq cev b0 = match b0 with
   | Bind(i,p,so,e) -> 

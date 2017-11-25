@@ -210,6 +210,7 @@ let add_atom ai (i,xs,bs) = match ai with
 %token <Hbase.Info.t> LT GT LEQ GEQ  
 %token <Hbase.Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
 %token <Hbase.Info.t> ERROR
+%token <Hbase.Info.t> SYNTH
 
 %start modl uid qid
 %type <Bsyntax.modl> modl
@@ -719,6 +720,12 @@ appexp:
   | appexp repexp                         
       { mk_app (me $1 $2) $1 $2 }
 
+  | synthexp
+      { $1 }
+
+synthexp:
+  | SYNTH exp DEQARROW exp
+      { mk_synth (me2 $1 $4) $2 $4 [] }
   | repexp
       { $1 }
       

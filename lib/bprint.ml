@@ -258,6 +258,20 @@ and format_exp e0 = match e0 with
   | EInteger (_,i) ->
       msg "@[%d@]" i
 
+  | ESynth (_,e1,e2,exs) ->
+    msg "@[synth@ ";
+    format_exp e1;
+    msg "@ <=>@ ";
+    format_exp e2;
+    begin match exs with
+      | [] -> msg "@]"
+      | _ ->
+        msg "@ using@ [";
+        Misc.format_list
+          "@ ;@ "
+          (fun (s1,s2) -> msg "(%s,%s)" s1 s2) exs;
+        msg "]@]"
+    end
   | ECSet (_,pos, ranges) ->
       msg "@[[";
       (if pos then () else msg "^");
