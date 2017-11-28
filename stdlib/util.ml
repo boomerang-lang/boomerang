@@ -1095,3 +1095,14 @@ sig
   val hash_fold_t : t hash_folder
   val dist : t metric
 end
+
+module Math =
+struct
+  let rec factorial
+      (n:int)
+    : float =
+    if n = 0 then
+      1.0
+    else
+      (Float.of_int n) *. (factorial (n - 1))
+end
