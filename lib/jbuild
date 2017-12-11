@@ -11,9 +11,21 @@
 ))
 
 (rule
+ ((targets (bparser.tex))
+  (deps (${ROOT}/tools/src2tex.exe bparser.srcy))
+  (action (run ${<} bparser.srcy ${@}))
+))
+
+(rule
   ((targets (blexer.mll))
    (deps (${ROOT}/tools/src2f.exe blexer.srcl))
    (action (run ${<} blexer.srcl ${@}))
+))
+
+(rule
+ ((targets (blexer.tex))
+  (deps (${ROOT}/tools/src2tex.exe bparser.srcy))
+  (action (run ${<} bparser.srcy ${@}))
 ))
 
 (rule
