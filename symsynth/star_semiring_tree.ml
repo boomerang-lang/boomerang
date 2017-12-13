@@ -1,33 +1,25 @@
 open Stdlib
 
-module LabelledPlusTimesStarTreeOf
+module NonemptyLabelledPlusTimesStarTreeOf
     (BD : Data)
     (PD : Data)
     (TD : Data)
     (SD : Data)
     (L  : Data) =
 struct
-  type nonempty_t =
-    | Base of BD.t
-    | Plus of PD.t * labelled_t list
-    | Times of TD.t * labelled_t list
-    | Star of SD.t * labelled_t
-
-  and  labelled_t = nonempty_t * L.t
-  [@@deriving ord, show, hash]
-
   type t =
-    | Empty
-    | Nonempty of nonempty_t
+    | Base of BD.t
+    | Plus of PD.t * l list
+    | Times of TD.t * l list
+    | Star of SD.t * l
+
+  and l = t * L.t
   [@@deriving ord, show, hash]
 
   let fold_downward_upward
       (type a)
       (type b)
-      (type c)
       ~init:(init:b)
-      ~upward_empty:(upward_empty:c)
-      ~upward_nonempty:(upward_nonempty:a -> c)
       ~upward_base:(upward_base:b -> BD.t -> a)
       ~upward_plus:(upward_plus:b -> PD.t -> (L.t * a) list -> a)
       ~upward_times:(upward_times:b -> TD.t -> (L.t * a) list -> a)
@@ -36,10 +28,10 @@ struct
       ?downward_times:(downward_times:b -> TD.t -> L.t -> b = curry3 fst_trip)
       ?downward_star:(downward_star:b -> SD.t -> L.t -> b = curry3 fst_trip)
       (ptst:t)
-    : c =
-    let rec fold_downward_upward_nonempty_internal
+    : a =
+    let rec fold_downward_upward_internal
         (downward_acc:b)
-        (nptst:nonempty_t)
+        (nptst:t)
       : a =
       begin match nptst with
         | Base bd ->
@@ -52,7 +44,7 @@ struct
                ~f:(fun (t,l) ->
                    let downward_acc' = downward_plus downward_acc pd l in
                    (l
-                   ,fold_downward_upward_nonempty_internal downward_acc' t))
+                   ,fold_downward_upward_internal downward_acc' t))
                ts)
         | Times (td,ts) ->
           upward_times
@@ -62,7 +54,7 @@ struct
                ~f:(fun (t,l) ->
                    let downward_acc' = downward_times downward_acc td l in
                    (l
-                   ,fold_downward_upward_nonempty_internal downward_acc' t))
+                   ,fold_downward_upward_internal downward_acc' t))
                ts)
         | Star (sd,(t,l)) ->
           let downward_acc' = downward_star downward_acc sd l in
@@ -70,38 +62,55 @@ struct
             downward_acc
             sd
             l
-            (fold_downward_upward_nonempty_internal downward_acc' t)
+            (fold_downward_upward_internal downward_acc' t)
       end
 
     in
-    begin match ptst with
-      | Empty -> upward_empty
-      | Nonempty nptst ->
-        upward_nonempty
-          (fold_downward_upward_nonempty_internal init nptst)
-    end
-
+    fold_downward_upward_internal init ptst
 
   let fold
       (type a)
-      (type c)
-      ~empty_f:(empty_f:c)
-      ~nonempty_f:(nonempty_f:a -> c)
       ~base_f:(base_f:BD.t -> a)
       ~plus_f:(plus_f:PD.t -> (L.t * a) list -> a)
       ~times_f:(times_f:TD.t -> (L.t * a) list -> a)
       ~star_f:(star_f:SD.t -> L.t -> a -> a)
       v
-    : c =
+    : a =
     fold_downward_upward
       ~init:()
-      ~upward_empty:(empty_f)
-      ~upward_nonempty:(nonempty_f)
       ~upward_base:(thunk_of base_f)
       ~upward_plus:(thunk_of plus_f)
       ~upward_times:(thunk_of times_f)
       ~upward_star:(thunk_of star_f)
       v
+end
+
+module LabelledPlusTimesStarTreeOf
+    (BD : Data)
+    (PD : Data)
+    (TD : Data)
+    (SD : Data)
+    (L  : Data) =
+struct
+  module Nonempty = NonemptyLabelledPlusTimesStarTreeOf(BD)(PD)(TD)(SD)(L)
+
+  type t =
+    | Empty
+    | Nonempty of Nonempty.t
+  [@@deriving ord, show, hash]
+
+  let fold
+      (type a)
+      ~empty_f:(empty_f:a)
+      ~nonempty_f:(nonempty_f:Nonempty.t -> a)
+      (ptst:t)
+    : a =
+    begin match ptst with
+      | Empty -> empty_f
+      | Nonempty nptst -> nonempty_f nptst
+    end
+
+
 end
 
 
@@ -253,7 +262,7 @@ struct
           let (nts,nss) = List.unzip nsnts in
           let (perm,sv) =
             CountedPermutation.sorting
-              ~cmp:(compare_nonempty_t)
+              ~cmp:(Nonempty.compare)
               nts
           in
           let nvs =
@@ -274,7 +283,7 @@ struct
           let (nts,nss) = List.unzip nsnts in
           let (perm,sv) =
             CountedPermutation.sorting
-              ~cmp:(compare_nonempty_t)
+              ~cmp:(Nonempty.compare)
               nts
           in
           let nvs =
