@@ -16,7 +16,11 @@ install:
 	jbuilder install
 
 clean:
-	rm -rf _build *.install $(TARGETS)
+	rm -rf _build *.install *.pdf $(TARGETS)
 
 test:
 	jbuilder runtest
+
+documentation:
+	jbuilder build @docs
+	if [ -f _build/default/docs/main.pdf ]; then mv _build/default/docs/main.pdf boomerang.pdf ; fi
