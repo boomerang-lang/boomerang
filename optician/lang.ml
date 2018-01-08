@@ -256,7 +256,6 @@ struct
       ~var_f:(fun _ -> 1)
 
 
-
   let from_char_set (l : (int * int) list) : t =
 	  let charOf (index : int) : char =
 		  match Char.of_int index with
@@ -265,10 +264,10 @@ struct
 	  in let helper ((m, n) : int * int) : t =
 		     let rec innerHelper (i : int) (r : t) : t =
 			     if i > n then r else
-				     innerHelper (i + 1) (RegExOr(r, RegExBase (Char.escaped (charOf i))))
+				     innerHelper (i + 1) (RegExOr(r, RegExBase (String.of_char (charOf i))))
 		     in if n < m then failwith "Malformed Character Set" else
-		     if n = m then RegExBase (Char.escaped (charOf m)) else
-			     innerHelper (m + 1) (RegExBase (Char.escaped (charOf m)))
+		     if n = m then RegExBase (String.of_char (charOf m)) else
+			     innerHelper (m + 1) (RegExBase (String.of_char (charOf m)))
 	  in
 	  List.fold_left l ~init: RegExEmpty
 		  ~f: (fun r x -> if r = RegExEmpty then helper x else RegExOr (r, (helper x)))
