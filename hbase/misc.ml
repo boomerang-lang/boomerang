@@ -194,6 +194,14 @@ let map_right alt1 f = match alt1 with
   | Right r -> f r
   | l -> l
 
+let map_left_alone alt f = match alt with 
+  | Left l -> Left (f l)
+  | Right r -> Right r
+      
+let map_right_alone alt1 f = match alt1 with
+  | Right r -> Right (f r)
+  | Left l -> Left l
+
 (* ------------- String/Char utilities --------------- *)
 
 (* Based on String.escape 

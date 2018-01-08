@@ -210,7 +210,7 @@ let add_atom ai (i,xs,bs) = match ai with
 %token <Hbase.Info.t> LT GT LEQ GEQ  
 %token <Hbase.Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
 %token <Hbase.Info.t> ERROR
-%token <Hbase.Info.t> SYNTH
+%token <Hbase.Info.t> SYNTH USING
 
 %start modl uid qid
 %type <Bsyntax.modl> modl
@@ -718,16 +718,30 @@ geqexp:
 #{#}
 appexp:
   | appexp repexp                         
-      { mk_app (me $1 $2) $1 $2 }
+    { mk_app (me $1 $2) $1 $2 }
 
-  | synthexp
-      { $1 }
+  | SYNTH appexp DEQARROW repexp USING LBRACE listexp
+    { let i = if List.length $7 = 0 then
+      me2 $1 $4 else
+      me2 $1 (List.hd (List.rev $7)) in 
+      ESynth (i,$2,$4,$7) }
 
-synthexp:
-  | SYNTH exp DEQARROW exp
-      { mk_synth (me2 $1 $4) $2 $4 [] }
+  | SYNTH appexp DEQARROW repexp
+    { let i = me2 $1 $4 in
+      ESynth (i,$2,$4,[]) }
+
   | repexp
-      { $1 }
+    { $1 }
+
+listexp:
+  | RBRACE
+		{[]}
+	
+	| appexp RBRACE
+		{[$1]}
+		
+	| appexp COMMA listexp
+		{$1 :: $3}
       
 /* repeated expressions */
 #{@}

@@ -173,6 +173,12 @@ module LensContext = struct
       
   let autogen_fresh_id (lc:t) : Id.t =
     autogen_id_from_base lc "l"
+
+  let insert_unnamed_list_exn (lc:t) (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
+    List.fold_left
+      ~f:(fun acc (l,r1,r2) -> let name = autogen_fresh_id acc in insert_exn acc name l r1 r2)
+      ~init:lc
+      nirsl
 end
 
 (***** }}} *****)

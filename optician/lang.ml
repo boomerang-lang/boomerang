@@ -428,6 +428,58 @@ struct
       (_:t)
     : t list =
     failwith "TODO"
+
+  let fold
+      (type a)
+      ~const_f:(const_f:string -> string -> a)
+      ~concat_f:(concat_f:a -> a -> a)
+      ~swap_f:(swap_f:a -> a -> a)
+      ~union_f:(union_f:a -> a -> a)
+      ~compose_f:(compose_f:a -> a -> a)
+      ~iterate_f:(iterate_f:a -> a)
+      ~identity_f:(identity_f:Regex.t -> a)
+      ~inverse_f:(inverse_f:a -> a)
+      ~permute_f:(permute_f:int list -> a list -> a)
+      ~variable_f:(variable_f:Id.t -> a)
+      (l:t)
+    : a =
+    let rec fold_internal
+        (l:t)
+      : a =
+      begin match l with
+        | LensConst(s1,s2) -> const_f s1 s2
+        | LensConcat(l1,l2) ->
+          let acc1 = fold_internal l1 in
+          let acc2 = fold_internal l2 in
+          concat_f acc1 acc2
+        | LensSwap(l1,l2) ->
+          let acc1 = fold_internal l1 in
+          let acc2 = fold_internal l2 in
+          swap_f acc1 acc2
+        | LensUnion(l1,l2) ->
+          let acc1 = fold_internal l1 in
+          let acc2 = fold_internal l2 in
+          union_f acc1 acc2
+        | LensCompose(l1,l2) ->
+          let acc1 = fold_internal l1 in
+          let acc2 = fold_internal l2 in
+          compose_f acc1 acc2
+        | LensIterate l -> 
+          let acc = fold_internal l in
+          iterate_f acc
+        | LensIdentity r ->
+          identity_f r
+        | LensInverse l ->
+          let acc = fold_internal l in
+          inverse_f acc
+        | LensPermute (p,ls) ->
+          let accs = List.map ~f:fold_internal ls in
+          permute_f p accs
+        | LensVariable v ->
+          variable_f v
+      end
+    in
+    fold_internal l
 end
 
 let lens_semiring = (module Lens : Semiring.Sig with type t = Lens.t)

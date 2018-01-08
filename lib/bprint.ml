@@ -269,7 +269,8 @@ and format_exp e0 = match e0 with
         msg "@ using@ [";
         Misc.format_list
           "@ ;@ "
-          (fun (s1,s2) -> msg "(%s,%s)" s1 s2) exs;
+          format_exp
+           exs;
         msg "]@]"
     end
   | ECSet (_,pos, ranges) ->

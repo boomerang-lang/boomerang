@@ -230,6 +230,7 @@ let _ =
     ; ("false", (fun i -> BOOLEAN(i,false)))
     ; ("cex", (fun i -> CEX i))
     ; ("synth", (fun i -> SYNTH i))
+    ; ("using", (fun i -> USING i))
     ]
 }
 

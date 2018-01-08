@@ -107,7 +107,7 @@ and exp =
     | ECSet    of Info.t * bool * (char * char) list 
 
     (* synthesis of lenses *)
-    | ESynth   of Info.t * exp * exp * (string * string) list
+    | ESynth   of Info.t * exp * exp * exp list
 
     (* booleans with counter examples *)
     (* None ~ true; Some s ~ false with counterexample s *)

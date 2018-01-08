@@ -363,10 +363,18 @@ and interp_exp wq cev e0 =
         (interp_exp wq cev e)
   | ESynth(i,e1,e2,exs) ->
     let v1 = interp_exp wq cev e1 in 
-    let v2 = interp_exp wq cev e1 in
+    let v2 = interp_exp wq cev e2 in
+    let exs = List.map (interp_exp wq cev) exs in
+    let exs =
+      List.map
+        (fun e ->
+           let (v1,v2) = V.get_p e in
+           (V.get_s v1, V.get_s v2))
+        exs
+    in
     let r1 = V.get_r v1 in
     let r2 = V.get_r v2 in
-    V.mk_l i (Bsynth.synth cev r1 r2 exs)
+    V.mk_l i (Bsynth.synth i cev r1 r2 exs)
 
 and interp_binding wq cev b0 = match b0 with
   | Bind(i,p,so,e) -> 

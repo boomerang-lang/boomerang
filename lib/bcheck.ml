@@ -853,7 +853,7 @@ and check_exp ?(in_let=false) sev e0 =
             i
             e_sort
             SRegexp
-            e1
+            e
       in
       let e1 = check_and_coerce_regexp e1 in
       let e2 = check_and_coerce_regexp e2 in

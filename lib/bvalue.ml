@@ -231,6 +231,10 @@ let get_m v = match v with
 let get_l v = match v with 
   | Lns(_,l) -> l
   | _ -> conversion_error "lens" v
+      
+let get_l_safe v = match v with 
+  | Lns(_,l) -> Some l
+  | _ -> None
 
 let get_q v = match v with
   | Can(_,q) -> q
