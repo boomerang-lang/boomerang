@@ -835,7 +835,29 @@ and check_exp ?(in_let=false) sev e0 =
         (e0_sort,new_e0)
 
     | ECast(i,f,t,b,e) -> 
-        static_error i (fun () -> msg "@[unexpected@ cast@ expression@ in@ source@ term@]")
+      static_error i (fun () -> msg "@[unexpected@ cast@ expression@ in@ source@ term@]")
+
+    | ESynth(i,e1,e2,exs) ->
+      let check_and_coerce_regexp e =
+        let (e_sort,e) = check_exp sev e in
+        let i = info_of_exp e in
+        if not (compatible e_sort SRegexp) then 
+            static_error i
+	            (fun () ->                    
+                 msg "@[in@ synth:@ expected@ %s@ but@ found@ %s@]"
+                   (string_of_sort SRegexp)
+                   (string_of_sort e_sort))
+        else
+          mk_coercion
+            "synth argument"
+            i
+            e_sort
+            SRegexp
+            e
+      in
+      let e1 = check_and_coerce_regexp e1 in
+      let e2 = check_and_coerce_regexp e2 in
+      (SLens,ESynth(i,e1,e2,exs))
 
     | EGrammar(i,ps) ->
         (* helpers for constructing asts *)

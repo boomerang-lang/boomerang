@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(executable
+ ((name synth_unittests)
+  (modules (synth_unittests ounit_general_extensions ounit_extensions))
+  (libraries (ounit stdlib))))
+
+(alias
+ ((name    runtest)
+  (deps    (synth_unittests.exe))
+  (action  (run ${^}))))

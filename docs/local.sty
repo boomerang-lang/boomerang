@@ -1,0 +1,253 @@
+\newcommand{\LENSSECTIONnott}[1]{\paragraph*{\fbox{#1}}}
+\newcommand{\LENSSECTION}[1]{\LENSSECTIONnott{\tt #1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lens Symbols
+
+\newcommand{\ql}{q-lens}
+\newcommand{\qls}{q-lenses}
+\newcommand{\qdl}{qd-lens}
+\newcommand{\qdls}{qd-lenses}
+
+\newcommand{\Ql}{Q-lens}
+\newcommand{\Qls}{Q-lenses}
+
+\renewcommand{\l}[1]{\mbox{\it #1}}
+\newcommand{\law}[1]{\mbox{\sc #1}}
+
+\newcommand{\regexps}{{\cal R}}
+\newcommand{\equivclass}[1]{{\cal C}l(#1)}
+
+\newcommand{\QUOTIENT}[2]{\ensuremath{#1/#2}}
+
+% arrows
+\newcommand{\somekindalens}[3]{#1\stackrel{#2}{\Longleftrightarrow} #3}
+\newcommand{\classiclens}[2]{#1 \Longleftrightarrow #2}
+\newcommand{\qlens}[4]{\somekindalens{\QUOTIENT{#1}{#2}}{}{\QUOTIENT{#3}{#4}}}
+\newcommand{\QLENS}[4]{\somekindalens{\QUOTIENT{#1}{#2}\ }{}{\ \QUOTIENT{#3}{#4}}}
+\newcommand{\dlens}[4]{\somekindalens{#1}{{#2}, {#3}}{#4}}
+\newcommand{\qdlens}[6]{\somekindalens{\QUOTIENT{#1}{#2}}{{#3}, {#4}}{\QUOTIENT{#5}{#6}}}
+
+\newcommand{\canonizer}[3]{%
+#1~
+\begin{tikzpicture}[scale=.11]
+\path[use as bounding box] (0,.8) rectangle (5.5,-.8);
+\draw[<->] (0,0) -- (5.5,0);
+% \filldraw 
+\draw 
+   (2.35,0) -- (2.35,.8) -- (3.15,.4) -- (3.15,-.4) -- (2.35,-.8) -- (2.35,0);
+\end{tikzpicture}
+~\QUOTIENT{#2}{#3}}
+
+% components
+\newcommand{\lenscomponent}[1]{\mbox{\em #1}}
+\newcommand{\GET}{\lenscomponent{get}}
+\newcommand{\PUT}{\lenscomponent{put}}
+\newcommand{\CREATE}{\lenscomponent{create}}
+\newcommand{\PARSE}{\lenscomponent{parse}}
+\newcommand{\KEY}{\lenscomponent{key}}
+\newcommand{\dicttype}[1]{D(#1)}
+\newcommand{\dappend}{\mathbin{\scriptstyle +\!+}}
+\newcommand{\makelens}[1]{\overline{#1}}
+
+% equivalence symbols
+\newcommand{\EQUIV}{\lenscomponent{$\sim$}}
+\newcommand{\EQUIVO}[1]{\EQUIV_{#1}}
+\newcommand{\EQUIVC}{\EQUIVO{C}}
+\newcommand{\EQUIVA}{\EQUIVO{A}}
+\newcommand{\EQUIVB}{\EQUIVO{B}}
+\newcommand{\EQUIVR}{\EQUIVO{R}}
+\newcommand{\EQUIVS}{\EQUIVO{S}}
+
+% q-lens symbols
+\newcommand{\uniqueconcat}[2]{{#1} \concat^{!} {#2}}
+\newcommand{\uniqueiter}[1]{{#1}^{!}\kleenestar}
+
+% q-lens names 
+\newcommand{\LIFT}{\ensuremath{\mathit{lift}}}
+\newcommand{\MKCANONIZER}{\ensuremath{\mathit{canonizer}}}
+\newcommand{\CANONIZE}{\ensuremath{\mathit{canonize}}}
+\newcommand{\CHOOSE}{\ensuremath{\mathit{choose}}}
+\newcommand{\choosemem}[1]{\ensuremath{\mathit{rep}(#1)}}
+\newcommand{\COPY}{\ensuremath{\mathit{copy}}}
+\newcommand{\RQUOT}{\ensuremath{\mathit{rquot}}}
+\newcommand{\LQUOT}{\ensuremath{\mathit{lquot}}}
+\newcommand{\DUP}{\ensuremath{\mathit{dup}}}
+\newcommand{\SWAP}{\ensuremath{\mathit{swap}}}
+\newcommand{\PERMUTE}{\ensuremath{\mathit{permute}}}
+\newcommand{\swapwith}{\ensuremath{\leftrightarrow}}
+\newcommand{\IDENTITY}{\ensuremath{\mathsf{Id}}}
+\newcommand{\TOTAL}[1]{\ensuremath{\mathsf{Tot}(#1)}}
+\newcommand{\TRCLOSE}[1]{\ensuremath{\mathsf{TransClosure}(#1)}}
+
+\newcommand{\CClass}[1]{\ensuremath{\mtt{[} #1 \mtt{]}}}
+\newcommand{\SLit}[1]{\ensuremath{\mtt{"} #1 \mtt{"}}}
+
+% other systems
+\newcommand{\XSugar}{\textrm{XSugar}}
+\newcommand{\XSProdA}[2]{\ensuremath{#1 &\mtt{=}& #2}}
+\newcommand{\XSProd}[2]{\ensuremath{#1 \;\mtt{=}\; #2}}
+\newcommand{\XSLit}[1]{\ensuremath{\mtt{"} #1 \mtt{"}}}
+\newcommand{\XSVar}[2]{\ensuremath{\mtt{[}#1\ #2\mtt{]}}}
+\newcommand{\XSReg}[1]{\ensuremath{\mtt{[}#1\mtt{]}}}
+\newcommand{\XSWsp}{\ensuremath{\mtt{\_\_}}}
+\newcommand{\XSWs}{\ensuremath{\mtt{\_}}}
+\newcommand{\XSElt}[3]{\ensuremath{\mtt{<}#1 #2\mtt{>}#3\mtt{</>}}}
+\newcommand{\XSAttr}[2]{\ensuremath{#1 \mtt{=} #2}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Math Mode Stuff
+
+\renewcommand{\iff}{\ensuremath{\mathrm{iff}}}
+\renewcommand{\implies}{\ensuremath{\mathrm{implies}}}
+
+\renewcommand{\-}{\ensuremath{\vdash}}
+\newcommand{\defeq}{\triangleq}
+\newcommand{\denot}[1]{[\![#1]\!]}
+\newcommand{\rdenot}[1]{(\!|#1|\!)}
+\newcommand{\dom}[1]{\mathit{dom}(#1)}
+\newcommand{\ran}[1]{\mathit{ran}(#1)}
+
+\newcommand{\arrow}{\longrightarrow}
+\newcommand{\defined}{\downarrow}
+% \newcommand{\undefined}{\uparrow}
+
+\newcommand{\IN}{\;\;\in\;\;}
+\newcommand{\BNFALT}{\;\;|\;\;}
+
+% operators 
+\newcommand{\union}{\mathrel{|}}
+\newcommand{\concat}{\mathord{\cdot}}
+\newcommand{\cons}{\mathbin{::}}
+\newcommand{\rawkleenestar}{\ensuremath{\ast}}
+\newcommand{\kleenestar}{\ensuremath{{}^{\ast}}}
+\newcommand{\kleeneplus}{\ensuremath{{}^{+}}}
+\newcommand{\compose}{\mathbin{;}}
+\newcommand{\swap}{\mathbin{\tilde}}
+
+% dots 
+\renewcommand{\cdots}{\!\cdot\!\cdot\!\cdot\!}
+\renewcommand{\dots}{. \,\! . \,\! .}
+
+% inference axioms / rules
+\newcommand{\infaxplain}[1]{#1}
+\newcommand{\infruleplain}[2]{\genfrac{}{}{}{0}{#1}{#2}}
+
+% case environments 
+\newenvironment{CASES}{
+  \left \{
+  \begin{array}{@{}ll@{}}
+}{
+  \end{array}
+  \right .
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TeX Stuff
+\newcommand{\SMALLSECTIONHEADER}[1]{%
+\iffull \subsection*{#1} \else \medskip \noindent {\bf #1} \quad\fi\ignorespaces }
+
+\newcommand{\SHOWCOMMENT}[1]{\ifdraft {$\blacksquare$\em [#1]} \fi}
+\newcommand{\bcp}[1]{\SHOWCOMMENT{BCP: #1}}
+\newcommand{\jnf}[1]{\SHOWCOMMENT{JNF: #1}}
+\newcommand{\orphaned}[1]{\SHOWCOMMENT{ORPHANED: #1}}
+\newcommand{\ap}[1]{\SHOWCOMMENT{AP: #1}}
+\newcommand{\finish}[1]{\SHOWCOMMENT{#1}}
+\newcommand{\FINISH}[1]{\SHOWCOMMENT{#1}}
+\newcommand{\finishlater}[1]{\iffull \finish{#1} \fi}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lens Definitions and Proofs
+
+\gdef\yes{Y}
+\newcommand{\lensdefn}[3][N]{
+\def\squeeze{#1}
+
+  \begin{center}
+  \fbox{$
+    \begin{array}{@{}c@{}}
+      #2 \\
+      \begin{array}{@{}l@{\;}l@{\;}l@{}}
+      #3
+      \end{array}
+    \end{array} $}
+  \end{center}
+}
+\newcommand{\lenstypedefn}[2][N]{
+\def\squeeze{#1}
+
+  \begin{center}
+  \fbox{$
+    \begin{array}{@{}c@{}}
+      #2 \\
+    \end{array} $}
+  \end{center}
+}
+
+\newcommand{\pfcase}[1]{$\blacktriangleright$ \textbf{#1}:}
+
+\newcommand{\qlensproofs}[9][N]{
+\iffull
+\def\noparens{#1}
+\ifx\noparens\yes
+  \gdef\llname{#2}
+\else
+  \gdef\llname{(#2)}
+\fi
+\gdef\llget{\llname.\GET}
+\gdef\llput{\llname.\PUT}
+\gdef\llcreate{\llname.\CREATE}
+\gdef\llparse{\llname.\PARSE}
+\gdef\lltype{#3}
+\begin{lemma}
+$#2 \in \lltype$.
+\end{lemma}
+\begin{proof}
+    \ \\
+
+    \noindent {\pfcase{GetEquiv}} #4
+    
+    \smallskip  
+
+    \noindent {\pfcase{PutEquiv}} #5
+    
+    \smallskip  
+
+    \noindent {\pfcase{CreatEquiv}} #6
+    
+    \smallskip  
+    
+    \noindent {\pfcase{GetPut}} #7
+    
+    \smallskip  
+    
+    \noindent {\pfcase{PutGet}} #8
+
+    \smallskip  
+    
+    \noindent {\pfcase{CreateGet}} #9 
+
+    \smallskip  
+\end{proof}\fi
+}
+
+\newcommand{\canonizerproofs}[4][N]{
+\iffull
+\def\noparens{#1}
+\ifx\noparens\yes
+  \gdef\llname{#2}
+\else
+  \gdef\llname{(#2)}
+\fi
+\gdef\llcanonize{\llname.\CANONIZE}
+\gdef\llchoose{\llname.\CHOOSE}
+\gdef\lltype{#3}
+\begin{lemma}
+$#2 \in \lltype$.
+\end{lemma}
+\begin{proof}
+#4
+\end{proof}\fi
+}
+

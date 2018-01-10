@@ -106,6 +106,9 @@ and exp =
     | EString  of Info.t * string
     | ECSet    of Info.t * bool * (char * char) list 
 
+    (* synthesis of lenses *)
+    | ESynth   of Info.t * exp * exp * exp list
+
     (* booleans with counter examples *)
     (* None ~ true; Some s ~ false with counterexample s *)
     | EBoolean of Info.t * exp option 
@@ -197,6 +200,7 @@ let rec info_of_exp e = match e with
   | EChar    (i,_)       -> i 
   | EString  (i,_)       -> i
   | ECSet    (i,_,_)     -> i
+  | ESynth   (i,_,_,_)   -> i
   | EGrammar (i,_)       -> i
 
 let info_of_rule = function
@@ -341,3 +345,6 @@ let mk_set i e1 e2 =
 
 let mk_rx i e = 
   mk_app i (mk_core_var i "str") e
+
+let mk_synth i e1 e2 exs =
+  ESynth(i,e1,e2,exs)

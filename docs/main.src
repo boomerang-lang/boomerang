@@ -1,0 +1,667 @@
+#{@}
+
+\newif\ifdraft\draftfalse
+\newif\ifhyperref\hyperreftrue
+
+% For temporary control of tex'ing, put commands like \draftfalse
+% in a file called texdirectives.tex, which we read at this point (if
+% it exists).  
+#> \makeatletter \@input{texdirectives.tex} \makeatother
+
+\documentclass[12pt]{report}
+
+\ifhyperref
+  \usepackage[pdftex, bookmarksopen=true, pdfpagemode=None,
+              bookmarks=true, bookmarksnum bered=true, colorlinks=true,
+              linkcolor={blue}, citecolor={black}]{hyperref}
+  \hypersetup{}
+\fi
+
+\usepackage{tikz}
+\usetikzlibrary{shapes,snakes}
+\usepackage{palatino}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{natbib}
+\usepackage{src2tex}
+\usepackage{fullpage}
+\usepackage{syntax}
+\usepackage{bcprules}
+\usepackage{local}
+
+\theoremstyle{definition}
+\newtheorem{example}{Example}
+
+\begin{document}
+
+\title{%
+\tikz[line width=1bp]\node[scale=.75]{\pgfimage{pdf/boomerang-logo}};\\[5ex]
+}
+
+\author{\Large J. Nathan Foster and Benjamin C. Pierce\\[3ex]
+\large with \\[3ex]
+%
+\large Davi Barbosa, Aaron Bohannon, Julien Cretin, Michael Greenberg,\\[1ex]
+\large Alan Schmitt, Adam Magee, Alexandre Pilkiewicz, and Daniel Puller\\[5ex]
+}
+\date{\LARGE \ifdraft {\bf Draft of} \fi  \today}
+
+\maketitle
+
+\thispagestyle{empty}
+
+\section*{Mailing List}
+
+Active users of Boomerang are encouraged to subscribe to the @harmony-hackers@
+mailing list by visiting the following URL:
+\begin{quote}
+@http://lists.seas.upenn.edu/mailman/listinfo/harmony-hackers@
+\end{quote}
+
+\bigskip
+\bigskip
+
+\section*{Caveats}
+
+The Boomerang system is a work in progress.  We are distributing it in
+hopes that others may find it useful or interesting, but it has some
+significant shortcomings that we know about (and, surely, some that we
+don't) plus a multitude of minor ones.  In particular, the
+documentation and user interface are... minimal.  Also, the Boomerang
+implementation has not been carefully optimized.  It's fast enough to
+run medium-sized (thousands of lines) programs on small to
+medium-sized (kilobytes to tens of kilobytes) inputs, but it's not up
+to industrial use.
+
+\bigskip
+\bigskip
+
+\section*{Copying}
+
+Boomerang is free software; you may redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published
+by the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.  See the file COPYING in the
+source distribution for more information.
+
+\bigskip
+\bigskip
+
+\section*{Contributing}
+
+Contributions to Boomerang---especially in the form of interesting or
+useful lenses---are very welcome.  By sending us your code for
+inclusion in Boomerang, you are signalling your agreement with the
+license described above.
+
+\tableofcontents{}
+
+\chapter{Introduction}
+
+This manual describes Boomerang, a {\em bidirectional programming
+  language} for ad-hoc, textual data formats. Most programs compute in
+a single direction, from input to output. But sometimes it is useful
+to take a modified {\em output} and ``compute backwards'' to obtain a
+correspondingly modified {\em input}.  For example, if we have a
+transformation mapping a simple XML database format describing
+classical composers...
+\begin{progeg}
+  <composers>
+    <composer>
+      <name>Jean Sibelius</name>
+      <years birth="1865" death="1956"/> 
+      <nationality>Finnish</nationality>
+    </composer>
+  </composers>
+\end{progeg}
+... to comma-separated lines of ASCII...
+\begin{progeg}
+  Jean Sibelius, 1865-1956
+\end{progeg}
+% 
+... we may want to be able to edit the ASCII output (e.g., to correct
+the erroneous death date above) and push the change back into the
+original XML. The need for {\em bidirectional transformations} like
+this one arises in many areas of computing, including in data
+converters and synchronizers, parsers and pretty printers, marshallers
+and unmarshallers, structure editors, graphical user interfaces,
+software model transformations, system configuration management tools,
+schema evolution, and databases.
+
+\begin{figure}\SHOWCOMMENT{change the notation of the image (concrete and abstract to source and view)}
+  \begin{center}
+\tikz[line width=1bp]\node[scale=.5]{\pgfimage{pdf/arch-basic}};
+\end{center}
+\caption{Lens Terminology}\label{fig:viewupdateterminology}
+\end{figure}
+
+\section{Lenses}
+Of course, we are not interested in just any transformations that map
+back and forth between data---we want the two directions of the
+transformation to work together in some reasonable way. Boomerang
+programs describe a certain class of well-behaved bidirectional
+transformations that we call \emph{lenses}. Mathematically, a lens $l$
+mapping between a set $S$ of ``source'' strings and a set $V$ of
+``view'' ones has three components:
+%
+\[
+#>\begin{array}{r@{\ \;}c@{\ \;}l}
+l.\GET &\in& S \arrow V\\
+l.\PUT &\in& V \arrow S \arrow S\\
+l.\CREATE &\in& V \arrow S\\
+\end{array}
+\]
+%
+$\GET$ is the forward transformation and is a total function from $S$
+to $V$.  The backwards transformation comes in two flavors. The first,
+$\PUT$, takes two arguments, a modified $V$ and an old $S$, and
+produces an updated $S$.  The second, $\CREATE$, handles the special
+case where we need to compute a $S$ from an $V$ but have no $S$ to use
+as the ``old value''. It fills in any information in $S$ that was
+discarded by the $\GET$ function (such as the nationality of each
+composer in the example above) with defaults. The components of a lens
+are shown graphically in Figure~\ref{fig:viewupdateterminology}.
+
+We say that are ``well-behaved'' because they obey the following
+``round-tripping'' laws for every $s \in S$ and $v \in V$:
+%
+\label{basiclaws}
+\infax[GetPut]{
+  l.\PUT\; (l.\GET \; s)\; s = s
+}
+\infax[PutGet]{
+  l.\GET\; (l.\PUT \; v \; s) = v
+}
+\infax[CreateGet]{
+  l.\GET\; (l.\CREATE \; v) = v
+}
+%
+The first law requires that if $\PUT$ is invoked with an view
+string that is identical to the string obtained by applying $\GET$ to
+the old source string---i.e., if the edit to the view string is
+a no-op---then it must produce the same source string.  The second
+and third laws state that $\PUT$ and $\CREATE$ must propagate all of
+the information in their $V$ arguments to the $S$ they produce. These
+laws capture fundamental expectations about how the components of a
+lens should work together.
+
+\section{Boomerang Overview}
+Boomerang is a language for writing lenses that work on strings. The
+key pieces of its design can be summarized as follows.
+\begin{itemize}
+\item The core of the language is a set of {\em string lens
+    combinators}---primitive lenses that copying and delete strings,
+  and ones that combine lenses using the familiar ``regular
+  operators'' of union, concatenation, and Kleene-star. This core set
+  of operators has a simple and intuitive semantics and is capable of
+  expressing many useful transformations.
+
+\item Of course, programming with low-level combinators alone would be
+  tedious and repetitive; we don't do this. The core combinators are
+  embedded in a full-blown functional language with all of the usual
+  features: let definitions, first-class functions, user-defined
+  datatypes, polymorphism, modules, etc. This infrastructure can be
+  used to abstract out common patterns and to build generic
+  bidirectional libraries. We have found that they make high-level
+  lens programming quite convenient.
+
+\SHOWCOMMENT {review this}
+\item To correctly handle ordered data structures, many applications
+  require that lenses match up corresponding pieces of the source and
+  the view. Boomerang allows the programmer to describe these pieces
+  (called ``chunks'') and how the they are aligned, choosing a method
+  and defining the parameters for this method (such as ``weights'' and
+  ``threshold''). \SHOWCOMMENT{We call lenses that use these features
+  \emph{resourceful lenses}.}
+
+\item Finally, in many applications, is often useful to be able to
+  break the lens laws. For example, when we process XML data in
+  Boomerang, we usually don't care whether the whitespace around
+  elements is preserved. Boomerang includes combinators for
+  ``quotienting'' lenses using ``canonizers'' that explicitly discard
+  such inessential features. We call lenses that use these features
+  \emph{quotient lenses}. 
+\end{itemize}
+
+\section{An Example Lens}
+
+To give a sense of what programming in Boomerang is like, we will
+define the lens implementing the transformations between XML and CSV
+composers shown above.
+
+First we define a lens @c@ that handles a single @<composer>@
+element. It uses a number of functions defined in our XML library, as
+well as primitives for copying (@copy@) and deleting (@del@) strings,
+and for concatenating lenses (@.@).
+
+## module Main = 
+#* let c : lens = 
+#*   Xml.elt NL2 "composer"
+#*     begin
+#*       Xml.simple_elt NL4 "name" 
+#*         (copy [A-Za-z ]+ . ins ", ") .  
+#*       Xml.attr2_elt_no_kids NL4 "years" 
+#*         "birth" (copy NUMBER . ins "-")
+#*         "death" (copy NUMBER) . 
+#*       Xml.simple_elt NL4 "nationality" (del [A-Za-z]+)
+#*    end 
+
+Using @c@, we then define a lens that handles a top-level
+@<composers>@ element, enclosing a list of @<composer>@. This lens is
+defined using the features already described, a primitive for
+inserting a string (@ins@), as well as union (@|@) and Kleene star
+(@*@).
+
+#* let cs : lens = 
+#*   Xml.elt NL0 "composers" 
+#*     begin 
+#*       copy EPSILON | 
+#*       c . (ins newline . c)* 
+#*     end
+
+We can check that this lens actually does the transformation we want
+by running its $\GET$ and $\PUT$ components on some sample data.
+First, let us bind the XML database to a variable (to avoid printing
+it many times). The @<< ... >>@ is heredoc notation for a multi-line
+string literal.
+
+#* let original_c : string = 
+#* <<
+#*   <composers>
+#*     <composer>
+#*       <name>Jean Sibelius</name>
+#*       <years birth="1865" death="1956"/> 
+#*       <nationality>Finnish</nationality>
+#*     </composer>
+#*   </composers>
+#* >> 
+
+\noindent Now we test the $\GET$ function...
+
+#* test cs.get original_c = 
+#* <<
+#*   Jean Sibelius, 1865-1956
+#* >>
+
+\noindent ...and obtain the expected result. To check the $\PUT$
+function, let us fix the error in Sibelius's death date, and $\PUT$ it
+back into the original XML database...
+
+#* test cs.put
+#* <<
+#* Jean Sibelius, 1865-1957
+#* >>
+#* into original_c
+#* = 
+#* <<
+#*   
+#*   <composers>
+#*     <composer>
+#*       <name>Jean Sibelius</name>
+#*       <years birth="1865" death="1957"/>
+#*       <nationality>Finnish</nationality>
+#*     </composer>
+#*   </composers>
+#* >>
+
+\noindent ... again, we obtain the expected result: the new XML
+database reflects the change to the death date we made in the CSV
+string.
+
+\section{Getting Started}
+
+The best way to get going with Boomerang, is by working through the
+next ``Quick Start'' chapter. It contains a lightning tour of some of
+the main features of Boomerang the language and the system.  A second
+step could be the section~\ref{sec:alignment}, which explains in
+details the alignment in Boomerang. After that, we suggest exploring
+examples (see chapter~\ref{chap:examples}), and consulting the rest of
+this manual as needed. The chapter~\ref{chap:system} shows how to run
+Boomerang, how to create your own Boomerang program and how to run a
+Boomerang program. Many more details can be found in our research
+papers on Boomerang (\cite{Boomerang07,QuotientLenses08}) and on
+lenses in general (\citet{Focal2005,BohannonPierceVaughanTR}), but
+take into account that some theorical changes have been made since
+these papers were published. These papers are all available from the
+Boomerang web page.
+
+Good luck and have fun!
+
+\chapter{Quick Start}\label{chap:quickstart}
+
+\input{QuickStart}
+
+\input{alignment}
+
+\chapter{The Boomerang Language}
+
+The Boomerang language provides convenient concrete syntax for writing
+lenses (and strings, regular expressions, canonizers, etc.). The
+concrete syntax is based on an explicitly-typed core fragment of
+OCaml. It includes user-defined datatypes and functions, modules, unit
+tests, and special syntax for constructing regular expressions and for
+accessing the components of lenses.
+
+\input{blexer}
+\input{bparser}
+
+\section{Coercions}
+
+Some coercions are automatically inserted by the type checker on
+programs that use subtyping. These coercions are
+
+\begin{itemize}
+\item @string@ to @regexp@ (can be made manually using @str@)
+\item @regexp@ to @aregexp@ (can be made manually using @rxlift@)
+\item @regexp@ to @lens@ (can be made manually using @copy@)
+\end{itemize}
+
+\section{Operators}
+
+To make it simple to write lenses and understand them, Boomerang has
+some operators that desugars into functions defined in Boomerang
+libraries.
+
+In the table~\ref{tab:postfix}, the notation @[type]@
+should be replaced by the type of @expr@, for example, @[a-z]?@
+desugars to @regexp_iter [a-z] 0 1@.
+
+\begin{table}[hb]
+\centering
+\begin{tabular}{cll}
+operator & applied to & resolves to \\\hline
+ @=@    & anything (polymorphic) & @equals{type}@ \\
+ @gt@   & @int@ & @bgt@ \\
+ @lt@   & @int@ & @blt@ \\
+ @geq@  & @int@ & @bgeq@\\
+ @leq@  & @int@ & @bleq@\\
+ @&&@   & @bool@ & @land@\\
+ @||@   & @bool@ & @lor@ \\
+ @||@   & @lens@ & @union@\\
+ @|@    & @regexp@ & @union@\\
+ @|@    & @lens@ & @disjoint_union@\\
+ @&@    & @regexp@ & @inter@\\
+ @-@    & @regexp@ & @diff@\\
+ @-@    & @int@ & @minus@\\
+ @.@    & @string@ & @string_concat@\\
+ @.@    & @regexp@ & @regexp_concat@\\
+ @.@    & @aregexp@ & @aregexp_concat@\\
+ @.@    & @lens@ & @lens_concat@\\
+ @.@    & @canonizer@ & @canonizer_concat@\\
+ @~@    & @lens@ & @lens_swap@\\
+ @<->@  & @lens@ & @set@\\
+ @<=>@  & @lens@ & @rewrite@\\
+\end{tabular}
+\caption{Infix operators}
+\end{table}
+
+\begin{table}[hb]
+\centering
+\begin{tabular}{lll}
+operator & applied to & resolves to \\\hline
+@expr+@        & @regexp@, @aregexp@, @canonizer@ & @[type]_iter expr 1 (-1)@\\
+@expr+@        & @lens@      & @lens_plus@\\
+@expr*@        & @regexp@, @aregexp@, @canonizer@ & @[type]_iter expr 0 (-1)@\\
+@expr*@        & @lens@      & @lens_star@\\
+@expr?@        & @regexp@, @aregexp@, @canonizer@ & @[type]_iter expr 0 1@\\
+@expr?@        & @lens@      & @lens_option@\\
+@expr{n,m}@    & @regexp@, @aregexp@, @lens@, @canonizer@ & @[type]_iter expr n m@\\
+@expr{n,}@     & @regexp@, @aregexp@, @lens@, @canonizer@ & @[type]_iter expr n (-1)@\\
+\end{tabular}
+\caption{Postfix operators}
+\label{tab:postfix}
+\end{table}
+
+\begin{table}[hb]
+\centering
+\begin{tabular}{lll}
+notation     & resolves to \\\hline
+@lens.bij@           & @bij@\\
+@lens.get@           & @get@\\
+@lens.put@           & @put@\\ % actually this is "lens.put v into s" -> "put l v s"
+@lens.create@        & @create@\\
+@lens.stype@         & @stype@\\
+@lens.domain_type@   & @stype@\\
+@lens.astype@        & @astype@\\
+@lens.vtype@         & @vtype@\\
+@lens.codomain_type@ & @vtype@\\
+@lens.avtype@        & @avtype@\\
+\end{tabular}
+\caption{Lens record-style projection notation}
+\end{table}
+
+\begin{table}[hb]
+\centering
+\begin{tabular}{lll}
+notation & desugars to \\\hline
+@<aregexp>@           & @aregexp_match (greedy 0 "")@ \SHOWCOMMENT{Check this!}\\
+@<lens>@              & @lens_match (greedy 0 "")@\\
+@<tag:aregexp>@       & @aregexp_match@\\
+@<tag:lens>@          & @lens_match@\\
+@lens in S <-> V@     & @in_lens_type@\\
+@lens in S <=> V@     & @in_bij_lens_type@\\
+\end{tabular}
+\caption{Other notations}
+\end{table}
+
+\chapter{The Boomerang Libraries}
+
+The Boomerang system includes an assortment of useful primitive
+lenses, regular expressions, canonizers, as well as derived forms. All
+these are described in this chapter, grouped by module.
+
+In most cases, the easiest way to understand what a lens does is to
+see it in action on examples; most lens descriptions therefore include
+several unit tests, using the notation explained in
+Section~\ref{sec:unittests}.
+
+More thorough descriptions of most of the primitive lenses can be
+found in our technical papers~\cite{Boomerang07,QuotientLenses08}.  The
+long versions of those papers include proofs that all of our
+primititives are ``well behaved,''. However, for getting up to speed
+with Boomerang programming, the shorter (conference) versions should
+suffice.
+
+\input{core}
+\input{prelude}
+\input{list}
+\input{sort}
+\input{prefs}
+\input{sys}
+
+
+\chapter{The Boomerang System}
+\label{chap:system}
+
+\section{Running Boomerang}\label{sec:cmdlineargs}
+
+All of the interactions with Boomerang we have seen so far have gone
+via unit tests. This works well for interactive lens development, but
+is less useful for batch processing of files. Boomerang can also be
+involved from the command line:
+
+\begin{progeg}
+Usage:
+    boomerang [get] l S          [options]     : get
+ or boomerang [put] l V S        [options]     : put
+ or boomerang create l V         [options]     : create
+ or boomerang M.boom [N.boom...] [options]     : run unit tests for M, N, ...
+\end{progeg}
+
+To try this out, create a file @comps-conc.txt@ containing the
+following lines:
+\begin{progeg}
+  Jean Sibelius, 1865-1957, Finnish
+  Aaron Copland, 1910-1990, American
+  Benjamin Britten, 1913-1976, English
+\end{progeg}
+\noindent and run the command
+\begin{progeg}
+boomerang get QuickStart.comps comps-conc.txt
+\end{progeg}
+\noindent You should see 
+\begin{progeg}
+Jean Sibelius, Finnish
+Aaron Copland, American
+Benjamin Britten, English
+\end{progeg} 
+\noindent written to the terminal. 
+
+Now let's do the same thing, but save the results to a file:
+\begin{progeg}
+boomerang get QuickStart.comps_cmdline comps-conc.txt -o comps-abs.txt
+\end{progeg}
+\noindent Next let's edit the abstract file to 
+\begin{progeg}
+Jean Sibelius, Finnish
+Benjamin Britten, English
+Alexandre Tansman, Polish
+\end{progeg}
+\noindent and $\PUT$ the results back:
+\begin{progeg}
+boomerang put QuickStart.comps_cmdline comps-abs.txt comps-conc.txt
+\end{progeg}
+\noindent You should see
+\begin{progeg}
+Jean Sibelius, 1865-1957, Finnish
+Benjamin Britten, 1913-1976, English
+Alexandre Tansman, 0000-0000, Polish
+\end{progeg}
+\noindent printed to the terminal. 
+
+\section{Running a Boomerang program}
+
+When Boomerang is called with another name, Boomerang run the module
+with this name passing all command line arguments to the
+module. Boomerang still interpret all arguments that are not
+interpreted by the module.
+
+The @examples/address.boom@ is a complete Boomerang program. It does
+transformations between VCard, XCard and CSV files. To run it, you
+need to create a link to Boomerang with the name @address@:
+\begin{progeg}
+> ln -s /path/to/trunk/bin/boomerang address
+\end{progeg}
+
+If you run @address@ now Boomerang will call the Address module. To
+try this out, create a file @contacts.csv@ containing the following
+lines:
+\begin{progeg}
+Doe, John, hello world (note), 792-8134 (h), 732-4684 (h)
+\end{progeg}
+\noindent and run the command
+\begin{progeg}
+./address get contacts.csv xml
+\end{progeg}
+\noindent You should see 
+\begin{progeg}
+<xcard>
+  <vcard>
+    <n>
+      <family>Doe</family>
+      <given>John</given>
+    </n>
+    <note>hello world</note>
+    <tel-home>792-8134</tel-home>
+    <tel-home>732-4684</tel-home>
+  </vcard>
+</xcard>
+\end{progeg} 
+\noindent written to the terminal. As address is not only one lens between
+two types, we need to specify to which format we are converting (the
+\emph{xml} in our previous example). For example, to transform the csv
+into a vcard you should run
+\begin{progeg}
+./address get contacts.csv vcf
+\end{progeg}
+
+The $\PUT$ is similar, but both arguments are a file and first
+is as the updated view and the second is the old source. To try
+this out, create a file @updated.xml@ containing the following lines:
+\begin{progeg}
+<xcard>
+  <vcard>
+    <n><family>Doe</family><given>Sally</given></n>
+    <tel-home>792-8134</tel-home>
+    <tel-home>732-4684</tel-home>
+  </vcard>
+  <vcard>
+    <n>
+      <family>Doe</family>
+      <given>John</given>
+    </n>
+    <note>updated</note>
+    <tel-home>792-8134</tel-home>
+  </vcard>
+</xcard>
+\end{progeg}
+\noindent and run the command
+\begin{progeg}
+./address put updated.xml contacts.csv
+\end{progeg}
+\noindent You should see 
+\begin{progeg}
+Doe, Sally, 792-8134 (h), 732-4684 (h)
+Doe, John, updated (note), 792-8134 (h)
+\end{progeg} 
+
+\section{Creating a Boomerang program}
+
+All you need to create a Boomerang program, in addition to write a
+lens, is to write a @main@ function that takes @unit@ and returns @unit@
+or @int@. In the second case, the return of @main@ is the return code of
+the program.
+
+Boomerang programas receive command line arguments using the @Prefs@
+library. The @bibtex.boom@ example can be a good start to see how to
+write a Boomerang program, just look at the main function at the end of
+the file.
+
+If you need to do more than just use anonymous arguments, see the
+@Prefs@ library and the @conflin.boom@ example.
+
+\section{Navigating the Distribution}
+
+If you want to check out the code, here is one reasonable order to
+look at the files:
+
+\medskip
+
+\begin{tabular}{ll}
+@src/lenses/core.boom@              & core lenses\\
+@src/lenses/prelude.boom@           & important derived lenses\\
+@src/blenses.ml@                    & native definitions of lenses and canonizers \\
+@src/bcompiler.ml@                  & the Boomerang interpreter\\
+@src/balign.ml@                     & the alignment functions\\
+%@src/sync.ml@                       & a synchronization algorithm\\
+@src/toplevel.ml@                   & the top-level program\\
+\end{tabular}
+
+\chapter{Case Studies}
+\label{chap:examples}
+
+{\it Under construction.  For now, see the demos in the @examples@
+  directory.}
+
+In the @examples@ directory, you can find some of the other
+Boomerang programs we have written:
+
+\begin{itemize}
+\item @demo.boom@: A simple demo, similar to composers lens.
+\item @addresses.boom@ : VCard, CSV, and XML-formatted address books.
+\item @bibtex.boom@: BiBTeX and RIS-formatted bibliographies.
+\item @uniProtV2.boom@: UniProtKB / SwissProt lens.
+\item @conflin.boom@: Management tool for multiple versions of a file.
+\item @xsugar/*@: example transformations from the XSugar project.
+\end{itemize}
+
+We will continue adding to this set of examples as we tidy and package
+our code... and we hope you'll write and let us know about the lenses
+you write!
+
+\bibliographystyle{plainnat}
+% Is the bibliography accessible if someone (external to upenn) gets the code from the svn?
+\bibliography{../../writing/papers/harmony,../../writing/papers/onlybcpshouldmodify/bcp}
+
+\end{document}

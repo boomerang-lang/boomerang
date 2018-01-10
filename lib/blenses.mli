@@ -117,4 +117,5 @@ module MLens : sig
   val right_quot : Info.t -> t -> Canonizer.t -> t
   val dup1 : Info.t -> t -> (string -> string) -> Brx.t -> t
   val dup2 : Info.t -> (string -> string) -> Brx.t -> t -> t
+  val to_optician_lens : t -> Optician.Lang.Lens.t option
 end

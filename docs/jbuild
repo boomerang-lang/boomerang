@@ -1,0 +1,79 @@
+(jbuild_version 1)
+
+(rule
+ ((targets (sys.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/sys.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/sys.boom)))))
+
+(rule
+ ((targets (prefs.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/prefs.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/prefs.boom)))))
+
+(rule
+ ((targets (sort.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/sort.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/sort.boom)))))
+
+(rule
+ ((targets (list.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/list.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/list.boom)))))
+
+(rule
+ ((targets (prelude.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/prelude.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/prelude.boom)))))
+
+(rule
+ ((targets (core.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lenses/core.boom))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lenses/core.boom)))))
+
+(rule
+ ((targets (bparser.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lib/bparser.srcy))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lib/bparser.srcy)))))
+
+(rule
+ ((targets (blexer.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/lib/blexer.srcl))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/lib/blexer.srcl)))))
+
+(rule
+ ((targets (alignment.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/examples/alignment.src))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/examples/alignment.src)))))
+
+(rule
+ ((targets (QuickStart.tex))
+  (deps (${ROOT}/tools/src2tex.exe ${ROOT}/QuickStart.src))
+  (action (with-stdout-to ${@} (run ${<} ${ROOT}/QuickStart.src)))))
+
+(rule
+ ((targets (main.tex))
+  (deps (${ROOT}/tools/src2tex.exe main.src))
+  (action (with-stdout-to ${@} (run ${<} main.src)))))
+
+(alias
+ ((name    docs)
+  (deps    (main.tex
+            local.sty
+            main.bbl
+            src2tex.sty
+            syntax.sty
+            bcprules.sty
+            QuickStart.tex
+            alignment.tex
+            blexer.tex
+            bparser.tex
+            core.tex
+            prelude.tex
+            list.tex
+            sort.tex
+            prefs.tex
+            sys.tex
+            pdf/boomerang-logo.pdf
+            pdf/arch-basic.pdf
+  ))
+  (action  (run latexmk -pdf -f ${<}))))
