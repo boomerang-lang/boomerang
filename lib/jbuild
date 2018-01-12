@@ -36,5 +36,5 @@
                    
 (library
   ((name bbase)
-   (libraries (hbase ubase threads str optician))
+   (libraries (hbase ubase threads str stdlib optician))
 ))

@@ -397,170 +397,170 @@ and interp_binding wq cev b0 = match b0 with
 let rec interp_decl wq cev ms d0 = match d0 with
   | DLet(i,b) ->
       interp_binding wq cev b
-  | DType(i,svl,qx,cl) -> 
-      let sx = SData(sl_of_svl svl,qx) in 
-      let mk_univ s = 
-        Safelist.fold_right 
-          (fun svi acc -> SForall(svi,acc)) 
-          svl s in 
-      let mk_impl v = 
-        Safelist.fold_right 
-          (fun _ f -> V.Fun(i,(fun _ v -> f))) 
-          svl v in 
-      let new_cev,xs = 
-        Safelist.fold_left 
-          (fun (cev,xs) (l,so) -> 
-             let ql = Qid.t_of_id l in 
-             let rv = match so with 
-               | None -> 
-                   let s = mk_univ sx in 
-                   let v = mk_impl (V.Vnt(i,qx,l,None)) in 
-                   (G.Sort s,v) 
-               | Some s -> 
-                   let s = mk_univ (SFunction(Id.wild,s,sx)) in 
-                   let f _ v = V.Vnt(V.info_of_t v,qx,l,Some v) in 
-                   let v = mk_impl (V.Fun(i,f)) in 
-                   (G.Sort s,v) in 
-             (CEnv.update cev ql rv,Qid.t_of_id l::xs))
+  | DType(i,svl,qx,cl) ->
+    let sx = SData(sl_of_svl svl,qx) in 
+    let mk_univ s = 
+      Safelist.fold_right 
+        (fun svi acc -> SForall(svi,acc)) 
+        svl s in 
+    let mk_impl v = 
+      Safelist.fold_right 
+        (fun _ f -> V.Fun(i,(fun _ v -> f))) 
+        svl v in 
+    let new_cev,xs = 
+      Safelist.fold_left 
+        (fun (cev,xs) (l,so) -> 
+           let ql = Qid.t_of_id l in 
+           let rv = match so with 
+             | None -> 
+               let s = mk_univ sx in 
+               let v = mk_impl (V.Vnt(i,qx,l,None)) in 
+               (G.Sort s,v) 
+             | Some s -> 
+               let s = mk_univ (SFunction(Id.wild,s,sx)) in 
+               let f _ v = V.Vnt(V.info_of_t v,qx,l,Some v) in 
+               let v = mk_impl (V.Fun(i,f)) in 
+               (G.Sort s,v) in 
+           (CEnv.update cev ql rv,Qid.t_of_id l::xs))
         (cev,[]) cl in 
-      let qcl = Safelist.map (fun (x,so) -> (Qid.t_of_id x,so)) cl in 
-      let new_cev' = CEnv.update_type new_cev svl qx qcl in   
-      (new_cev',xs)
+    let qcl = Safelist.map (fun (x,so) -> (Qid.t_of_id x,so)) cl in 
+    let new_cev' = CEnv.update_type new_cev svl qx qcl in   
+    (new_cev',xs)
 
   | DMod(i,n,ds) ->
-      let m_cev, names = interp_mod_aux wq cev ms ds in
-      let n_cev,names_rev = 
-        Safelist.fold_left
-          (fun (n_cev, names) q ->
-             match CEnv.lookup m_cev q with
-               | Some rv ->
-                   let nq = Qid.id_dot n q in
-                   (CEnv.update n_cev nq rv, nq::names)
-               | None -> 
-                   Berror.run_error i 
-                     (fun () -> msg "@[@ declaration@ for@ %s@ missing@]"
-                        (Qid.string_of_t q)))
-          (cev,[])
-          names in
-        (n_cev, Safelist.rev names_rev)
+    let m_cev, names = interp_mod_aux wq cev ms ds in
+    let n_cev,names_rev = 
+      Safelist.fold_left
+        (fun (n_cev, names) q ->
+           match CEnv.lookup m_cev q with
+           | Some rv ->
+             let nq = Qid.id_dot n q in
+             (CEnv.update n_cev nq rv, nq::names)
+           | None -> 
+             Berror.run_error i 
+               (fun () -> msg "@[@ declaration@ for@ %s@ missing@]"
+                   (Qid.string_of_t q)))
+        (cev,[])
+        names in
+    (n_cev, Safelist.rev names_rev)
 
   | DTest(i,e,tr) ->
-      begin 
-        (* disable parallel checking for [test ... = error] *)
-        let wq = if tr = TestError then None else wq in
-        if check_test ms then 
-          let vo = 
-            try OK(interp_exp wq cev e)
-            with 
-              | (Error.Harmony_error(err)) -> Error err 
-              | exn -> 
-                  if Prefs.read Prefs.unsafePref 
-                  then 
-                    Error (fun () -> 
-                             msg 
-                               "Test result: native exception@\n%s@\n%!" 
-                               (Printexc.to_string exn))
-                  else raise exn in
-          match vo,tr with 
-            | OK (v),TestPrint ->
-                msg "Test result:@ "; 
-                V.format v; 
-                msg "@\n%!"
-            | OK (v),TestSortPrint(Some s) -> 
-                msg "Test result:@ "; 
-                format_sort s;
-                msg "@\n%!"
-            | OK (v),TestSortPrint(None) 
-            | OK (v),TestSortEqual(None,_) -> 
-                Berror.run_error i 
-                  (fun () -> msg "@[unannotated@ unit@ test@]")
-            | Error err, TestPrint 
-            | Error err, TestSortPrint _ -> 
-                test_error i 
-                  (fun () -> 
-                     msg "Test result: error@\n";
-                     err (); 
-                     msg "@\n%!")
-            | Error _, TestError -> ()
-            | OK v1, TestEqual e2 -> 
-                let v2 = interp_exp wq cev e2 in
-                  if not (V.equal v1 v2) then
-                    test_error i 
-                      (fun () ->
-                         msg "@\nExpected@ "; V.format v2;
-                         msg "@ but found@ "; V.format v1; 
-                         msg "@\n%!")
-            | OK v1, TestSortEqual(Some s1,s2) ->
-                let err () = 
-                  test_error i 
-                    (fun () ->
-                       msg "@\nExpected@ a@ value@ with@ sort@ "; 
-                       format_sort s1;
-                       msg "@ but found@ "; V.format v1;
-                       msg "@ : "; format_sort s2;
-                       msg "@\n%!") in 
-                  if not (Bcheck.compatible s1 s2) then err ()
-                  else 
-                    begin
-                      try 
-                        ignore 
-                          ((interp_cast wq cev i s1 s2)
-                             (interp_exp wq cev e))
-                      with Error.Harmony_error(e) -> err ()
-                    end                      
-            | Error err, TestEqual e2 -> 
-                let v2 = interp_exp wq cev e2 in 
-                  test_error i 
-                    (fun () ->
-                       msg "@\nExpected@ "; V.format v2; 
-                       msg "@ but found an error:@ "; 
-                       err (); 
-                       msg "@\n%!")
-            | Error err, TestSortEqual(_,s2) -> 
-                test_error i 
-                  (fun () ->
-                     msg "@\nExpected@ "; format_sort s2;
-                     msg "@ but found an error:@ "; 
-                     err (); 
-                     msg "@\n%!")
-            | OK v, TestError -> 
-                let msgFun = 
-                  (fun () ->
-                     msg "@\nExpected an error@ "; 
-                     msg "@ but found:@ "; 
-                     V.format v; 
-                     msg "@\n%!")  in
-                if Prefs.read Prefs.unsafePref
-                then (msgFun (); msg "@\nMISSING ERROR IGNORED, RUNNING UNSAFELY@\n%!")
-                else test_error i msgFun
-      end;
+    begin 
+      (* disable parallel checking for [test ... = error] *)
+      let wq = if tr = TestError then None else wq in
+      if check_test ms then 
+        let vo = 
+          try OK(interp_exp wq cev e)
+          with 
+          | (Error.Harmony_error(err)) -> Error err 
+          | exn -> 
+            if Prefs.read Prefs.unsafePref 
+            then 
+              Error (fun () -> 
+                  msg 
+                    "Test result: native exception@\n%s@\n%!" 
+                    (Printexc.to_string exn))
+            else raise exn in
+        match vo,tr with 
+        | OK (v),TestPrint ->
+          msg "Test result:@ "; 
+          V.format v; 
+          msg "@\n%!"
+        | OK (v),TestSortPrint(Some s) -> 
+          msg "Test result:@ "; 
+          format_sort s;
+          msg "@\n%!"
+        | OK (v),TestSortPrint(None) 
+        | OK (v),TestSortEqual(None,_) -> 
+          Berror.run_error i 
+            (fun () -> msg "@[unannotated@ unit@ test@]")
+        | Error err, TestPrint 
+        | Error err, TestSortPrint _ -> 
+          test_error i 
+            (fun () -> 
+               msg "Test result: error@\n";
+               err (); 
+               msg "@\n%!")
+        | Error _, TestError -> ()
+        | OK v1, TestEqual e2 -> 
+          let v2 = interp_exp wq cev e2 in
+          if not (V.equal v1 v2) then
+            test_error i 
+              (fun () ->
+                 msg "@\nExpected@ "; V.format v2;
+                 msg "@ but found@ "; V.format v1; 
+                 msg "@\n%!")
+        | OK v1, TestSortEqual(Some s1,s2) ->
+          let err () = 
+            test_error i 
+              (fun () ->
+                 msg "@\nExpected@ a@ value@ with@ sort@ "; 
+                 format_sort s1;
+                 msg "@ but found@ "; V.format v1;
+                 msg "@ : "; format_sort s2;
+                 msg "@\n%!") in 
+          if not (Bcheck.compatible s1 s2) then err ()
+          else 
+            begin
+              try 
+                ignore 
+                  ((interp_cast wq cev i s1 s2)
+                     (interp_exp wq cev e))
+              with Error.Harmony_error(e) -> err ()
+            end                      
+        | Error err, TestEqual e2 -> 
+          let v2 = interp_exp wq cev e2 in 
+          test_error i 
+            (fun () ->
+               msg "@\nExpected@ "; V.format v2; 
+               msg "@ but found an error:@ "; 
+               err (); 
+               msg "@\n%!")
+        | Error err, TestSortEqual(_,s2) -> 
+          test_error i 
+            (fun () ->
+               msg "@\nExpected@ "; format_sort s2;
+               msg "@ but found an error:@ "; 
+               err (); 
+               msg "@\n%!")
+        | OK v, TestError -> 
+          let msgFun = 
+            (fun () ->
+               msg "@\nExpected an error@ "; 
+               msg "@ but found:@ "; 
+               V.format v; 
+               msg "@\n%!")  in
+          if Prefs.read Prefs.unsafePref
+          then (msgFun (); msg "@\nMISSING ERROR IGNORED, RUNNING UNSAFELY@\n%!")
+          else test_error i msgFun
+    end;
     (cev, [])
-        
+
 and interp_mod_aux wq cev ms ds = 
   Safelist.fold_left
     (fun (cev, names) di ->
-      let m_cev, new_names = interp_decl wq cev ms di in
-        (m_cev, names@new_names))
+       let m_cev, new_names = interp_decl wq cev ms di in
+       (m_cev, names@new_names))
     (cev,[])
     ds
 
 let interp_module m0 = match m0 with 
   | Mod(i,m,nctx,ds) -> 
-      pc := 0;
-      ic := 0;
-      mc := 0;
-      let qm = Qid.t_of_id m in 
-      let nctx' = nctx in
-      let cev = CEnv.set_ctx (CEnv.empty qm) (qm::nctx') in
-      let wqo : ((unit -> V.t) -> unit) option = 
-        if Prefs.read Prefs.parallelPref
-        then 
-          let wq = Workqueue.create () in 
-          Some (fun (f:unit -> V.t) -> Workqueue.enq f wq)
-        else None in
-      let new_cev,_ = interp_mod_aux wqo cev [m] ds in
-      G.register_env (CEnv.get_ev new_cev) nctx' m;
-      Trace.debug "parallel"
-        (fun () ->
-           msg "@[Checks:@ %d parallel, %d inline, %d mandatory@]@\n" 
-             !pc !ic !mc)
+    pc := 0;
+    ic := 0;
+    mc := 0;
+    let qm = Qid.t_of_id m in 
+    let nctx' = nctx in
+    let cev = CEnv.set_ctx (CEnv.empty qm) (qm::nctx') in
+    let wqo : ((unit -> V.t) -> unit) option = 
+      if Prefs.read Prefs.parallelPref
+      then 
+        let wq = Workqueue.create () in 
+        Some (fun (f:unit -> V.t) -> Workqueue.enq f wq)
+      else None in
+    let new_cev,_ = interp_mod_aux wqo cev [m] ds in
+    G.register_env (CEnv.get_ev new_cev) nctx' m;
+    Trace.debug "parallel"
+      (fun () ->
+         msg "@[Checks:@ %d parallel, %d inline, %d mandatory@]@\n" 
+           !pc !ic !mc)

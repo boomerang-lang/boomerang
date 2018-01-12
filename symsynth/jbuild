@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name        symsynth)
+  (modules     (lang star_semiring_tree star_semiring_tree_alignment))
+  (preprocess (pps (ppx_deriving.std ppx_hash)))
+  (synopsis "Symmetric Lens Synthesis")
+  (libraries (stdlib))))

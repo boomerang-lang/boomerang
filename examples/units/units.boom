@@ -29,8 +29,6 @@ module Units =
     DIGIT .
     (">" <-> "")
 
-  test left_quot (single_cn | double_cn) double_lns = error
-
   let final_lns = left_quot (double_cn | single_cn) double_lns
 
   test final_lns.get "  \n<a x=7>" = "7,7"

@@ -56,11 +56,12 @@ let rec to_boomerang_lens
   : Lens.t -> MLens.t =
   Lens.fold
     ~const_f:(fun s1 s2 ->
-        Blenses.MLens.clobber
+        Blenses.MLens.disconnect
           i
           (Brx.mk_string s1)
-          s2
-          (fun _ -> s1))
+          (Brx.mk_string s2)
+          (fun _ -> s1)
+          (fun _ -> s2))
     ~concat_f:(Blenses.MLens.concat i)
     ~swap_f:(fun l1 l2 ->
         MLens.permute i [1;0] [l1;l2])

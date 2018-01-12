@@ -100,7 +100,7 @@ module MLens : sig
   val invert : Info.t -> t -> t
   val copy : Info.t -> Brx.t -> t
   val weight : Info.t -> bool -> Bannot.Weight.t -> t -> t
-  val clobber : Info.t -> Brx.t -> string -> (string -> string) -> t
+  val disconnect : Info.t -> Brx.t -> Brx.t -> (string -> string) -> (string -> string) -> t
   val concat : Info.t -> t -> t -> t
   val union : Info.t -> t -> t -> t
   val star : Info.t -> t -> t
@@ -108,14 +108,21 @@ module MLens : sig
   val permute : Info.t -> int list -> t list -> t
   val compose : Info.t -> t -> t -> t
   val align : Info.t -> t -> t
-  val default : Info.t -> t -> Bstring.t -> t
+  val default : Info.t -> t -> (string -> string) -> (string -> string) -> t
   val mmatch : Info.t -> Btag.t -> t -> t
   val partition : Info.t -> Brx.t list -> t
   val merge : Info.t -> Brx.t -> t
   val fiat : Info.t -> t -> t
   val left_quot : Info.t -> Canonizer.t -> t -> t
   val right_quot : Info.t -> t -> Canonizer.t -> t
-  val dup1 : Info.t -> t -> (string -> string) -> Brx.t -> t
-  val dup2 : Info.t -> (string -> string) -> Brx.t -> t -> t
+  val dup_first : Info.t -> t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> t
+  val dup_second : Info.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> (string -> (string * string) option -> string) -> Brx.t
+    -> t -> t
+  val to_optician_lens : t -> Optician.Lang.Lens.t option
   val to_optician_lens : t -> Optician.Lang.Lens.t option
 end

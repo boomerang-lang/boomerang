@@ -367,7 +367,10 @@ let prelude_spec =
                                         
   (* core lens combinators *)           
   ; pmk_rl     "copy"                 L.copy
-  ; pmk_rsfl   "clobber"              (fun i r s f -> L.clobber i r s (fun s -> get_s (f (mk_s i s))))
+  ; pmk_rsfl   "clobber"              (fun i r s f -> L.disconnect i r
+                                          (Brx.mk_string s)
+                                          (fun s -> get_s (f (mk_s i s)))
+                                          (fun _ -> s))
   ; pmk_lll    "lens_union"           L.union
   ; pmk_lll    "lens_concat"          L.concat
   ; pmk_lll    "lens_swap"            (fun i l1 l2 -> L.permute i [1;0] [l1;l2])
@@ -382,19 +385,50 @@ let prelude_spec =
   ; pmk_tll    "lens_match"           L.mmatch
   ; pmk_lll    "compose"              L.compose
   ; pmk_ll     "align"                L.align
-  ; pmk_lsl    "default"              (fun i l w -> L.default i l (Bstring.of_string w))
+  ; pmk_lsl    "default"              (fun i l w -> L.default i l
+                                          (fun _ -> w)
+                                          (fun _ ->
+                                             begin match Brx.representative (Blenses.MLens.vtype l) with
+                                               | None -> assert false
+                                               | Some r -> r
+                                             end
+                                          ))
   ; pmk_bill   "lens_weight"          (fun i b w -> L.weight i b (Bannot.Weight.of_int w))
   ; pmk_rzl    "partition"            (fun i rl -> L.partition i (Safelist.map get_r rl))
-  ; pmk_rl     "merge"                L.merge
+  ; pmk_rl     "merge"                (fun i r ->
+                                         let l = (L.copy i r) in
+                                         L.dup_first i
+                                           l
+                                           (fun v r1r2o ->
+                                              let vs = Bstring.of_string v in
+                                              begin match r1r2o with
+                                                | None ->
+                                                  L.rcreate l vs
+                                                | Some (s1,s2) ->
+                                                  if (s1 = s2) then
+                                                    L.rput l vs (Bstring.of_string s1)
+                                                  else
+                                                    s2
+                                              end)
+                                           r
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string ""))
   ; pmk_ll     "fiat"                 L.fiat
   ; pmk_dup1   "dup1"                 (fun i l f fat ->
-                                         L.dup1 i l
-                                           (fun s -> get_s (f (mk_s i s))) fat)
+                                         L.dup_first i
+                                           l
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string "")
+                                           (fun s _ -> get_s (f (mk_s i s)))
+                                           fat)
   ; pmk_dup2   "dup2"                 (fun i f fat l ->
-                                         L.dup2 i
-                                           (fun s -> get_s (f (mk_s i s))) fat
+                                         L.dup_second i
+                                           (fun _ _ -> "")
+                                           (Brx.mk_string "")
+                                           (fun s _ -> get_s (f (mk_s i s)))
+                                           fat
                                            l)
-                                      
+
   (* canonizer operations *)          
   ; pmk_rq     "canonizer_copy"       C.copy
   ; pmk_qqq    "canonizer_union"      C.union
