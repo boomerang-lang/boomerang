@@ -4,7 +4,7 @@ open Ounit_extensions
 
 let test_abc _ =
   assert_equal
-    false
+    true
     true
 
 let normalize_from_tree_suite = "Test NormalizedPTST from_tree" >:::

@@ -116,12 +116,12 @@ module MLens : sig
   val left_quot : Info.t -> Canonizer.t -> t -> t
   val right_quot : Info.t -> t -> Canonizer.t -> t
   val dup_first : Info.t -> t
-    -> (string -> (string * string) option -> string) -> Brx.t
-    -> (string -> (string * string) option -> string) -> Brx.t
+    -> Brx.t -> (string -> (string * string) option -> string)
+    -> Brx.t -> (string -> (string * string) option -> string)
     -> t
   val dup_second : Info.t
-    -> (string -> (string * string) option -> string) -> Brx.t
-    -> (string -> (string * string) option -> string) -> Brx.t
+    -> Brx.t -> (string -> (string * string) option -> string)
+    -> Brx.t -> (string -> (string * string) option -> string)
     -> t -> t
   val to_optician_lens : t -> Optician.Lang.Lens.t option
   val to_optician_lens : t -> Optician.Lang.Lens.t option

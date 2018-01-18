@@ -306,9 +306,10 @@ let create l_n a_fn o_fn =
 let toplevel' progName () = 
   let baseUsageMsg = (* update the documentation (main.src) after changing this *)
     "Usage:\n"
-    ^ "    "^progName^" [get] l S             [options] : get\n"
-    ^ " or "^progName^" [put] l V S           [options] : put\n"
-    ^ " or "^progName^" create l V            [options] : create\n"
+    ^ "    "^progName^" [creater] l S         [options] : creater\n"
+    ^ " or "^progName^" [createl] l V         [options] : createl\n"
+    ^ " or "^progName^" [putr]    l S V       [options] : putr\n"
+    ^ " or "^progName^" [putl]    l V S       [options] : putl\n"
     (* ^ " or "^progName^" sync l O A B          [options] : sync\n" *)
     (* ^ " or "^progName^" sync l O A B O' A' B' [options] : sync\n" *)
     ^ " or "^progName^" F.boom [F.boom...]    [options] : run unit tests\n"
@@ -394,39 +395,59 @@ let toplevel' progName () =
        | [] -> assert false
        | _ -> bad_cmdline ()
      end else begin 
-       let rest_pref,ll,sl,vl,o = match rest_pref,ll,sl,vl,o with 
-         (* get *)
-         | [l;s_fn],[],[],[],o
-         | [s_fn],[l],[],[],o 
-         | ["get"],[l],[s_fn],[],o
-         | ["get"; s_fn],[l],[],[],o   
-         | ["get"; l],[],[s_fn],[],o   
-         | ["get"; l; s_fn],[],[],[],o -> 
-             ["get"],[l],[s_fn],[],o             
-         (* create *)
-         | ["create"],[l],[],[v_fn],o
-         | ["create"; l],[],[],[v_fn],o
-         | ["create"; v_fn],[l],[],[],o 
-         | ["create"; l; v_fn],[],[],[],o ->             
-             ["create"],[l],[],[v_fn],o
-         (* put *)
-         | [l; v_fn; s_fn],[],[],[],o 
-         | [v_fn; s_fn],[l],[],[],o 
-         | ["put"],[l],[s_fn],[v_fn],o
-         | ["put"; v_fn; s_fn],[l],[],[],o 
-         | ["put"; l],[],[s_fn],[v_fn],o
-         | ["put"; l; v_fn; s_fn],[],[],[],o -> 
-             ["put"],[l],[s_fn],[v_fn],o
-         | _ -> bad_cmdline () in 
-       let o_fn = if o="" then "-" else o in 
+       let rest_pref,ll,sl,vl,o = match rest_pref,ll,sl,vl,o with
+         (* undef create *)
+         | [l;u_fn],[],[],[],o
+         | [u_fn],[l],[],[],o  ->
+           (["create"],[l],[u_fn],[],o)
+
+         (* creater *)
+         | ["creater"],[l],[s_fn],[],o
+         | ["creater"; s_fn],[l],[],[],o
+         | ["creater"; l],[],[s_fn],[],o
+         | ["creater"; l; s_fn],[],[],[],o ->
+           ["creater"],[l],[s_fn],[],o
+
+         (* createl *)
+         | ["createl"],[l],[],[v_fn],o
+         | ["createl"; l],[],[],[v_fn],o
+         | ["createl"; v_fn],[l],[],[],o
+         | ["createl"; l; v_fn],[],[],[],o ->
+           ["createl"],[l],[],[v_fn],o
+
+         (* undef put *)
+         | [l; v_fn; s_fn],[],[],[],o
+         | [v_fn; s_fn],[l],[],[],o ->
+           ["put"],[l],[s_fn],[v_fn],o
+
+         (* putl *)
+         | ["putl"],[l],[s_fn],[v_fn],o
+         | ["putl"; v_fn; s_fn],[l],[],[],o
+         | ["putl"; l],[],[s_fn],[v_fn],o
+         | ["putl"; l; v_fn; s_fn],[],[],[],o ->
+           ["putl"],[l],[s_fn],[v_fn],o
+
+         (* putr *)
+         | ["putr"],[l],[v_fn],[s_fn],o
+         | ["putr"; s_fn; v_fn],[l],[],[],o
+         | ["putr"; l],[],[v_fn],[s_fn],o
+         | ["putr"; l; s_fn; v_fn],[],[],[],o ->
+           ["putr"],[l],[v_fn],[s_fn],o
+
+         | _ -> bad_cmdline ()
+       in
+       let o_fn = if o="" then "-" else o in
        match rest_pref,ll,sl,vl with
-         | ["get"],[l],[s_fn],[]        -> get l s_fn o_fn
-         | ["create"],[l],[],[v_fn]     -> create l v_fn o_fn
-         | ["put"],[l],[s_fn],[v_fn]    -> put l v_fn s_fn o_fn
-         | _ -> assert false
+       | ["create"],[l],[u_fn],[]     -> create l u_fn o_fn
+       | ["creater"],[l],[s_fn],[]        -> get l s_fn o_fn
+       | ["createl"],[l],[],[v_fn]     -> create l v_fn o_fn
+       | ["putr"],[l],[v_fn],[s_fn]    -> put l s_fn v_fn o_fn
+       | ["putl"],[l],[s_fn],[v_fn]    -> put l v_fn s_fn o_fn
+       | ["put"],[l],[s_fn],[v_fn]    -> put l v_fn s_fn o_fn
+       | _ -> assert false
      end)
-    (fun () -> Util.flush ())
-    
+  (fun () -> Util.flush ())
+
 let toplevel progName =
   try
     exit 

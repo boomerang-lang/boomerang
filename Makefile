@@ -18,8 +18,27 @@ install:
 clean:
 	rm -rf _build *.install *.pdf $(TARGETS)
 
-test:
+functionaltest: all
+	for file in *.boom ; do \
+		./boomerang.exe $$file ; \
+	done
+	for file in *.src ; do \
+		./boomerang.exe $$file ; \
+	done
+	for file in examples/*.boom ; do \
+		./boomerang.exe $$file ; \
+	done
+	for file in examples/*.src ; do \
+		./boomerang.exe $$file ; \
+	done
+	for file in examples/*/*.boom ; do \
+		./boomerang.exe $$file ; \
+	done
+
+unittest:
 	jbuilder runtest
+
+test: unittest functionaltest
 
 documentation:
 	jbuilder build @docs

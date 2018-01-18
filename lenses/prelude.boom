@@ -17,7 +17,7 @@
 (******************************************************************************)
 (* /lenses/prelude.boom                                                       *)
 (* Boomerang definitions of lens primitives                                   *)
-(* $Id: prelude.boom 4995 2011-03-08 16:32:54Z jnfoster $ *)
+(* $Id: prelude.boom 4995 2011-03-08 16:32:54Z jnfoster $                     *)
 (******************************************************************************)
 
 module Prelude =
@@ -167,6 +167,21 @@ It is also defined using @<->@.
 #* test get (del ANY) "Boomerang" = ""
 #* test put (del ANY) "" "Boomerang" = "Boomerang"
 #* test create (del ANY) "" = ""
+
+\LENSSECTION{@merge@} The @merge@ operator takes a regular expression @R@ 
+and produces a lens whose $\GET$ function transforms a string belonging to the 
+concatenation of @R@ with itself by discarding the second substring belonging 
+to @R@. The regular expression @R@ must be unambiguously concatenable with itself.
+
+#* let merge 
+#*     (R:regexp where! splittable_cex R R) 
+#*   : (l:lens where! in_lens_type l (regexp_concat R R) R)
+##   = Native.Prelude.merge R
+
+#* test get (merge [A-Z]) "AA" = "A"
+#* test get (merge [A-Z]) "AB" = "A"
+#* test put (merge [A-Z]) "C" "AA" = "CC"
+#* test put (merge [A-Z]) "C" "AB" = "CB"
 
 \LENSSECTION{@merge_with_sep@} The lens @merge_with_sep@ behaves like @merge@, 
 but allows a separator between the copied string. 
@@ -505,6 +520,65 @@ that is compact (though imprecise); see~\cite{QuotientLens08} for a discussion.
 #*   (UALPHACHAR . DIGIT)
 
 \subsection{Miscellaneous}
+
+\LENSSECTION{@dup_first@} TODO
+#*    let dup_first
+#*      (l:lens where! is_basic l)
+#*      (R1:regexp where! splittable_cex (stype l) R1)
+#*      (f1:string -> (string * string) option -> (x:string where! matches_cex R1 x))
+#*      (R2:regexp where! splittable_cex (vtype l) R2)
+#*      (f2:string -> (string * string) option -> (x:string where! matches_cex R2 x))
+#*   : (l':lens where! in_lens_type l' (regexp_concat (stype l) R1) (regexp_concat (vtype l) R2))
+##   = Native.Prelude.dup_first l R1 f1 R2 f2
+
+\LENSSECTION{@dup_second@} TODO
+#*    let dup_second
+#*      (R1:regexp)
+#*      (f1:string -> (string * string) option -> (x:string where! matches_cex R1 x))
+#*      (R2:regexp)
+#*      (f2:string -> (string * string) option -> (x:string where! matches_cex R2 x))
+#*      (l:lens where! is_basic l)
+#*   : (l':lens where!
+#*       land 
+#*         (in_lens_type l' (regexp_concat (stype l) R1) (regexp_concat (vtype l) R2))
+#*         (land 
+#*           (splittable_cex R1 (stype l))
+#*           (splittable_cex R2 (vtype l))))
+##   = Native.Prelude.dup_second R1 f1 R2 f2 l
+
+\LENSSECTION{@dup1@} The @dup1@ operator takes as arguments a 
+lens @l@, a function @f@, and a regular expression @R@, which 
+should denote the codomain of @f@. Its $\GET$ function supplies 
+one copy of the concrete string to @l@'s $\GET$ function and one 
+to @f@, and concatenates the results. The $\PUT$ and $\CREATE$ functions 
+simply discard the part of the string computed by @f@ and use the 
+corresponding from @l@ on the rest of the string. The concatenation of 
+@l@'s abstract type and the codomain of @f@ must be unambiguous.
+
+#* let dup1 
+#*     (l:lens where! is_basic l)
+#*     (R:regexp)
+#*     (f:string -> (x:string where! matches_cex R x))
+#*  :  (l':lens where! in_lens_type l' 
+#*           (stype l) (regexp_concat (vtype l) R))
+## = Native.Prelude.dup1 l f R 
+
+#* test get (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "A" = "AA"
+#* test put (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "BC" "A" = "B"
+
+\LENSSECTION{@dup2@} The @dup2@ operator is like @dup1@ but uses
+@f@ to build the first part of the output.
+
+#* let dup2
+#*     (R:regexp)
+#*     (f:string -> (x:string where! matches_cex R x)) 
+#*     (l:lens where! is_basic l)
+#*   : (l':lens where! in_lens_type l' 
+#*         (stype l) (regexp_concat R (vtype l)))
+## = Native.Prelude.dup2 f R l 
+
+#* test get (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "A" = "AA"
+#* test put (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "BC" "A" = "C"
 
 \LENSSECTION{@iterate@} The operator @iterate@ compose @f@ with itself
  @i@ times using @b@ for the first argument, i.e., @f(f(...(f b)...))@

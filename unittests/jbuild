@@ -3,7 +3,7 @@
 (executable
  ((name synth_unittests)
   (modules (synth_unittests ounit_general_extensions ounit_extensions))
-  (libraries (ounit stdlib))))
+  (libraries (ounit stdlib symsynth))))
 
 (alias
  ((name    runtest)

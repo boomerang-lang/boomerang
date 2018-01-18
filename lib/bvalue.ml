@@ -288,6 +288,8 @@ let mk_szP i szp = Prf(i,PrSLi szp)
 let mk_p i (p1,p2) = Par(i,p1,p2)
 let mk_f i f = Fun(i,fun wq v -> f v)
 
+let mk_alpha_fun get_alpha i f =
+  Fun(i,(fun wq v -> f (get_alpha v wq)))
 let mk_ufun i f = Fun(i,(fun wq v -> f (get_u v)))
 let mk_bfun i f = Fun(i,(fun wq v -> f (get_b v)))
 let mk_xfun i f = Fun(i,(fun wq v -> f (get_x v)))
@@ -307,6 +309,11 @@ let mk_szPfun i f = Fun(i,(fun wq v -> f (get_szP v)))
 let mk_pfun i f = Fun(i,(fun wq v -> f (get_p v)))
 let mk_vfun i f = Fun(i,(fun wq v -> f (get_v v)))
 let mk_ffun i f = Fun(i,(fun wq v -> f (get_f v wq)))
+let mk_fffun i (f:(t -> t -> t) -> t) : t =
+  Fun(i,(fun wq v ->
+      let vf1 = (get_f v wq) in
+      let vf2 = (fun x -> get_f (vf1 x) wq) in
+      f vf2))
 
 let string_of_t v = Util.format_to_string (fun () -> format v)
 

@@ -622,6 +622,21 @@ an argument and copies strings belonging to @R@ in both directions.
 #* test vtype (copy [A-Z]) = stype (copy [A-Z])
 
 
+\LENSSECTION{@disconnect@} TODO.
+
+#* let disconnect 
+#*     (R1:regexp)
+#*     (R2:regexp)
+#*     (f1:string -> (s:string where! matches_cex R1 s))
+#*     (f2:string -> (s:string where! matches_cex R2 s))
+#*   : (l:lens where! in_lens_type l R1 R2)
+##   = Native.Prelude.disconnect R1 R2 f1 f2 
+
+#* test get (disconnect [A-Z] "" (fun (s:string) -> "B") (fun (s:string) -> "")) "A" = ""
+#* test put (disconnect [A-Z] "" (fun (s:string) -> "B") (fun (s:string) -> "")) "" "A" = "A"
+#* test create (disconnect [A-Z] "" (fun (s:string) -> "B") (fun (s:string) -> "")) "" = "B"
+
+
 \LENSSECTION{@clobber@} The @clobber@ lens takes as arguments a
 regular expression @R@, a string @u@, and a function from strings to
 strings @f@.  Its $\GET$ function is the constant function that
@@ -631,7 +646,7 @@ its $\CREATE$ function returns the string @f u@.
 #* let clobber 
 #*     (R:regexp) (u:string) (f:string -> (s:string where! matches_cex R s))
 #*   : (l:lens where! in_lens_type l R (regexp_of_string u))
-##   = Native.Prelude.clobber R u f 
+##   = disconnect R (regexp_of_string u) f (fun (s:string) -> u) 
 
 #* test get (clobber [A-Z] "" (fun (s:string) -> "B")) "A" = ""
 #* test put (clobber [A-Z] "" (fun (s:string) -> "B")) "" "A" = "A"
@@ -864,23 +879,6 @@ components of a lens, which must be bijective.
 #*             (d:string where! matches_cex (stype l) d)
 #*           : (l':lens where! in_lens_type l' (stype l) (vtype l))
 ## = Native.Prelude.default l d
-
-#* test create (default (const [A-Z] "X" "A") "B") "X" = "B"
-
-\LENSSECTION{@merge@} The @merge@ operator takes a regular expression @R@ 
-and produces a lens whose $\GET$ function transforms a string belonging to the 
-concatenation of @R@ with itself by discarding the second substring belonging 
-to @R@. The regular expression @R@ must be unambiguously concatenable with itself.
-
-#* let merge 
-#*     (R:regexp where! splittable_cex R R) 
-#*   : (l:lens where! in_lens_type l (regexp_concat R R) R)
-##   = Native.Prelude.merge R
-
-#* test get (merge [A-Z]) "AA" = "A"
-#* test get (merge [A-Z]) "AB" = "A"
-#* test put (merge [A-Z]) "C" "AA" = "CC"
-#* test put (merge [A-Z]) "C" "AB" = "CB"
 
 \subsection{Resourceful Lenses}
 
@@ -1145,38 +1143,4 @@ a canonizer @q@ on the right by passing abstract strings through @q@.
 #*                            (rel_is_id (cnrel cn)))
 #* : (l':lens where! in_lens_type l' (stype l) (uncanonized_type cn))
 ## = Native.Prelude.right_quot l cn
-
-\LENSSECTION{@dup1@} The @dup1@ operator takes as arguments a 
-lens @l@, a function @f@, and a regular expression @R@, which 
-should denote the codomain of @f@. Its $\GET$ function supplies 
-one copy of the concrete string to @l@'s $\GET$ function and one 
-to @f@, and concatenates the results. The $\PUT$ and $\CREATE$ functions 
-simply discard the part of the string computed by @f@ and use the 
-corresponding from @l@ on the rest of the string. The concatenation of 
-@l@'s abstract type and the codomain of @f@ must be unambiguous.
-
-#* let dup1 
-#*     (l:lens where! is_basic l)
-#*     (R:regexp)
-#*     (f:string -> (x:string where! matches_cex R x))
-#*  :  (l':lens where! in_lens_type l' 
-#*           (stype l) (regexp_concat (vtype l) R))
-## = Native.Prelude.dup1 l f R 
-
-#* test get (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "A" = "AA"
-#* test put (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "BC" "A" = "B"
-
-\LENSSECTION{@dup2@} The @dup2@ operator is like @dup1@ but uses
-@f@ to build the first part of the output.
-
-#* let dup2
-#*     (R:regexp)
-#*     (f:string -> (x:string where! matches_cex R x)) 
-#*     (l:lens where! is_basic l)
-#*   : (l':lens where! in_lens_type l' 
-#*         (stype l) (regexp_concat R (vtype l)))
-## = Native.Prelude.dup2 f R l 
-
-#* test get (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "A" = "AA"
-#* test put (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "BC" "A" = "C"
 

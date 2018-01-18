@@ -126,6 +126,7 @@ val mk_szPfun : Info.t -> (string list Prefs.t -> t) -> t
 val mk_pfun : Info.t -> (t * t -> t) -> t
 val mk_vfun : Info.t -> (Bident.Id.t * t option -> t) -> t
 val mk_ffun : Info.t -> ((t -> t) -> t) -> t
+val mk_fffun : Info.t -> ((t -> t -> t) -> t) -> t
 
 val string_of_t : t -> string
 

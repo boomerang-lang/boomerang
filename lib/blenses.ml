@@ -670,10 +670,14 @@ module MLens = struct
     | LeftQuot of  Canonizer.t * t
     | RightQuot of t * Canonizer.t
     | DupFirst of t
-                  * (string -> (string * string) option -> string) * Rx.t
-                  * (string -> (string * string) option -> string) * Rx.t
-    | DupSecond of (string -> (string * string) option -> string) * Rx.t
-                   * (string -> (string * string) option -> string) * Rx.t
+                  * Rx.t
+                  * (string -> (string * string) option -> string)
+                  * Rx.t
+                  * (string -> (string * string) option -> string)
+    | DupSecond of Rx.t
+                   * (string -> (string * string) option -> string)
+                   * Rx.t
+                   * (string -> (string * string) option -> string)
                    * t
 
     (* ----- extensions ----- *)
@@ -737,8 +741,8 @@ module MLens = struct
             | Default (t',f1,f2)               -> Default (invert t', f2, f1)
             | LeftQuot (c,t')                  -> RightQuot (invert t', c)
             | RightQuot (t',c)                 -> LeftQuot (c, invert t')
-            | DupFirst (t', f1, r1, f2, r2)    -> DupFirst (invert t', f2, r2, f1, r1)
-            | DupSecond (f1, r1, f2, r2, t')   -> DupSecond (f2, r2, f1, r1, invert t')
+            | DupFirst (t', r1, f1, r2, f2)    -> DupFirst (invert t', r2, f2, r1, f1)
+            | DupSecond (r1, f1, r2, f2, t')   -> DupSecond (r2, f2, r1, f1, invert t')
             | Partition (i, irl)               -> Interleave (i, irl)
             | Interleave (i, irl)              -> Partition (i, irl)
             | Merge r                          -> Merge r
@@ -829,8 +833,8 @@ module MLens = struct
           | Default (ml, _, _)      -> astype ml
           | LeftQuot (cn, _)        -> Canonizer.uncanonized_atype cn
           | RightQuot (ml, _)       -> astype ml
-          | DupFirst (ml,_,r1,_,_)  -> Arx.mk_seq (astype ml) (Arx.mk_rx r1)
-          | DupSecond (_,r1,_,_,ml) -> Arx.mk_seq (Arx.mk_rx r1) (astype ml)
+          | DupFirst (ml,r1,_,_,_)  -> Arx.mk_seq (astype ml) (Arx.mk_rx r1)
+          | DupSecond (r1,_,_,_,ml) -> Arx.mk_seq (Arx.mk_rx r1) (astype ml)
           | Partition (_,rs1)  ->
             Arx.mk_rx
               (Rx.mk_star
@@ -871,11 +875,11 @@ module MLens = struct
           | Default (ml, _, _)    -> avtype ml
           | LeftQuot (_, ml)   -> avtype ml
           | RightQuot (_, cn)  -> Canonizer.uncanonized_atype cn
-          | DupFirst (ml, _, _, _, r2) ->
+          | DupFirst (ml, _, _, r2, _) ->
             Arx.mk_seq
               (avtype ml)
               (Arx.mk_rx r2)
-          | DupSecond (_, _, _, r2, ml)    ->
+          | DupSecond (_, _, r2, _, ml)    ->
             Arx.mk_seq (Arx.mk_rx r2) (avtype ml)
           | Partition (_,rs1)  ->
             Arx.mk_rx
@@ -1071,13 +1075,13 @@ module MLens = struct
     | Weight (_, ml)
     | Fiat ml
       -> srep ml s
-    | DupFirst (ml, _, r1, _, _) -> 
+    | DupFirst (ml, r1, _, _, _) -> 
       let s, _ = Bstring.concat_split (stype ml) r1 s in
       begin match Rx.representative r1 with
         | Some r -> srep ml s ^ r
         | None -> assert false
       end
-    | DupSecond (_, r1, _, _, ml) ->
+    | DupSecond (r1, _, _, _, ml) ->
       let _, s = Bstring.concat_split r1 (stype ml) s in
       begin match Rx.representative r1 with
         | Some r -> r ^ srep ml s
@@ -1131,13 +1135,13 @@ module MLens = struct
     | Invert ml -> srep ml v
     | RightQuot (_, cn)
       -> Canonizer.choose cn (Bstring.of_string (Canonizer.canonize cn v))
-    | DupFirst (ml, _, _, _, r2)
+    | DupFirst (ml, _, _, r2, _)
         -> (let v, _ = Bstring.concat_split (vtype ml) r2 v in
          match Rx.representative r2 with
           | Some r -> vrep ml v ^ r
           | None -> assert false
            )
-    | DupSecond (_, _, _, r2, ml)
+    | DupSecond (_, _, r2, _, ml)
       -> (
           let _, v = Bstring.concat_split r2 (vtype ml) v in
           match Rx.representative r2 with
@@ -1515,7 +1519,7 @@ module MLens = struct
         let s, ri, ri_acc = gputl' ml (u, co) (r, i) ri_acc in
 (*         print_endline "---gput' for RightQuot"; *)
         s, ri, ri_acc
-    | DupFirst (ml, f1, r1, _, r2) ->
+    | DupFirst (ml, r1, f1, r2, _) ->
       let co1, n, s1s2o =
         begin match co with
           | Some (C_concat (c1, n, c2)) ->
@@ -1547,7 +1551,7 @@ module MLens = struct
       in
       let c2 = C_string v2 in
       (s, C_concat (c1, n, c2)), ri, ri_acc
-    | DupSecond (f1, r1, _, r2, ml) ->
+    | DupSecond (r1, f1, r2, _, ml) ->
       let co2, n, s1s2o =
         begin match co with
           | Some (C_concat (c1, n, c2)) ->
@@ -1787,14 +1791,14 @@ module MLens = struct
       | Default (ml, f1, f2)          -> msg "(default@ "; format_t ml; msg "@ "; msg "@ <function>"; msg "@ <function>"; msg ")"
       | LeftQuot(cn1,dl1)  -> msg "(left_quot@ "; Canonizer.format_t cn1; msg "@ "; format_t dl1; msg ")"
       | RightQuot(dl1,cn1) -> msg "(right_quot@ "; format_t dl1; msg "@ "; Canonizer.format_t cn1; msg ")"
-      | DupFirst(dl,f1,r1,f2,r2) -> msg "(dupfirst@ ";
+      | DupFirst(dl,r1,f1,r2,f2) -> msg "(dupfirst@ ";
         format_t dl;
         msg "@ <function>@ ";
         Rx.format_t r1;
         msg "@ <function>@ ";
         Rx.format_t r2;
         msg ")"
-      | DupSecond(f1,r1,f2,r2,dl) -> msg "(dupsecond@ ";
+      | DupSecond(r1,f1,r2,f2,dl) -> msg "(dupsecond@ ";
         msg "@ <function>@ ";
         Rx.format_t r1;
         msg "@ <function>@ ";
@@ -1877,8 +1881,8 @@ module MLens = struct
   let default i ml f1 f2 = mk i (Default (ml, f1, f2))
   let left_quot i cn1 dl1 = mk i (LeftQuot(cn1,dl1))
   let right_quot i dl1 cn1 = mk i (RightQuot(dl1,cn1))
-  let dup_first i dl1 f1 r1 f2 r2 = mk i (DupFirst(dl1,f1,r1,f2,r2))
-  let dup_second i f1 r1 f2 r2 dl1 = mk i (DupSecond(f1,r1,f2,r2,dl1))
+  let dup_first i dl1 r1 f1 r2 f2 = mk i (DupFirst(dl1,r1,f1,r2,f2))
+  let dup_second i r1 f1 r2 f2 dl1 = mk i (DupSecond(r1,f1,r2,f2,dl1))
   let partition i rs1 = 
     let k, irs1 = Safelist.fold_left (fun (i,acc) ri -> (succ i,(i,ri)::acc)) (0,[]) rs1 in 
     mk i (Partition(k,Safelist.rev irs1))

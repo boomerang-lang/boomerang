@@ -231,6 +231,27 @@ let pmk_lql   = pmk2 S.SLens mk_lfun S.SCanonizer mk_qfun S.SLens mk_l
 let pmk_lrrb  = 
   pmk3 S.SLens mk_lfun S.SRegexp mk_rfun S.SRegexp mk_rfun S.SBool mk_b
 
+let pmk_rfrfll =
+  let sso_sort = S.SData ([S.SProduct (S.SString,S.SString)], option_qid) in
+  let s_sso_s_sort = S.SString ^> (sso_sort ^> S.SString) in
+  pmk5
+    S.SRegexp mk_rfun
+    s_sso_s_sort mk_fffun
+    S.SRegexp mk_rfun
+    s_sso_s_sort mk_fffun
+    S.SLens mk_lfun
+    S.SLens mk_l
+
+let pmk_lrfrfl =
+  let sso_sort = S.SData ([S.SProduct (S.SString,S.SString)], option_qid) in
+  let s_sso_s_sort = S.SString ^> (sso_sort ^> S.SString) in
+  pmk5
+    S.SLens mk_lfun
+    S.SRegexp mk_rfun
+    s_sso_s_sort mk_fffun
+    S.SRegexp mk_rfun
+    s_sso_s_sort mk_fffun
+    S.SLens mk_l
 let pmk_mmb   = pmk2 S.SResources mk_mfun S.SResources mk_mfun S.SBool mk_b
 let pmk_mmx   = pmk2 S.SResources mk_mfun S.SResources mk_mfun S.SBool mk_x
 
@@ -263,6 +284,14 @@ let pmk_dup2  =
 
 let pmk_rsfl = 
   pmk3 S.SRegexp mk_rfun S.SString mk_sfun (S.SString ^> S.SString) mk_ffun 
+    S.SLens mk_l
+
+let pmk_rrffl =
+  pmk4
+    S.SRegexp mk_rfun
+    S.SRegexp mk_rfun
+    (S.SString ^> S.SString) mk_ffun
+    (S.SString ^> S.SString) mk_ffun
     S.SLens mk_l
 
 let pmk_rzl =
@@ -372,6 +401,11 @@ let prelude_spec =
                                           (fun s -> get_s (f (mk_s i s)))
                                           (fun _ -> s))
   ; pmk_lll    "lens_union"           L.union
+  ; pmk_rrffl  "disconnect"           (fun i r1 r2 f1 f2 -> L.disconnect i
+                                          r1
+                                          r2
+                                          (fun s -> get_s (f1 (mk_s i s)))
+                                          (fun s -> get_s (f2 (mk_s i s))))
   ; pmk_lll    "lens_concat"          L.concat
   ; pmk_lll    "lens_swap"            (fun i l1 l2 -> L.permute i [1;0] [l1;l2])
   ; pmk_liil   "lens_iter"            L.iter
@@ -395,10 +429,59 @@ let prelude_spec =
                                           ))
   ; pmk_bill   "lens_weight"          (fun i b w -> L.weight i b (Bannot.Weight.of_int w))
   ; pmk_rzl    "partition"            (fun i rl -> L.partition i (Safelist.map get_r rl))
+  ; pmk_lrfrfl "dup_first"            (fun i l r1 f1 r2 f2 ->
+                                        let v_v_v_to_s_sso_s f =
+                                          (fun s sso ->
+                                             let s = mk_s i s in
+                                             let sso =
+                                               mk_option
+                                                 i
+                                                 (match sso with
+                                                    | None -> None
+                                                    | Some (s1,s2) ->
+                                                      Some
+                                                        (mk_p i
+                                                           (mk_s i s1
+                                                           ,mk_s i s2)))
+                                             in
+                                             get_s (f s sso))
+                                        in
+                                        L.dup_first
+                                          i
+                                          l
+                                          r1
+                                          (v_v_v_to_s_sso_s f1)
+                                          r2
+                                          (v_v_v_to_s_sso_s f2))
+  ; pmk_rfrfll "dup_second"            (fun i r1 f1 r2 f2 l ->
+                                        let v_v_v_to_s_sso_s f =
+                                          (fun s sso ->
+                                             let s = mk_s i s in
+                                             let sso =
+                                               mk_option
+                                                 i
+                                                 (match sso with
+                                                    | None -> None
+                                                    | Some (s1,s2) ->
+                                                      Some
+                                                        (mk_p i
+                                                           (mk_s i s1
+                                                           ,mk_s i s2)))
+                                             in
+                                             get_s (f s sso))
+                                        in
+                                        L.dup_second
+                                          i
+                                          r1
+                                          (v_v_v_to_s_sso_s f1)
+                                          r2
+                                          (v_v_v_to_s_sso_s f2)
+                                          l)
   ; pmk_rl     "merge"                (fun i r ->
                                          let l = (L.copy i r) in
                                          L.dup_first i
                                            l
+                                           r
                                            (fun v r1r2o ->
                                               let vs = Bstring.of_string v in
                                               begin match r1r2o with
@@ -410,23 +493,22 @@ let prelude_spec =
                                                   else
                                                     s2
                                               end)
-                                           r
-                                           (fun _ _ -> "")
-                                           (Brx.mk_string ""))
+                                           (Brx.mk_string "")
+                                           (fun _ _ -> ""))
   ; pmk_ll     "fiat"                 L.fiat
   ; pmk_dup1   "dup1"                 (fun i l f fat ->
                                          L.dup_first i
                                            l
-                                           (fun _ _ -> "")
                                            (Brx.mk_string "")
-                                           (fun s _ -> get_s (f (mk_s i s)))
-                                           fat)
+                                           (fun _ _ -> "")
+                                           fat
+                                           (fun s _ -> get_s (f (mk_s i s))))
   ; pmk_dup2   "dup2"                 (fun i f fat l ->
                                          L.dup_second i
-                                           (fun _ _ -> "")
                                            (Brx.mk_string "")
-                                           (fun s _ -> get_s (f (mk_s i s)))
+                                           (fun _ _ -> "")
                                            fat
+                                           (fun s _ -> get_s (f (mk_s i s)))
                                            l)
 
   (* canonizer operations *)          
