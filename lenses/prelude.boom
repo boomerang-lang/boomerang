@@ -168,33 +168,6 @@ It is also defined using @<->@.
 #* test put (del ANY) "" "Boomerang" = "Boomerang"
 #* test create (del ANY) "" = ""
 
-\LENSSECTION{@merge@} The @merge@ operator takes a regular expression @R@ 
-and produces a lens whose $\GET$ function transforms a string belonging to the 
-concatenation of @R@ with itself by discarding the second substring belonging 
-to @R@. The regular expression @R@ must be unambiguously concatenable with itself.
-
-#* let merge 
-#*     (R:regexp where! splittable_cex R R) 
-#*   : (l:lens where! in_lens_type l (regexp_concat R R) R)
-##   = Native.Prelude.merge R
-
-#* test get (merge [A-Z]) "AA" = "A"
-#* test get (merge [A-Z]) "AB" = "A"
-#* test put (merge [A-Z]) "C" "AA" = "CC"
-#* test put (merge [A-Z]) "C" "AB" = "CB"
-
-\LENSSECTION{@merge_with_sep@} The lens @merge_with_sep@ behaves like @merge@, 
-but allows a separator between the copied string. 
-
-#* let merge_with_sep (R:regexp) (s:string) : (lens in (R . s . R) <-> R) = 
-#*   copy (R . s . R) . ins s; 
-#*   merge (R . s); 
-#*   copy R . del s
-
-#* test (merge_with_sep [A-Z] ",").get "A,B" = "A"
-#* test (merge_with_sep [A-Z] ",").put "C" into "A,B" = "C,B"
-#* test (merge_with_sep [A-Z] ",").create "B" = "B,B"
-
 \subsection{Lens Predicates}
 
 \LENSSECTION{@lens_iterable@} This predicate is true for lenses with
@@ -540,7 +513,7 @@ that is compact (though imprecise); see~\cite{QuotientLens08} for a discussion.
 #*      (l:lens where! is_basic l)
 #*   : (l':lens where!
 #*       land 
-#*         (in_lens_type l' (regexp_concat (stype l) R1) (regexp_concat (vtype l) R2))
+#*         (in_lens_type l' (regexp_concat R1 (stype l)) (regexp_concat R2 (vtype l)))
 #*         (land 
 #*           (splittable_cex R1 (stype l))
 #*           (splittable_cex R2 (vtype l))))
@@ -560,8 +533,13 @@ corresponding from @l@ on the rest of the string. The concatenation of
 #*     (R:regexp)
 #*     (f:string -> (x:string where! matches_cex R x))
 #*  :  (l':lens where! in_lens_type l' 
-#*           (stype l) (regexp_concat (vtype l) R))
-## = Native.Prelude.dup1 l f R 
+#*           (stype l) (regexp_concat (vtype l) R)) =
+##  dup_first
+##    l
+##    (regexp_of_string "")
+##    (fun (s:string) (sso:(string * string) option) -> "")
+##    R
+##    (fun (s:string) (sso:(string * string) option) -> f s)
 
 #* test get (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "A" = "AA"
 #* test put (dup1 (copy [A-Z]) [A-Z] (get (copy [A-Z]))) "BC" "A" = "B"
@@ -574,11 +552,43 @@ corresponding from @l@ on the rest of the string. The concatenation of
 #*     (f:string -> (x:string where! matches_cex R x)) 
 #*     (l:lens where! is_basic l)
 #*   : (l':lens where! in_lens_type l' 
-#*         (stype l) (regexp_concat R (vtype l)))
-## = Native.Prelude.dup2 f R l 
+#*         (stype l) (regexp_concat R (vtype l))) =
+##  dup_second
+##    (regexp_of_string "")
+##    (fun (s:string) (sso:(string * string) option) -> "")
+##    R
+##    (fun (s:string) (sso:(string * string) option) -> f s)
+##    l
 
 #* test get (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "A" = "AA"
 #* test put (dup2 [A-Z] (get (copy [A-Z])) (copy [A-Z])) "BC" "A" = "C"
+
+\LENSSECTION{@merge@} The @merge@ operator takes a regular expression @R@ 
+and produces a lens whose $\GET$ function transforms a string belonging to the 
+concatenation of @R@ with itself by discarding the second substring belonging 
+to @R@. The regular expression @R@ must be unambiguously concatenable with itself.
+
+#* let merge 
+#*     (R:regexp where! splittable_cex R R) 
+#*   : (l:lens where! in_lens_type l (regexp_concat R R) R)
+##   = Native.Prelude.merge R
+
+#* test get (merge [A-Z]) "AA" = "A"
+#* test get (merge [A-Z]) "AB" = "A"
+#* test put (merge [A-Z]) "C" "AA" = "CC"
+#* test put (merge [A-Z]) "C" "AB" = "CB"
+
+\LENSSECTION{@merge_with_sep@} The lens @merge_with_sep@ behaves like @merge@, 
+but allows a separator between the copied string. 
+
+#* let merge_with_sep (R:regexp) (s:string) : (lens in (R . s . R) <-> R) = 
+#*   copy (R . s . R) . ins s; 
+#*   merge (R . s); 
+#*   copy R . del s
+
+#* test (merge_with_sep [A-Z] ",").get "A,B" = "A"
+#* test (merge_with_sep [A-Z] ",").put "C" into "A,B" = "C,B"
+#* test (merge_with_sep [A-Z] ",").create "B" = "B,B"
 
 \LENSSECTION{@iterate@} The operator @iterate@ compose @f@ with itself
  @i@ times using @b@ for the first argument, i.e., @f(f(...(f b)...))@

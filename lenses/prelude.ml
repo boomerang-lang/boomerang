@@ -224,6 +224,7 @@ let pmk_lk    = pmk1 S.SLens mk_lfun S.SSkeletons mk_k
 let pmk_lm    = pmk1 S.SLens mk_lfun S.SResources mk_m
 let pmk_lss   = pmk2 S.SLens mk_lfun S.SString mk_sfun S.SString mk_s
 let pmk_lsl   = pmk2 S.SLens mk_lfun S.SString mk_sfun S.SLens mk_l
+let pmk_lssl  = pmk3 S.SLens mk_lfun (S.SString ^> S.SString) mk_ffun (S.SString ^> S.SString) mk_ffun S.SLens mk_l
 let pmk_lsss  =
   pmk3 S.SLens mk_lfun S.SString mk_sfun S.SString mk_sfun S.SString mk_s 
 let pmk_lq    = pmk1 S.SLens mk_lfun S.SCanonizer mk_q
@@ -389,23 +390,20 @@ let pmk_uszP = pmk_uXP S.PrStringList mk_szP
 
 let prelude_spec =
   [ (* lens operations *)
-    pmk_lss    "get"                  (fun _ ml s -> L.rget ml (Bstring.of_string s))
-  ; pmk_lsss   "put"                  (fun _ ml v s -> L.rput ml (Bstring.of_string v) (Bstring.of_string s))
-  ; pmk_lss    "create"               (fun _ ml v -> L.rcreate ml (Bstring.of_string v))
+    pmk_lss    "creater"              (fun _ ml s -> L.rcreater ml (Bstring.of_string s))
+  ; pmk_lss    "createl"               (fun _ ml v -> L.rcreatel ml (Bstring.of_string v))
+  ; pmk_lsss   "putr"                  (fun _ ml s v -> L.rputr ml (Bstring.of_string s) (Bstring.of_string v))
+  ; pmk_lsss   "putl"                  (fun _ ml v s -> L.rputl ml (Bstring.of_string v) (Bstring.of_string s))
   ; pmk_ll     "invert"               L.invert
                                         
   (* core lens combinators *)           
   ; pmk_rl     "copy"                 L.copy
-  ; pmk_rsfl   "clobber"              (fun i r s f -> L.disconnect i r
-                                          (Brx.mk_string s)
-                                          (fun s -> get_s (f (mk_s i s)))
-                                          (fun _ -> s))
-  ; pmk_lll    "lens_union"           L.union
   ; pmk_rrffl  "disconnect"           (fun i r1 r2 f1 f2 -> L.disconnect i
                                           r1
                                           r2
                                           (fun s -> get_s (f1 (mk_s i s)))
                                           (fun s -> get_s (f2 (mk_s i s))))
+  ; pmk_lll    "lens_union"           L.union
   ; pmk_lll    "lens_concat"          L.concat
   ; pmk_lll    "lens_swap"            (fun i l1 l2 -> L.permute i [1;0] [l1;l2])
   ; pmk_liil   "lens_iter"            L.iter
@@ -419,14 +417,9 @@ let prelude_spec =
   ; pmk_tll    "lens_match"           L.mmatch
   ; pmk_lll    "compose"              L.compose
   ; pmk_ll     "align"                L.align
-  ; pmk_lsl    "default"              (fun i l w -> L.default i l
-                                          (fun _ -> w)
-                                          (fun _ ->
-                                             begin match Brx.representative (Blenses.MLens.vtype l) with
-                                               | None -> assert false
-                                               | Some r -> r
-                                             end
-                                          ))
+  ; pmk_lssl   "defaults"             (fun i l f1 f2 -> L.defaults i l
+                                          (fun s -> get_s (f1 (mk_s i s)))
+                                          (fun s -> get_s (f2 (mk_s i s))))
   ; pmk_bill   "lens_weight"          (fun i b w -> L.weight i b (Bannot.Weight.of_int w))
   ; pmk_rzl    "partition"            (fun i rl -> L.partition i (Safelist.map get_r rl))
   ; pmk_lrfrfl "dup_first"            (fun i l r1 f1 r2 f2 ->
@@ -486,30 +479,16 @@ let prelude_spec =
                                               let vs = Bstring.of_string v in
                                               begin match r1r2o with
                                                 | None ->
-                                                  L.rcreate l vs
+                                                  L.rcreatel l vs
                                                 | Some (s1,s2) ->
                                                   if (s1 = s2) then
-                                                    L.rput l vs (Bstring.of_string s1)
+                                                    L.rputl l vs (Bstring.of_string s1)
                                                   else
                                                     s2
                                               end)
                                            (Brx.mk_string "")
                                            (fun _ _ -> ""))
   ; pmk_ll     "fiat"                 L.fiat
-  ; pmk_dup1   "dup1"                 (fun i l f fat ->
-                                         L.dup_first i
-                                           l
-                                           (Brx.mk_string "")
-                                           (fun _ _ -> "")
-                                           fat
-                                           (fun s _ -> get_s (f (mk_s i s))))
-  ; pmk_dup2   "dup2"                 (fun i f fat l ->
-                                         L.dup_second i
-                                           (Brx.mk_string "")
-                                           (fun _ _ -> "")
-                                           fat
-                                           (fun s _ -> get_s (f (mk_s i s)))
-                                           l)
 
   (* canonizer operations *)          
   ; pmk_rq     "canonizer_copy"       C.copy

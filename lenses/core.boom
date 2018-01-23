@@ -580,13 +580,48 @@ notation desugars into @in_bij_lens_type@.
 #* let in_bij_lens_type (l:lens) (S:regexp) (V:regexp) : bool =
 #*   (land (in_lens_type l S V) (bij l))
 
+\LENSSECTION{@creater@} The @creater@ function extracts the $\CREATER$ component of a lens. The record-style 
+projection notation @l.creater@ desugars into @creater@.
+
+#* let creater : (l:lens -> 
+#*               (s:string where! matches_cex (stype l) s) ->
+#*               (s':string where! matches_cex (vtype l) s'))
+## = Native.Prelude.creater
+
+\LENSSECTION{@createl@} The @createl@ function extracts the $\CREATEL$ 
+component of a lens. The record-style projection notation @l.createl@ 
+desugars into @createl@.
+
+#* let createl : (l:lens -> 
+#*              (v:string where! matches_cex (vtype l) v) -> 
+#*              (s:string where! matches_cex (stype l) s))
+## = Native.Prelude.createl 
+
+\LENSSECTION{@putr@} The @putr@ function extracts the $\PUTR$ component of a lens. 
+The record-style projection notation @l.putr s into v@ desugars into @putr@.
+
+#* let putr : (l:lens ->
+#*            (s:string where! matches_cex (stype l) s) -> 
+#*            (v:string where! matches_cex (vtype l) v) -> 
+#*            (v':string where! matches_cex (vtype l) v'))
+## = Native.Prelude.putr
+
+\LENSSECTION{@putl@} The @putl@ function extracts the $\PUTL$ component of a lens. 
+The record-style projection notation @l.putl v into s@ desugars into @putl@.
+
+#* let putl : (l:lens ->
+#*            (v:string where! matches_cex (vtype l) v) -> 
+#*            (s:string where! matches_cex (stype l) s) -> 
+#*            (s':string where! matches_cex (stype l) s'))
+## = Native.Prelude.putl
+
 \LENSSECTION{@get@} The @get@ function extracts the $\GET$ component of a lens. The record-style 
 projection notation @l.get@ desugars into @get@.
 
 #* let get : (l:lens -> 
 #*           (s:string where! matches_cex (stype l) s) ->
 #*           (s':string where! matches_cex (vtype l) s'))
-## = Native.Prelude.get
+## = creater
 
 \LENSSECTION{@put@} The @put@ function extracts the $\PUT$ component of a lens. 
 The record-style projection notation @l.put v into s@ desugars into @put@.
@@ -595,7 +630,7 @@ The record-style projection notation @l.put v into s@ desugars into @put@.
 #*           (v:string where! matches_cex (vtype l) v) -> 
 #*           (s:string where! matches_cex (stype l) s) -> 
 #*           (s':string where! matches_cex (stype l) s'))
-## = Native.Prelude.put 
+## = putl
 
 \LENSSECTION{@create@} The @create@ function extracts the $\CREATE$ 
 component of a lens. The record-style projection notation @l.create@ 
@@ -604,7 +639,7 @@ desugars into @create@.
 #* let create : (l:lens -> 
 #*              (v:string where! matches_cex (vtype l) v) -> 
 #*              (s:string where! matches_cex (stype l) s))
-## = Native.Prelude.create 
+## = createl 
 
 \subsection{Lenses}
 
@@ -861,15 +896,39 @@ resolves into instances of @lens_iter@ when applied to a lens argument.
 #* test create (lens_iter (copy [A-Z]) 1 4) "A" = "A"
 
 \LENSSECTION{@invert@} The @invert@ operator swaps the $\GET$ and $\CREATE$ 
-components of a lens, which must be bijective.
+components of a lens.
 
 #* let invert 
-#*     (l:lens where! land (bij l) (is_basic l)) 
+#*     (l:lens) 
 #*   : (l':lens where! in_bij_lens_type l' (vtype l) (stype l))
 ##   = Native.Prelude.invert l
 
 #* test get (invert (const [A] "B" "A")) "B" = "A"
-#* test invert (const [A-Z] "B" "A") = error
+#* test get (invert (const [A-Z] "B" "A")) "B" = "A"
+
+\LENSSECTION{@defaults@} The @defaults@ operator takes a lens @l@ and strings 
+@d1@ and @d2@ as arguments. It overrides @l@'s $\CREATE$ function to use $\PUT$ with 
+@d@ TODO.
+
+#* let defaults (l:lens where! is_basic l)
+#*              (f1:string -> (d:string where! matches_cex (stype l) d))
+#*              (f2:string -> (d:string where! matches_cex (vtype l) d))
+#*            : (l':lens where! in_lens_type l' (stype l) (vtype l))
+## = Native.Prelude.defaults l f1 f2
+
+\LENSSECTION{@default_left@} The @default_left@ operator TODO
+
+#* let default_left (l:lens where! is_basic l)
+#*                  (f:string -> (d:string where! matches_cex (stype l) d))
+#*                : (l':lens where! in_lens_type l' (stype l) (vtype l))
+## = Native.Prelude.defaults l f (fun (s:string) -> get l s)
+
+\LENSSECTION{@default_right@} The @default_right@ operator TODO
+
+#* let default_right (l:lens where! is_basic l)
+#*                  (f:string -> (d:string where! matches_cex (vtype l) d))
+#*                : (l':lens where! in_lens_type l' (vtype l) (stype l))
+## = Native.Prelude.defaults l (fun (v:string) -> create l v) f
 
 \LENSSECTION{@default@} The @default@ operator takes a lens @l@ and a string 
 @d@ as arguments. It overrides @l@'s $\CREATE$ function to use $\PUT$ with 
@@ -878,7 +937,7 @@ components of a lens, which must be bijective.
 #* let default (l:lens where! is_basic l)
 #*             (d:string where! matches_cex (stype l) d)
 #*           : (l':lens where! in_lens_type l' (stype l) (vtype l))
-## = Native.Prelude.default l d
+## = default_left l (fun (s:string) -> d)
 
 \subsection{Resourceful Lenses}
 
