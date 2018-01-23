@@ -1,0 +1,221 @@
+module Hosts =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let WS : regexp = (" " | "\t") . (" " | "\t")*  
+
+let IPADDR : regexp = NUMBER . "." . NUMBER . "." . NUMBER . "." . NUMBER 
+
+let HOSTNAME : regexp = WORD 
+
+let HOSTSLINE
+  : regexp =
+  IPADDR . WS . HOSTNAME . (WS . HOSTNAME)*  . (WS . COMMENT | "") 
+
+let HOSTS : regexp = ((HOSTSLINE | "" | COMMENT) . "\n")*  
+
+let IPADDR_DICT : regexp = "{\"ipaddr\"=\"" . IPADDR . "\"}" 
+
+let HOST_DICT
+  : regexp =
+  "{\"name\"=\"" . HOSTNAME . "\",\"ws\"=\"" . WS . "\"}" 
+
+let COMM_DICT
+  : regexp =
+  "{\"comment\"=\"" . COMMENT . "\",\"ws\"=\"" . WS . "\"}" 
+
+let HOSTLINE_DICT
+  : regexp =
+  "{\"ipaddrs\"="
+    . IPADDR_DICT
+    . ",\"hosts\"=" . HOST_DICT . HOST_DICT*  . (COMM_DICT | "") . "}" 
+
+let HOSTS_DICT
+  : regexp =
+  ((HOSTLINE_DICT | EMPTYDICT | COMMENT_DICT) . "\n")*  
+
+let ipaddr_lens
+  : (lens in IPADDR <=> IPADDR_DICT) =
+  synth IPADDR <=> IPADDR_DICT 
+
+let hostline_lens
+  : (lens in HOSTSLINE <=> HOSTLINE_DICT) =
+  synth HOSTSLINE <=> HOSTLINE_DICT 
+
+let hosts_lens : (lens in HOSTS <=> HOSTS_DICT) = synth HOSTS <=> HOSTS_DICT 
+
+test hosts_lens.get
+  "127.0.0.1 localhost alias # comment\n"
+  = "{\"ipaddrs\"={\"ipaddr\"=\"127.0.0.1\"},\"hosts\"={\"name\"=\"localhost\",\"ws\"=\" \"}{\"name\"=\"alias\",\"ws\"=\" \"}{\"comment\"=\"# comment\",\"ws\"=\" \"}}\n"

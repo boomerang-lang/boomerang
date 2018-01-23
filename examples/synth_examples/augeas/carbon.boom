@@ -1,0 +1,305 @@
+module Carbon =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let BRACKETLESS_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let NONEMPTY_BRACKETLESS_STRING
+  : regexp =
+  BRACKETLESS_STRING_COMPONENT . BRACKETLESS_STRING_COMPONENT*  
+
+let BRACKETLESS_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let NONEMPTY_BRACKETLESS_DELIMITED_STRING
+  : regexp =
+  BRACKETLESS_STRING_COMPONENT . BRACKETLESS_STRING_COMPONENT*  
+
+let HASHLESS_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let NONEMPTY_HASHLESS_STRING
+  : regexp =
+  HASHLESS_STRING_COMPONENT . HASHLESS_STRING_COMPONENT*  
+
+let HASHLESS_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let NONEMPTY_HASHLESS_DELIMITED_STRING
+  : regexp =
+  BRACKETLESS_DELIMITED_STRING_COMPONENT
+    . BRACKETLESS_DELIMITED_STRING_COMPONENT*  
+
+let CARBON_ENTRY_ENTRY
+  : regexp =
+  WORD . " =" . ("" | " " . NONEMPTY_HASHLESS_STRING) . ("" | COMMENT) 
+
+test matches_cex
+  CARBON_ENTRY_ENTRY
+  "LINE_RECEIVER_INTERFACE = 0.0.0.0" = true
+
+test matches_cex
+  CARBON_ENTRY_ENTRY
+  "MAX_CACHE_SIZE = inf # comment at EOL" = true
+
+test matches_cex CARBON_ENTRY_ENTRY "USER =" = true
+
+test matches_cex CARBON_ENTRY_ENTRY "USER =# test" = true
+
+let CARBON_ENTRY
+  : regexp =
+  "[" . NONEMPTY_BRACKETLESS_STRING . "]\n"
+    . ((CARBON_ENTRY_ENTRY | COMMENT | "") . "\n")*  
+
+test matches_cex
+  CARBON_ENTRY
+  "[cache]\n# Configure carbon directories.\n\n# Specify the user to drop privileges to\n# If this is blank carbon runs as the user that invokes it\n# This user must have write access to the local data directory\nUSER =\n\nMAX_CACHE_SIZE = inf # comment at EOL\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2003\nENABLE_UDP_LISTENER = False\n" = true
+
+let CARBON_CONF : regexp = CARBON_ENTRY*  
+
+test matches_cex
+  CARBON_CONF
+  "[cache]\n# Configure carbon directories.\n\n# Specify the user to drop privileges to\n# If this is blank carbon runs as the user that invokes it\n# This user must have write access to the local data directory\nUSER =\n\nMAX_CACHE_SIZE = inf # comment at EOL\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2003\nENABLE_UDP_LISTENER = False\n\n[relay]\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2013\nPICKLE_RECEIVER_INTERFACE = 0.0.0.0\nPICKLE_RECEIVER_PORT = 2014\n" = true
+
+let CARBON_ENTRY_ENTRY_DICT
+  : regexp =
+  "{\""
+    . WORD
+    . "\""
+    . ("" | "=\"" . NONEMPTY_BRACKETLESS_DELIMITED_STRING . "\"")
+    . ("" | COMMENT_DICT) . "}" 
+
+let entry_entry_map
+  : (lens in CARBON_ENTRY_ENTRY <=> CARBON_ENTRY_ENTRY_DICT) =
+  synth CARBON_ENTRY_ENTRY <=> CARBON_ENTRY_ENTRY_DICT 
+
+let CARBON_ENTRY_DICT
+  : regexp =
+  "{\""
+    . NONEMPTY_BRACKETLESS_DELIMITED_STRING
+    . "\"" . (CARBON_ENTRY_ENTRY_DICT | "{ }" | COMMENT_DICT)*  . "}" 
+
+let entry_map
+  : (lens in CARBON_ENTRY <=> CARBON_ENTRY_DICT) =
+  synth CARBON_ENTRY <=> CARBON_ENTRY_DICT 
+
+let CARBON_DICT
+  : regexp =
+  "" | "{" . CARBON_ENTRY_DICT . CARBON_ENTRY_DICT*  . "}" 
+
+let carbon_map
+  : (lens in CARBON_CONF <=> CARBON_DICT) =
+  synth CARBON_CONF <=> CARBON_DICT 

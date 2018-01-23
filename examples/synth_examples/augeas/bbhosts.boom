@@ -1,0 +1,376 @@
+module Bbhosts =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let NON_WSP_START_NONEMPTY_STRING : regexp = NON_WSP_CHAR . STRING 
+
+let NON_WSP_START_NONEMPTY_DELIMITED_STRING
+  : regexp =
+  NON_WSP_CHAR . DELIMITED_STRING 
+
+let PAGE_TITLE : regexp = "page " . SIMPLE_WORD . " " . STRING 
+
+test matches_cex PAGE_TITLE "page firstpage My first page" = true
+
+let GROUP_INFO
+  : regexp =
+  "group-compress" . NONEMPTY_SAMELINE_WSP . NON_WSP_START_NONEMPTY_STRING
+    | "group-only"
+        . NONEMPTY_SAMELINE_WSP
+        . SIMPLE_WORD . NONEMPTY_SAMELINE_WSP . NON_WSP_START_NONEMPTY_STRING 
+
+let IP_NUMBER : regexp = DIGIT | DIGIT . DIGIT | DIGIT . DIGIT . DIGIT 
+
+let IP_ADDRESS
+  : regexp =
+  IP_NUMBER . "." . IP_NUMBER . "." . IP_NUMBER . "." . IP_NUMBER 
+
+test matches_cex IP_ADDRESS "1.2.3.4" = true
+
+let URL : regexp = ("http" | "https") . WORD 
+
+test matches_cex URL "http://url.to/monitor" = true
+
+let PROBE_TYPE
+  : regexp =
+  "cont"
+    | "noping"
+    | "noconn"
+    | "ssh"
+    | "dns"
+    | "pop3"
+    | "imap2"
+    | "telnet"
+    | "fping"
+    | "http"
+    | "ftps"
+    | "imaps"
+    | "imap4"
+    | "pop-3"
+    | "pop2s" | "pop" | "smtp" | "smtps" | "ssh1" | "ssh2" | "telnets" 
+
+let PROBE : regexp = ("!" | "") . PROBE_TYPE | URL 
+
+let PROBE_DICT
+  : regexp =
+  "{\"" . PROBE_TYPE . "\"=\"" . ("!" | "") . "\""
+    | "{\"url\"=\"" . URL . "\"" 
+
+let probe_map : (lens in PROBE <=> PROBE_DICT) = synth PROBE <=> PROBE_DICT 
+
+let PROBE_WITH_SUBSTUFF
+  : regexp =
+  PROBE . ("" | ";" . WORD | ";" . WORD . ";" . WORD) 
+
+test matches_cex PROBE_WITH_SUBSTUFF "http://url.to/monitor" = true
+
+test matches_cex PROBE_WITH_SUBSTUFF "https://another.url/to/monitor" = true
+
+test matches_cex
+  PROBE_WITH_SUBSTUFF
+  "cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+let PROBE_WITH_SUBSTUFF_DICT
+  : regexp =
+  PROBE_DICT
+    . (""
+         | "{\"url\"=\"" . WORD . "\"}"
+             . ("" | "{\"keyword\"=\"" . WORD . "\"}"))
+    . "}" 
+
+let probe_with_substuff_map
+  : (lens in PROBE_WITH_SUBSTUFF <=> PROBE_WITH_SUBSTUFF_DICT) =
+  synth PROBE_WITH_SUBSTUFF <=> PROBE_WITH_SUBSTUFF_DICT 
+
+let DATETIME : regexp = NUMBER | "*" 
+
+let DOWNTIME
+  : regexp =
+  "DOWNTIME="
+    . ("" | PROBE_TYPE . ("," . PROBE_TYPE)* )
+    . ":" . DATETIME
+    . ":" . DATETIME . ":" . DATETIME . ":" . "\"" . QUOTELESS_STRING . "\"" 
+
+test matches_cex
+  DOWNTIME
+  "DOWNTIME=fping,http:*:1800:1015:\"Frontal 01 Redirect Amazon eteint entre 18h et 10h\"" = true
+
+let DOWNTIME_DICT
+  : regexp =
+  "{\"DOWNTIME\""
+    . ("{\"probe\"=\"" . PROBE_TYPE . "\"}")* 
+    . "{\"day\"=\""
+    . DATETIME
+    . "\"}"
+    . "{\"starttime\"=\""
+    . DATETIME
+    . "\"}"
+    . "{\"endtime\"=\""
+    . DATETIME . "\"}" . "{\"cause\"=\"" . QUOTELESS_STRING . "\"}" . "}" 
+
+let PROBES
+  : regexp =
+  "#" . (NONEMPTY_SAMELINE_WSP . (PROBE_WITH_SUBSTUFF | DOWNTIME))*  
+
+test matches_cex
+  PROBES
+  "# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+let PROBES_DICT
+  : regexp =
+  ""
+    | "{\"probes\""
+        . NONEMPTY_SAMELINE_WSP . (PROBE_WITH_SUBSTUFF_DICT | DOWNTIME_DICT)
+        . (NONEMPTY_SAMELINE_WSP . (PROBE_WITH_SUBSTUFF_DICT | DOWNTIME_DICT))* 
+        . "}" 
+
+let USER_ADDR
+  : regexp =
+  IP_ADDRESS . NONEMPTY_SAMELINE_WSP . WORD . NONEMPTY_SAMELINE_WSP . PROBES 
+
+test matches_cex
+  USER_ADDR
+  "1.2.3.4\t\tamachine\t# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+test matches_cex
+  USER_ADDR
+  "1.2.3.5\t\tamachine2\t# http://url.to/monitor https://another.url/to/monitor !cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+let GROUP
+  : regexp =
+  GROUP_INFO . "\n" . ((USER_ADDR | COMMENT | "") . "\n")*  
+
+test matches_cex
+  GROUP
+  "group-compress  A group\n1.2.3.4\t\tamachine\t# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind\n1.2.3.5\t\tamachine2\t# http://url.to/monitor https://another.url/to/monitor !cont;http://a.cont.url/to/monitor;wordtofind\n# a comment in a group\n\n\n" = true
+
+let PAGE : regexp = PAGE_TITLE . "\n" . (("" | COMMENT) . "\n")*  . GROUP*  
+
+test matches_cex
+  PAGE
+  "page firstpage My first page\n\n# page comment\n\n\ngroup-compress  A group\n1.2.3.4\t\tamachine\t# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind\n1.2.3.5\t\tamachine2\t# http://url.to/monitor https://another.url/to/monitor !cont;http://a.cont.url/to/monitor;wordtofind\n# a comment in a group\n\n\ngroup-only  dns VIP DNS\n10.50.25.48\tmydnsmachine.network #\n10.50.25.49     myotherdnsmachine.network # noping noconn !ssh dns;mydnstocheck\n# a comment in a group\n" = true
+
+let CONF : regexp = (("" | COMMENT) . "\n")*  . PAGE*  
+
+test matches_cex
+  CONF
+  "\n# A comment\n\npage firstpage My first page\n\ngroup-compress  A group\n1.2.3.4\t\tamachine\t# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind\n1.2.3.5\t\tamachine2\t# http://url.to/monitor https://another.url/to/monitor !cont;http://a.cont.url/to/monitor;wordtofind\n\ngroup-only  dns  VIP DNS\n10.50.25.48\tmydnsmachine.network #\n10.50.25.49     myotherdnsmachine.network # noping noconn !ssh dns;mydnstocheck\n# a comment in a group\n\n\npage anotherpage A new page\n\n# a comment in a page\n\ngroup-compress My test\n192.168.0.2\tmyhost\t# https://myurl.com:1256 noconn pop3 imap2 ssh\n192.168.0.3\tmyhost2 # !imap2 telnet dns\n\ngroup-compress DownTime\n0.0.0.0\tmyhost3 # DOWNTIME=fping,http:*:1800:1015:\"Frontal 01 Redirect Amazon eteint entre 18h et 10h\"\n0.0.0.0\tmyhost4 # ftps imaps imap4 pop-3 pop2s pop smtp smtps ssh ssh1 ssh2 telnet telnets\n" = true
+
+let USER_ADDR
+  : regexp =
+  IP_ADDRESS . NONEMPTY_SAMELINE_WSP . WORD . NONEMPTY_SAMELINE_WSP . PROBES 
+
+test matches_cex
+  USER_ADDR
+  "1.2.3.4\t\tamachine\t# http://url.to/monitor https://another.url/to/monitor cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+test matches_cex
+  USER_ADDR
+  "1.2.3.5\t\tamachine2\t# http://url.to/monitor https://another.url/to/monitor !cont;http://a.cont.url/to/monitor;wordtofind" = true
+
+let GROUP
+  : regexp =
+  GROUP_INFO . "\n" . ((USER_ADDR | COMMENT | "") . "\n")*  
+
+let GROUP_DICT
+  : regexp =
+  ("{\"group-compress\"=\""
+     . NON_WSP_START_NONEMPTY_DELIMITED_STRING . "\"" . NONEMPTY_SAMELINE_WSP
+     | "{\"group-only\"=\""
+         . NON_WSP_START_NONEMPTY_DELIMITED_STRING
+         . "\""
+         . NONEMPTY_SAMELINE_WSP
+         . "{\"col\"=\"" . SIMPLE_WORD . "\"}" . NONEMPTY_SAMELINE_WSP)
+    . ("{\"host\"{\"ip\"=\""
+         . IP_ADDRESS
+         . "\"}"
+         . NONEMPTY_SAMELINE_WSP
+         . "{\"fqdn\"=\""
+         . WORD . "\"}" . NONEMPTY_SAMELINE_WSP . PROBES_DICT
+         | COMMENT_DICT | "{ }")* 
+    . "}" 
+
+let PAGE_DICT
+  : regexp =
+  "{\"page\"=\""
+    . SIMPLE_WORD
+    . "\""
+    . "{\"title\"=\""
+    . DELIMITED_STRING
+    . "\"}" . ("{ }" | COMMENT_DICT)*  . GROUP_DICT*  . "}" 
+
+let DICT : regexp = ("{ }" | COMMENT_DICT)*  . PAGE_DICT*  
+
+let map : (lens in CONF <=> DICT) = synth CONF <=> DICT 

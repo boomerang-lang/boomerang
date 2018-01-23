@@ -1,0 +1,91 @@
+module Extr-num =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let CHARACTER : regexp = LOWERCASE | UPPERCASE 
+
+let TEXT : regexp = (CHARACTER | " ")*  
+
+let NUMERICTEXT : regexp = (CHARACTER | " " | DIGIT)*  
+
+let PHONENUMBER
+  : regexp =
+  DIGIT
+    . DIGIT
+    . DIGIT
+    . "-" . DIGIT . DIGIT . DIGIT . "-" . DIGIT . DIGIT . DIGIT . DIGIT 
+
+test matches_cex PHONENUMBER "415-342-3622" = true
+
+let PHONENUMBERHIDDEN : regexp = TEXT . PHONENUMBER . TEXT 
+
+test matches_cex
+  PHONENUMBERHIDDEN
+  "asdfscxv as df415-342-3622 asdfasdf v a" = true
+
+let PHONENUMBEREXPLICIT
+  : regexp =
+  "number: \""
+    . PHONENUMBER
+    . "\"\nbeforetext: \"" . TEXT . "\"\naftertext: \"" . TEXT . "\"" 
+
+test matches_cex
+  PHONENUMBEREXPLICIT
+  "number: \"415-342-3622\"\nbeforetext: \"asdfscxv as df\"\naftertext: \" asdfasdf v a\"" = true
+
+let extract_number
+  : (lens in PHONENUMBERHIDDEN <=> PHONENUMBEREXPLICIT) =
+  synth PHONENUMBERHIDDEN <=> PHONENUMBEREXPLICIT using {("asdfscxv as df415-342-3622 asdfasdf v a","number: \"415-342-3622\"\nbeforetext: \"asdfscxv as df\"\naftertext: \" asdfasdf v a\"")} 

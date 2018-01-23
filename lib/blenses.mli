@@ -93,9 +93,10 @@ module MLens : sig
   val sequiv_identity : t -> bool
   val vequiv_identity : t -> bool
   val bij : t -> bool
-  val rget : t -> Bstring.t -> string
-  val rput : t -> Bstring.t -> Bstring.t -> string
-  val rcreate : t -> Bstring.t -> string
+  val rcreater : t -> Bstring.t -> string
+  val rcreatel : t -> Bstring.t -> string
+  val rputr : t -> Bstring.t -> Bstring.t -> string
+  val rputl : t -> Bstring.t -> Bstring.t -> string
   val canonizer_of_t : Info.t -> t -> Canonizer.t
   val invert : Info.t -> t -> t
   val copy : Info.t -> Brx.t -> t
@@ -108,7 +109,7 @@ module MLens : sig
   val permute : Info.t -> int list -> t list -> t
   val compose : Info.t -> t -> t -> t
   val align : Info.t -> t -> t
-  val default : Info.t -> t -> (string -> string) -> (string -> string) -> t
+  val defaults : Info.t -> t -> (string -> string) -> (string -> string) -> t
   val mmatch : Info.t -> Btag.t -> t -> t
   val partition : Info.t -> Brx.t list -> t
   val merge : Info.t -> Brx.t -> t

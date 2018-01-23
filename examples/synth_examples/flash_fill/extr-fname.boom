@@ -1,0 +1,90 @@
+module Extr-fname =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let LOCALFOLDER
+  : regexp =
+  (LOWERCASE | UPPERCASE | "_" | "." | "-")
+    . (LOWERCASE | UPPERCASE | "_" | "." | "-")*  
+
+test matches_cex LOCALFOLDER "extract-filename.txt" = true
+
+let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*  
+
+let NONEMPTYDIRECTORY
+  : regexp =
+  ("/" | "") . LOCALFOLDER . ("/" . LOCALFOLDER)*  
+
+let GLOBALFOLDER : regexp = DIRECTORY . LOCALFOLDER 
+
+let FOLDER : regexp = (LOCALFOLDER . "/")*  . LOCALFOLDER . ("" | "/") 
+
+test matches_cex
+  DIRECTORY
+  "Users/amiltner/lens/tests/flashfill/extract-filename.txt/" = true
+
+let FILEANDFOLDER
+  : regexp =
+  "file: " . LOCALFOLDER . "\nfolder: " . DIRECTORY 
+
+test matches_cex
+  FILEANDFOLDER
+  "file: extract-filename.txt\nfolder: Users/amiltner/lens/tests/flashfill/" = true
+
+let extract_file
+  : (lens in NONEMPTYDIRECTORY <=> FILEANDFOLDER) =
+  synth NONEMPTYDIRECTORY <=> FILEANDFOLDER using {("/Users/amiltner/lens/tests/flashfill/extract-filename.txt","file: extract-filename.txt\nfolder: /Users/amiltner/lens/tests/flashfill/"),
+    ("tests/flashfill/extract-filename.txt","file: extract-filename.txt\nfolder: tests/flashfill/")} 

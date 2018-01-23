@@ -1,0 +1,199 @@
+module Xml =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let X : regexp = UPPERCASE 
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT | "\\\"" | " ")*  
+
+let COMMENT_KVP : regexp = "\"#comment\" = \"" . DELIMITED_STRING . "\"" 
+
+let TEXTCHAR : regexp = UPPERCASE | LOWERCASE | " " | "\n" | DIGIT 
+
+let TEXT : regexp = TEXTCHAR*  
+
+let NONEMPTYTEXT : regexp = TEXTCHAR . TEXTCHAR*  
+
+let NAME
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT) . (UPPERCASE | LOWERCASE | DIGIT)*  
+
+let XML_ATTRIBUTE_KVP : regexp = NAME . "=\"" . TEXT . "\"" 
+
+test matches_cex XML_ATTRIBUTE_KVP "attribute=\"myattribute\"" = true
+
+let XML_ATTRIBUTE_LIST : regexp = (" " . XML_ATTRIBUTE_KVP)*  
+
+let XML_ELEMENT : regexp = "<" . NAME . XML_ATTRIBUTE_LIST . ">" 
+
+test matches_cex XML_ELEMENT "<hello attribute=\"myattribute\">" = true
+
+let XML_END_ELEMENT : regexp = "</" . NAME . ">" 
+
+test matches_cex XML_END_ELEMENT "</hello>" = true
+
+let XML_CONTENTLESS_ELEMENT
+  : regexp =
+  "<" . NAME . XML_ATTRIBUTE_LIST . "/>" 
+
+test matches_cex
+  XML_CONTENTLESS_ELEMENT
+  "<hello attribute=\"myattribute\"/>" = true
+
+let XML_INNER_ELEMENT
+  : regexp =
+  XML_ELEMENT . TEXT . XML_END_ELEMENT | XML_CONTENTLESS_ELEMENT 
+
+test matches_cex XML_INNER_ELEMENT "<hello></hello>" = true
+
+test matches_cex XML_INNER_ELEMENT "<hello/>" = true
+
+let SINGLE_ATTRIBUTE_DICT : regexp = "{\"" . NAME . "\"=\"" . TEXT . "\"}" 
+
+test matches_cex SINGLE_ATTRIBUTE_DICT "{\"attribute\"=\"value\"}" = true
+
+let FULL_ATTRIBUTE_DICT
+  : regexp =
+  "{\"#attribute\"" . SINGLE_ATTRIBUTE_DICT . SINGLE_ATTRIBUTE_DICT*  . "}" 
+
+test matches_cex
+  FULL_ATTRIBUTE_DICT
+  "{\"#attribute\"{\"attribute\"=\"value\"}}" = true
+
+let ENDBRACE_DICT : regexp = "{\"endbrace\"=\"" . NAME . "\"}" 
+
+test matches_cex ENDBRACE_DICT "{\"endbrace\"=\"test\"}" = true
+
+let NONEMPTY_TEXT_DICT : regexp = "{\"#text\"=\"" . NONEMPTYTEXT . "\"}" 
+
+test matches_cex NONEMPTY_TEXT_DICT "{\"#text\"=\"text\"}" = true
+
+let INNER_XML_DICT
+  : regexp =
+  "{"
+    . "\""
+    . NAME
+    . "\""
+    . (FULL_ATTRIBUTE_DICT | "")
+    . ((NONEMPTY_TEXT_DICT | "") . ENDBRACE_DICT | "") . "}" 
+
+test matches_cex INNER_XML_DICT "{\"element\"}" = true
+
+let SECONDLEVEL_XML_DICT
+  : regexp =
+  "{"
+    . "\""
+    . NAME
+    . "\""
+    . (FULL_ATTRIBUTE_DICT | "")
+    . ((NONEMPTY_TEXT_DICT | "" | INNER_XML_DICT . INNER_XML_DICT* )
+         . ENDBRACE_DICT
+         | "")
+    . "}" 
+
+test matches_cex SECONDLEVEL_XML_DICT "{\"element\"}" = true
+
+test matches_cex
+  SECONDLEVEL_XML_DICT
+  "{\"element\"{\"#attribute\"{\"attribute\"=\"value\"}}}" = true
+
+test matches_cex
+  SECONDLEVEL_XML_DICT
+  "{\"element\"{\"#attribute\"{\"attribute\"=\"value\"}}{\"endbrace\"=\"test\"}}" = true
+
+test matches_cex
+  SECONDLEVEL_XML_DICT
+  "{\"element\"{\"#attribute\"{\"attribute\"=\"value\"}}{\"element\"}{\"endbrace\"=\"test\"}}" = true
+
+let THIRDLEVEL_XML_DICT
+  : regexp =
+  "{"
+    . "\""
+    . NAME
+    . "\""
+    . (FULL_ATTRIBUTE_DICT | "")
+    . ((NONEMPTY_TEXT_DICT
+          | "" | SECONDLEVEL_XML_DICT . SECONDLEVEL_XML_DICT* )
+         . ENDBRACE_DICT
+         | "")
+    . "}" 
+
+let XML_SECONDLEVEL_ELEMENT
+  : regexp =
+  XML_ELEMENT
+    . (TEXT | XML_INNER_ELEMENT . XML_INNER_ELEMENT* ) . XML_END_ELEMENT
+    | XML_CONTENTLESS_ELEMENT 
+
+let XML_THIRDLEVEL_ELEMENT
+  : regexp =
+  XML_ELEMENT
+    . (TEXT | XML_SECONDLEVEL_ELEMENT . XML_SECONDLEVEL_ELEMENT* )
+    . XML_END_ELEMENT
+    | XML_CONTENTLESS_ELEMENT 
+
+let map_inner
+  : (lens in XML_INNER_ELEMENT <=> INNER_XML_DICT) =
+  synth XML_INNER_ELEMENT <=> INNER_XML_DICT 
+
+let map_outer
+  : (lens in XML_SECONDLEVEL_ELEMENT <=> SECONDLEVEL_XML_DICT) =
+  synth XML_SECONDLEVEL_ELEMENT <=> SECONDLEVEL_XML_DICT 
+
+let map_third
+  : (lens in XML_THIRDLEVEL_ELEMENT <=> THIRDLEVEL_XML_DICT) =
+  synth XML_THIRDLEVEL_ELEMENT <=> THIRDLEVEL_XML_DICT 

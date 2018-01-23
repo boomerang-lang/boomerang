@@ -1,0 +1,226 @@
+module Cgrules =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let NON_WSP_NON_PERCENT_NON_AT_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" 
+
+let USERNAME
+  : regexp =
+  NON_WSP_NON_PERCENT_NON_AT_CHAR . NON_WSP_NON_PERCENT_NON_AT_CHAR*  
+
+let GROUPNAME : regexp = "@" . USERNAME 
+
+let USER_OR_GROUP_RECORD
+  : regexp =
+  (USERNAME | GROUPNAME)
+    . NONEMPTY_SAMELINE_WSP
+    . WORD
+    . NONEMPTY_SAMELINE_WSP
+    . WORD
+    . "\n"
+    . ("%"
+         . NONEMPTY_SAMELINE_WSP . WORD . NONEMPTY_SAMELINE_WSP . WORD . "\n")*  
+
+let USER_OR_GROUP_RECORD_DICT
+  : regexp =
+  "{\""
+    . ("user" | "group")
+    . "\"=\""
+    . USERNAME
+    . "\""
+    . "{"
+    . NONEMPTY_SAMELINE_WSP
+    . "\"" . WORD . "\"=\"" . WORD . "\"" . NONEMPTY_SAMELINE_WSP . "}"
+    . ("{"
+         . NONEMPTY_SAMELINE_WSP
+         . "\"" . WORD . "\"=\"" . WORD . "\"" . NONEMPTY_SAMELINE_WSP . "}")* 
+    . "}" 
+
+let user_or_group_record_map
+  : (lens in USER_OR_GROUP_RECORD <=> USER_OR_GROUP_RECORD_DICT) =
+  synth USER_OR_GROUP_RECORD <=> USER_OR_GROUP_RECORD_DICT 
+
+let RULES_CONF : regexp = (USER_OR_GROUP_RECORD | COMMENT . "\n" | "\n")*  
+
+let RULES_DICT
+  : regexp =
+  "{" . (USER_OR_GROUP_RECORD_DICT | COMMENT_DICT | "{ }")*  . "}" 
+
+let rules_map
+  : (lens in RULES_CONF <=> RULES_DICT) =
+  synth RULES_CONF <=> RULES_DICT 

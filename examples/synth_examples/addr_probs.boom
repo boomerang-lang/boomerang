@@ -1,0 +1,113 @@
+module Addr_probs =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let NAME : regexp = UPPERCASE . LOWERCASE*  
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let STREETTYPE : regexp = "Road" | "Avenue" | "Street" | "Boulevard" . "" 
+
+let CARDINALDIRECTION : regexp = "North" | "South" | "East" | "West" 
+
+let STREETNAME
+  : regexp =
+  NAME
+    . (" " . NAME)* 
+    . (" " . STREETTYPE | "") . ("" | " " . CARDINALDIRECTION) 
+
+let ZIP : regexp = DIGIT . DIGIT . DIGIT . DIGIT . DIGIT 
+
+let STATE : regexp = UPPERCASE . UPPERCASE 
+
+let CSV_ADDRESS
+  : regexp =
+  NAME
+    . ","
+    . NAME
+    . ","
+    . STATE . "," . ZIP . "," . NAME . "," . NUMBER . "," . STREETNAME . "\n" 
+
+let LETTER_ADDRESS
+  : regexp =
+  NAME
+    . " "
+    . NAME
+    . "\n"
+    . NUMBER
+    . " "
+    . STREETNAME
+    . "\n" . UPPERCASE . LOWERCASE*  . ", " . STATE . " " . " " . ZIP 
+
+let CSV_ADDRESS_DATABASE : regexp = CSV_ADDRESS*  
+
+let LETTER_ADDRESS_LIST
+  : regexp =
+  "" | LETTER_ADDRESS . ("\n\n" . LETTER_ADDRESS)*  
+
+let csv_to_letter
+  : (lens in CSV_ADDRESS_DATABASE <=> LETTER_ADDRESS_LIST) =
+  synth CSV_ADDRESS_DATABASE <=> LETTER_ADDRESS_LIST using {("Doe,John,NP,12345,Porttown,88,Town Road West\nDoe,Jane,CJ,54321,Greentown,610,Direction House\n","John Doe\n88 Town Road West\nPorttown, NP  12345\n\nJane Doe\n610 Direction House\nGreentown, CJ  54321")} 
+
+test csv_to_letter.get
+  "Doe,John,NP,12345,Porttown,88,Town Road West\nDoe,Jane,CJ,54321,Greentown,610,Direction House\n"
+  = "John Doe\n88 Town Road West\nPorttown, NP  12345\n\nJane Doe\n610 Direction House\nGreentown, CJ  54321"
+
+test csv_to_letter.get "" = ""
+
+test csv_to_letter.get
+  "Doe,John,MI,98765,Cityyy,1620,Rosey Avenue\n"
+  = "John Doe\n1620 Rosey Avenue\nCityyy, MI  98765"

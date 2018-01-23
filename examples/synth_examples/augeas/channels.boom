@@ -1,0 +1,302 @@
+module Channels =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let SAMELINE_NON_SEMI_QUOTELESS_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_"
+    | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | " " | "\t" 
+
+let SAMELINE_NON_COLON_AT_QUOTELESS_PLUSLESS_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ";" | "/" | DIGIT | "," | "=" | "*" | " " | "\t" 
+
+let ENTRY_NAME
+  : regexp =
+  SAMELINE_NON_SEMI_QUOTELESS_CHAR . SAMELINE_NON_SEMI_QUOTELESS_CHAR*  
+
+let VALUE
+  : regexp =
+  SAMELINE_NON_COLON_AT_QUOTELESS_PLUSLESS_CHAR
+    . SAMELINE_NON_COLON_AT_QUOTELESS_PLUSLESS_CHAR*  
+
+let LANG
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT) . (UPPERCASE | LOWERCASE | DIGIT)*  
+
+let ENTRY_CONF
+  : regexp =
+  ENTRY_NAME
+    . ";"
+    . VALUE
+    . ":"
+    . NUMBER
+    . ":"
+    . VALUE
+    . ":"
+    . VALUE
+    . ":"
+    . NUMBER
+    . ":"
+    . NUMBER
+    . "="
+    . NUMBER
+    . (":" . NUMBER . "=" . ("" | LANG . ("+" . LANG)* ) . "@" . NUMBER)* 
+    . ":"
+    . NUMBER
+    . ":"
+    . NUMBER . ":" . NUMBER . ":" . NUMBER . ":" . NUMBER . ":" . NUMBER 
+
+test matches_cex
+  ENTRY_CONF
+  "Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0" = true
+
+let ENTRY_DICT
+  : regexp =
+  "{\"entry\"=\""
+    . ENTRY_NAME
+    . "\""
+    . "{\"provider\"=\""
+    . VALUE
+    . "\"}"
+    . "{\"frequency\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"parameter\"=\""
+    . VALUE
+    . "\"}"
+    . "{\"signal_source\"=\""
+    . VALUE
+    . "\"}"
+    . "{\"symbol_rate\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"tpid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"caid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"sid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"nid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"tid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"rid\"=\""
+    . NUMBER
+    . "\"}"
+    . "{\"vpid\"=\""
+    . NUMBER
+    . "\""
+    . "{\"codec\"=\""
+    . NUMBER
+    . "\"}}"
+    . ("{\"apid\"=\""
+         . NUMBER
+         . "\""
+         . ("{\"lang\"=\"" . LANG . "\"}")* 
+         . "{\"codec\"=\"" . NUMBER . "\"}}")* 
+    . "}" 
+
+let THIS_COMMENT : regexp = "; " . STRING 
+
+let entry_map
+  : (lens in ENTRY_CONF <=> ENTRY_DICT) =
+  synth ENTRY_CONF <=> ENTRY_DICT using {("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0","{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}")} 
+
+let CHANNELS_CONF
+  : regexp =
+  ((ENTRY_CONF | THIS_COMMENT) . "\n")* 
+    . (":" . ENTRY_NAME . "\n" . ((ENTRY_CONF | THIS_COMMENT) . "\n")* )*  
+
+let CHANNELS_DICT
+  : regexp =
+  "{"
+    . (ENTRY_DICT | COMMENT_DICT)* 
+    . ("{\"group\"=\""
+         . ENTRY_NAME . "\"" . (ENTRY_DICT | COMMENT_DICT)*  . "}")* 
+    . "}" 
+
+let channels_map
+  : (lens in CHANNELS_CONF <=> CHANNELS_DICT) =
+  synth CHANNELS_CONF <=> CHANNELS_DICT using {("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0\n","{{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}}")} 

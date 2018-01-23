@@ -1,0 +1,129 @@
+module Bib_prob =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let NAME : regexp = UPPERCASE . LOWERCASE*  
+
+let LASTCOMMASTART : regexp = NAME . "," . (WSP . NAME)*  
+
+let STARTTOEND : regexp = (NAME . WSP)*  . NAME 
+
+let BIBTEXAUTHORLIST
+  : regexp =
+  LASTCOMMASTART . (" and " . LASTCOMMASTART)*  
+
+let BIBTEXAUTHORINFO : regexp = "author={" . BIBTEXAUTHORLIST . "}" 
+
+let AUTAG : regexp = "au - " 
+
+let TITAG : regexp = "ti - " 
+
+let JOTAG : regexp = "jo - " 
+
+let TAGGEDAUTHORDEFNS
+  : regexp =
+  AUTAG . STARTTOEND . ("\n " . AUTAG . STARTTOEND)*  
+
+let TITLE : regexp = NAME . (WSP . NAME)*  
+
+let BIBTEXTITLE : regexp = "title={" . TITLE . "}" 
+
+let TAGGEDTITLE : regexp = TITAG . TITLE 
+
+let JOURNAL : regexp = NAME . (WSP . NAME)*  
+
+let BIBTEXJOURNAL : regexp = "journal={" . JOURNAL . "}" 
+
+let TAGGEDJOURNAL : regexp = JOTAG . JOURNAL 
+
+let FULLBIBTEX
+  : regexp =
+  "{" . ((BIBTEXJOURNAL | BIBTEXAUTHORINFO | BIBTEXTITLE) . ",")*  . "}" 
+
+let FULLTAGS
+  : regexp =
+  ""
+    | (TAGGEDAUTHORDEFNS | TAGGEDTITLE | TAGGEDJOURNAL)
+        . ("\n" . (TAGGEDAUTHORDEFNS | TAGGEDTITLE | TAGGEDJOURNAL))*  
+
+let bibtex_to_readable_au
+  : (lens in BIBTEXAUTHORINFO <=> TAGGEDAUTHORDEFNS) =
+  synth BIBTEXAUTHORINFO <=> TAGGEDAUTHORDEFNS using {("author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron}","au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon")} 
+
+let bibtext_to_readable_title
+  : (lens in BIBTEXTITLE <=> TAGGEDTITLE) =
+  synth BIBTEXTITLE <=> TAGGEDTITLE using {("title={Boomerang Resourceful Lenses For String Data}","ti - Boomerang Resourceful Lenses For String Data")} 
+
+let journal_to_readable_journal
+  : (lens in BIBTEXJOURNAL <=> TAGGEDJOURNAL) =
+  synth BIBTEXJOURNAL <=> TAGGEDJOURNAL using {("journal={Principals Of Programming Languages}","jo - Principals Of Programming Languages")} 
+
+let bibtext_to_tagged_tester
+  : (lens in FULLBIBTEX <=> FULLTAGS) =
+  synth FULLBIBTEX <=> FULLTAGS using {("{author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron},title={Boomerang Resourceful Lenses For String Data},journal={Principals Of Programming Languages},}","au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon\nti - Boomerang Resourceful Lenses For String Data\njo - Principals Of Programming Languages"),
+    ("{title={Boomerang Resourceful Lenses For String Data},}","ti - Boomerang Resourceful Lenses For String Data")} 
+
+test bibtext_to_tagged_tester.get
+  "{author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron},}"
+  = "au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon"
+
+test bibtext_to_tagged_tester.get
+  "{title={Boomerang Resourceful Lenses For String Data},}"
+  = "ti - Boomerang Resourceful Lenses For String Data"
+
+test bibtext_to_tagged_tester.get
+  "{journal={Principals Of Programming Languages},}"
+  = "jo - Principals Of Programming Languages"

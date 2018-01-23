@@ -1,0 +1,228 @@
+module Anacron =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let ENV_VAR_CONF : regexp = ENV_VAR . "=" . STRING 
+
+test matches_cex ENV_VAR_CONF "PATH=/path to/fOlder" = true
+
+let TIMEFRAME : regexp = NUMBER | "@" . WORD 
+
+let CRON_ENTRY
+  : regexp =
+  TIMEFRAME . "\t" . TIMEFRAME . "\t" . WORD . "\t" . STRING 
+
+test matches_cex
+  CRON_ENTRY
+  "@monthly\t15\tcron.monthly\tnice run-parts --report /etc/cron.monthly" = true
+
+let ANACRON_CONF
+  : regexp =
+  ((COMMENT | "" | CRON_ENTRY | ENV_VAR_CONF) . "\n")*  
+
+let ENV_VAR_DICT : regexp = "{\"" . ENV_VAR . "\"=\"" . STRING . "\"}" 
+
+test matches_cex ENV_VAR_DICT "{\"PATH\"=\"/path to/fOlder\"}" = true
+
+let PERIOD_DICT
+  : regexp =
+  "{\"" . ("period\"=\"" . NUMBER | "period_name\"=\"" . WORD) . "\"}" 
+
+test matches_cex PERIOD_DICT "{\"period_name\"=\"monthly\"}" = true
+
+let DELAY_DICT : regexp = "{\"delay\"=\"" . TIMEFRAME . "\"}" 
+
+test matches_cex DELAY_DICT "{\"delay\"=\"15\"}" = true
+
+let JOB_ID_DICT : regexp = "{\"job-identifier\"=\"" . WORD . "\"}" 
+
+test matches_cex JOB_ID_DICT "{\"job-identifier\"=\"cron.monthly\"}" = true
+
+let CRON_ENTRY_DICT
+  : regexp =
+  "{\"entry\"=\""
+    . STRING . "\"" . PERIOD_DICT . DELAY_DICT . JOB_ID_DICT . "}" 
+
+test matches_cex
+  CRON_ENTRY_DICT
+  "{\"entry\"=\"nice run-parts --report /etc/cron.monthly\"{\"period_name\"=\"monthly\"}{\"delay\"=\"15\"}{\"job-identifier\"=\"cron.monthly\"}}" = true
+
+let ANACRON_DICT
+  : regexp =
+  (COMMENT_DICT | CRON_ENTRY_DICT | EMPTYDICT | ENV_VAR_DICT)*  
+
+let afs_cellalias
+  : (lens in ANACRON_CONF <=> ANACRON_DICT) =
+  synth ANACRON_CONF <=> ANACRON_DICT using {("# comment\nPATH=/path to/fOlder\n\n@monthly\t15\tcron.monthly\tnice run-parts --report /etc/cron.monthly\n","{\"#comment\"=\"comment\"}{\"PATH\"=\"/path to/fOlder\"}{}{\"entry\"=\"nice run-parts --report /etc/cron.monthly\"{\"period_name\"=\"monthly\"}{\"delay\"=\"15\"}{\"job-identifier\"=\"cron.monthly\"}}")} 

@@ -1,0 +1,255 @@
+module Cgconfig =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let KVP_ELEMENT : regexp = " " . WORD . " = " . WORD . ";" 
+
+let KVP_LIST_CONF
+  : regexp =
+  "{" . (KVP_ELEMENT | COMMENT . "\n" | "\n")*  . "}" 
+
+let KVP_ELEMENT_DICT : regexp = "{\"" . WORD . "\"=\"" . WORD . "\"}" 
+
+let KVP_LIST_DICT
+  : regexp =
+  "{" . (KVP_ELEMENT_DICT | COMMENT_DICT | "{}")*  . "}" 
+
+let MOUNT_CONF : regexp = "mount" . KVP_LIST_CONF 
+
+let MOUNT_DICT : regexp = "{\"mount\"" . KVP_LIST_DICT . "}" 
+
+let CONTROLLER_NAME
+  : regexp =
+  "cpuacct"
+    | "cpu"
+    | "devices"
+    | "ns"
+    | "cpuset"
+    | "memory" | "freezer" | "net_cls" | "blkio" | "hugetlb" | "perf_event" 
+
+let CONTROLLER_CONF : regexp = CONTROLLER_NAME . KVP_LIST_CONF 
+
+let CONTROLLER_DICT
+  : regexp =
+  "{\"controller\"=\"" . CONTROLLER_NAME . "\"" . KVP_LIST_DICT . "}" 
+
+let TASK_CONF : regexp = "task" . KVP_LIST_CONF 
+
+let TASK_DICT : regexp = "{\"task\"" . KVP_LIST_DICT . "}" 
+
+let task_map
+  : (lens in TASK_CONF <=> TASK_DICT) =
+  synth TASK_CONF <=> TASK_DICT 
+
+let ADMIN_CONF : regexp = "admin" . KVP_LIST_CONF 
+
+let ADMIN_DICT : regexp = "{\"admin\"" . KVP_LIST_DICT . "}" 
+
+let PERM_CONF
+  : regexp =
+  "perm{"
+    . ((COMMENT | "") . "\n")* 
+    . TASK_CONF
+    . ((COMMENT | "") . "\n")* 
+    . ADMIN_CONF . ((COMMENT | "") . "\n")*  . "}" 
+
+let PERM_DICT
+  : regexp =
+  "{\"perm\""
+    . (COMMENT_DICT | "{}")* 
+    . TASK_DICT
+    . (COMMENT_DICT | "{}")*  . ADMIN_DICT . (COMMENT_DICT | "{}")*  . "}" 
+
+let GROUP_CONF
+  : regexp =
+  "group "
+    . WORD . " {" . ("\n" | COMMENT . "\n" | PERM_CONF | ADMIN_CONF)*  . "}" 
+
+let GROUP_DICT
+  : regexp =
+  "{\"group\"=\""
+    . WORD . "\"" . ("{}" | COMMENT_DICT | PERM_DICT | ADMIN_DICT)*  . "}" 
+
+let CGCONFIG_CONF
+  : regexp =
+  (("" | COMMENT | GROUP_CONF | MOUNT_CONF) . "\n")*  
+
+let CGCONFIG_DICT
+  : regexp =
+  "{" . ("{}" | COMMENT_DICT | GROUP_DICT | MOUNT_DICT)*  . "}" 
+
+let cgconfig_map
+  : (lens in CGCONFIG_CONF <=> CGCONFIG_DICT) =
+  synth CGCONFIG_CONF <=> CGCONFIG_DICT 

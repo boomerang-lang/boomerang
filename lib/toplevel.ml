@@ -123,16 +123,16 @@ let check_str n r x =
 
 let get_str l s = 
   check_str "get" (L.stype l) s;
-  L.rget l (Bstring.of_string s)  (* TODO: push this up to read_string *)
+  L.rcreater l (Bstring.of_string s)  (* TODO: push this up to read_string *)
 
 let put_str l v s = 
   check_str "put" (L.vtype l) v;
   check_str "put" (L.stype l) s;
-  L.rput l (Bstring.of_string v) (Bstring.of_string s)
+  L.rputl l (Bstring.of_string v) (Bstring.of_string s)
 
 let create_str l v =
   check_str "create" (L.vtype l) v;
-  L.rcreate l (Bstring.of_string v)
+  L.rcreatel l (Bstring.of_string v)
 
 (************)
 (* RUN MAIN *)

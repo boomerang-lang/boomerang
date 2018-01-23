@@ -664,7 +664,7 @@ module MLens = struct
     | Compose of t * t
     | Align of t
     | Invert of t
-    | Default of  t * (string -> string) * (string -> string)
+    | Defaults of t * (string -> string) * (string -> string)
 
     (* ----- quotient lenses ----- *)
     | LeftQuot of  Canonizer.t * t
@@ -738,7 +738,7 @@ module MLens = struct
             | Compose (t1,t2)                  -> Compose (invert t2, invert t1)
             | Align t'                         -> Align (invert t')
             | Invert t'                        -> Invert (invert t')
-            | Default (t',f1,f2)               -> Default (invert t', f2, f1)
+            | Defaults (t',f1,f2)              -> Defaults (invert t', f2, f1)
             | LeftQuot (c,t')                  -> RightQuot (invert t', c)
             | RightQuot (t',c)                 -> LeftQuot (c, invert t')
             | DupFirst (t', r1, f1, r2, f2)    -> DupFirst (invert t', r2, f2, r1, f1)
@@ -781,7 +781,7 @@ module MLens = struct
           | Compose (ml1, ml2)        -> bij ml1 && bij ml2
           | Align ml                  -> bij ml
           | Invert (ml)               -> true
-          | Default (ml, _, _)        -> bij ml
+          | Defaults (ml, _, _)       -> bij ml
           | LeftQuot (cn, ml)         -> bij ml
           | RightQuot (ml, cn)        -> bij ml
           | DupFirst (ml,_,_,_,_)     -> bij ml
@@ -830,7 +830,7 @@ module MLens = struct
           | Compose (ml, _)         -> astype ml
           | Align ml                -> Arx.mk_rx (stype ml)
           | Invert ml               -> avtype ml
-          | Default (ml, _, _)      -> astype ml
+          | Defaults (ml, _, _)     -> astype ml
           | LeftQuot (cn, _)        -> Canonizer.uncanonized_atype cn
           | RightQuot (ml, _)       -> astype ml
           | DupFirst (ml,r1,_,_,_)  -> Arx.mk_seq (astype ml) (Arx.mk_rx r1)
@@ -862,19 +862,19 @@ module MLens = struct
     | Some at -> at
     | None ->
         let at = match ml.desc with
-          | Copy r             -> Arx.mk_rx r
+          | Copy r              -> Arx.mk_rx r
           | Disconnect (_, r2, _, _)  -> Arx.mk_rx r2
-          | Concat (ml1, ml2)  -> Arx.mk_seq (avtype ml1) (avtype ml2)
-          | Union (ml1, ml2)   -> Arx.mk_alt (avtype ml1) (avtype ml2)
-          | Star ml            -> Arx.mk_star (avtype ml)
-          | Weight (w, ml)     -> Arx.annot_weight w (avtype ml)
-          | Match (t, ml)      -> Arx.mk_box t (avtype ml)
-          | Compose (_, ml)    -> avtype ml
-          | Align ml           -> Arx.mk_rx (vtype ml)
-          | Invert ml          -> astype ml
-          | Default (ml, _, _)    -> avtype ml
-          | LeftQuot (_, ml)   -> avtype ml
-          | RightQuot (_, cn)  -> Canonizer.uncanonized_atype cn
+          | Concat (ml1, ml2)   -> Arx.mk_seq (avtype ml1) (avtype ml2)
+          | Union (ml1, ml2)    -> Arx.mk_alt (avtype ml1) (avtype ml2)
+          | Star ml             -> Arx.mk_star (avtype ml)
+          | Weight (w, ml)      -> Arx.annot_weight w (avtype ml)
+          | Match (t, ml)       -> Arx.mk_box t (avtype ml)
+          | Compose (_, ml)     -> avtype ml
+          | Align ml            -> Arx.mk_rx (vtype ml)
+          | Invert ml           -> astype ml
+          | Defaults (ml, _, _) -> avtype ml
+          | LeftQuot (_, ml)    -> avtype ml
+          | RightQuot (_, cn)   -> Canonizer.uncanonized_atype cn
           | DupFirst (ml, _, _, r2, _) ->
             Arx.mk_seq
               (avtype ml)
@@ -916,7 +916,7 @@ module MLens = struct
           | Disconnect _
           | Align _
           | Invert _
-          | Default _
+          | Defaults _
           | DupFirst _
           | DupSecond _
           | Partition _
@@ -954,7 +954,7 @@ module MLens = struct
           | Align _
           | Fiat _
           | Invert _
-          | Default _
+          | Defaults _
           | DupFirst _
           | DupSecond _
             -> basic
@@ -993,7 +993,7 @@ module MLens = struct
           | Compose (ml, _)    -> sequiv ml
           | Align ml           -> sequiv ml
           | Invert (ml)        -> vequiv ml
-          | Default (ml,_,_)   -> sequiv ml
+          | Defaults (ml,_,_)   -> sequiv ml
           | LeftQuot (cn, ml)  -> Unknown
           | RightQuot (ml, cn) -> sequiv ml
           | DupFirst (ml,_,_,_,_)    -> sequiv ml
@@ -1023,7 +1023,7 @@ module MLens = struct
           | Compose(ml1,ml2)   -> vequiv ml2
           | Align ml           -> vequiv ml
           | Invert(ml1)        -> sequiv ml1
-          | Default(ml1,_,_)   -> vequiv ml1
+          | Defaults(ml1,_,_)   -> vequiv ml1
           | LeftQuot(cn1,ml1)  -> vequiv ml1
           | RightQuot(ml1,cn1) -> Unknown
           | DupFirst (ml, _,_,_,_) -> vequiv ml
@@ -1071,7 +1071,7 @@ module MLens = struct
     | Compose (ml, _)
     | Align ml
     | RightQuot (ml, _)
-    | Default (ml, _, _)
+    | Defaults (ml, _, _)
     | Weight (_, ml)
     | Fiat ml
       -> srep ml s
@@ -1127,7 +1127,7 @@ module MLens = struct
     | Match (_, ml)
     | Compose (_, ml)
     | Align ml
-    | Default (ml, _, _)
+    | Defaults (ml, _, _)
     | LeftQuot (_, ml)
     | Weight (_, ml)
     | Fiat ml
@@ -1164,7 +1164,7 @@ module MLens = struct
     | Copy _
     | Disconnect _
     | Invert _
-    | Default _
+    | Defaults _
     | DupFirst _
     | DupSecond _
     | Partition _
@@ -1193,7 +1193,7 @@ module MLens = struct
     | Compose (ml1, ml2) ->
         let p, i = pi in
         let p1, i1 = gperm ml1 s (P.empty, i) in
-        let u = rget ml1 s in
+        let u = rcreater ml1 s in
         let u = Bstring.of_string u in
         let p2, i2 = gperm ml2 u (P.empty, i) in
         assert (TmI.equal i1 i2);
@@ -1209,7 +1209,7 @@ module MLens = struct
     | RightQuot (ml, cn) ->
         let p, i = pi in
         let p1, i1 = gperm ml s (P.empty, i) in
-        let u = rget ml s in
+        let u = rcreater ml s in
         let u = Bstring.of_string u in
         let p2, i2 = Canonizer.gperm cn u (P.empty, i) in
         let p2 = P.inv p2 in
@@ -1338,7 +1338,7 @@ module MLens = struct
       in
      (f v so, C_string v), ri, ri_acc
     in
-    let basic_no_op ml = basic (rput' ml) in
+    let basic_no_op ml = basic (rputl' ml) in
     let no_op ml = gputl' ml (v, co) ri ri_acc in
     match ml.desc with
     | Copy _
@@ -1487,12 +1487,12 @@ module MLens = struct
         (s, C_compose (uc, sc)), (r, i1), (r_acc, iv_acc)
     | Weight (_, ml) -> no_op ml
     | Align ml -> basic_no_op ml
-    | Invert ml -> basic (fun v _ -> rget ml v)
-    | Default (ml, f1, _) -> basic (
+    | Invert ml -> basic (fun v _ -> rcreater ml v)
+    | Defaults (ml, f1, _) -> basic (
         fun v so ->
           match so with
-          | Some s -> rput ml v s
-          | None -> rput ml v (Bstring.of_string (f1 (Bstring.to_string v))))
+          | Some s -> rputl ml v s
+          | None -> rputl ml v (Bstring.of_string (f1 (Bstring.to_string v))))
     | LeftQuot (cn, ml) ->
         let r_acc, i_acc = ri_acc in
         let (u,c), ri, (r_acc, i1_acc) = gputl' ml (v, co) ri ri_acc in
@@ -1649,11 +1649,11 @@ module MLens = struct
     | Fiat ml -> basic (
         fun v so ->
           match so with
-          | None -> rcreate ml v
+          | None -> rcreatel ml v
           | Some s ->
-              if rget ml s = Bstring.to_string v
+              if rcreater ml s = Bstring.to_string v
               then Bstring.to_string s
-              else rput ml v s
+              else rputl ml v s
       )
     | Permute (p, mls) ->
         let k, sigma, sigma_inv, cts, ats = p in
@@ -1706,10 +1706,10 @@ module MLens = struct
 
   (* these are the definitions for lower *)
 
-  and rcreate ml (v:Bstring.t) =
+  and rcreatel ml (v:Bstring.t) =
     fst (fst (gcreatel ml v))
 
-  and rput ml v' (s:Bstring.t) =
+  and rputl ml v' (s:Bstring.t) =
     (*     print_endline "+++rput"; *)
     let vparse v = Bstring.at_to_chunktree (Arx.parse (avtype ml) (Bstring.of_string (vrep ml v))) in
     let align = Balign.align Bcost.infinite in
@@ -1720,7 +1720,7 @@ module MLens = struct
     let g = align (vparse v') (vparse (Bstring.of_string v)) G.empty in
 (*     G.print g; *)
     (match G.to_error_option g with
-     | Some e -> Err.run_error (Info.M "Blenses.MLens.rput") e
+     | Some e -> Err.run_error (Info.M "Blenses.MLens.rputl") e
      | None -> ()
     );
     let r = Balign.align_compose_res r g in
@@ -1729,12 +1729,32 @@ module MLens = struct
 (*     print_endline "---rput"; *)
     s
 
-  and rput' ml v' so =
-    match so with
-    | Some s -> rput ml v' s
-    | None -> rcreate ml v'
+  and rputr ml s' (v:Bstring.t) =
+    (*     print_endline "+++rput"; *)
+    let sparse s = Bstring.at_to_chunktree (Arx.parse (astype ml) (Bstring.of_string (srep ml s))) in
+    let align = Balign.align Bcost.infinite in
+    let (s, k), (r, _) = gcreatel ml v in
+(*     print_endline ("v = \"" ^ vrep ml (Bstring.of_string v) ^ "\" from \"" ^ v ^ "\""); *)
+(*     print_endline ("v' = \"" ^ vrep ml v'  ^ "\" from \"" ^ Bstring.to_string v' ^ "\""); *)
+    (*     Balign.print_res print_complement r; *)
+    let g = align (sparse s') (sparse (Bstring.of_string s)) G.empty in
+(*     G.print g; *)
+    (match G.to_error_option g with
+     | Some e -> Err.run_error (Info.M "Blenses.MLens.rputr") e
+     | None -> ()
+    );
+    let r = Balign.align_compose_res r g in
+(*     Balign.print_res print_complement r; *)
+    let v = gputl ml s' k (r, TmI.empty) in
+(*     print_endline "---rput"; *)
+    v
 
-  and rget ml (s:Bstring.t) =
+  and rputl' ml v' so =
+    match so with
+    | Some s -> rputl ml v' s
+    | None -> rcreatel ml v'
+
+  and rcreater ml (s:Bstring.t) =
     fst (fst (gcreater ml s))
 
 
@@ -1788,7 +1808,7 @@ module MLens = struct
       | Compose(dl1,dl2)   -> msg "("; format_t dl1; msg "@ ;@ "; format_t dl2; msg ")"
       | Align ml           -> msg "(align@ "; format_t ml; msg ")"
       | Invert (ml)        -> msg "(invert@ "; format_t ml; msg ")"
-      | Default (ml, f1, f2)          -> msg "(default@ "; format_t ml; msg "@ "; msg "@ <function>"; msg "@ <function>"; msg ")"
+      | Defaults (ml, f1, f2)          -> msg "(defaults@ "; format_t ml; msg "@ "; msg "@ <function>"; msg "@ <function>"; msg ")"
       | LeftQuot(cn1,dl1)  -> msg "(left_quot@ "; Canonizer.format_t cn1; msg "@ "; format_t dl1; msg ")"
       | RightQuot(dl1,cn1) -> msg "(right_quot@ "; format_t dl1; msg "@ "; Canonizer.format_t cn1; msg ")"
       | DupFirst(dl,r1,f1,r2,f2) -> msg "(dupfirst@ ";
@@ -1878,7 +1898,7 @@ module MLens = struct
   let compose i dl1 dl2 = mk i (Compose(dl1,dl2))
   let align i ml = mk i (Align ml)
   let invert i ml = mk i (Invert (ml))
-  let default i ml f1 f2 = mk i (Default (ml, f1, f2))
+  let defaults i ml f1 f2 = mk i (Defaults (ml, f1, f2))
   let left_quot i cn1 dl1 = mk i (LeftQuot(cn1,dl1))
   let right_quot i dl1 cn1 = mk i (RightQuot(dl1,cn1))
   let dup_first i dl1 r1 f1 r2 f2 = mk i (DupFirst(dl1,r1,f1,r2,f2))
@@ -1907,7 +1927,7 @@ module MLens = struct
       ml_arr (pred k, Rx.epsilon) in
       mk i (Permute ((k, sigma, sigma_inv, cts, ats), ml_arr))
   let canonizer_of_t i ml =
-    Canonizer.from_lens i (astype ml) (avtype ml) (vequiv ml) (mtype ml) (gperm ml) (rget ml) (rcreate ml)
+    Canonizer.from_lens i (astype ml) (avtype ml) (vequiv ml) (mtype ml) (gperm ml) (rcreater ml) (rcreatel ml)
   let iter i dl1 min maxo =
     Arx.generic_iter (copy i Rx.epsilon) (union i) (concat i) (star i)
       min maxo dl1

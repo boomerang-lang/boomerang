@@ -1,0 +1,299 @@
+module Automounter =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let NO_PLUSSTAR_WORD
+  : regexp =
+  (LOWERCASE
+     | UPPERCASE | "_" | "." | "-" | ":" | "/" | DIGIT | "," | "=" | "*")
+    . (LOWERCASE
+         | UPPERCASE
+         | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*")*  
+
+let NO_COLON_COMMA_SLASH_CHAR
+  : regexp =
+  LOWERCASE | UPPERCASE | DIGIT | "_" | "." | "+" | "=" | "&" 
+
+let FILE : regexp = NO_COLON_COMMA_SLASH_CHAR . NO_COLON_COMMA_SLASH_CHAR*  
+
+let NO_COMMA_EQ_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | "_" | "." | "-" | "/" | "+" | ":" | DIGIT)
+    . (LOWERCASE | UPPERCASE | "_" | "." | "-" | "/" | "+" | ":" | DIGIT)*  
+
+let OPTION : regexp = NO_COMMA_EQ_WORD . ("" | "=" . NO_COMMA_EQ_WORD) 
+
+let OPTIONS
+  : regexp =
+  "" | NONEMPTY_SAMELINE_WSP . "-" . OPTION . ("," . OPTION)*  
+
+test matches_cex OPTIONS "" = true
+
+test matches_cex OPTIONS " -hi,hello=what,m" = true
+
+let PATH : regexp = "/" | "/" . FILE . ("/" . FILE)*  
+
+test matches_cex PATH "/" = true
+
+test matches_cex PATH "/usr/local/moxill" = true
+
+let AREA : regexp = "" | NONEMPTY_SAMELINE_WSP . PATH . OPTIONS 
+
+let HOST
+  : regexp =
+  NO_COLON_COMMA_SLASH_CHAR . NO_COLON_COMMA_SLASH_CHAR* 
+    . ("" | "(" . NUMBER . ")") 
+
+let HOSTS : regexp = "" | HOST . ("," . HOST)*  
+
+test matches_cex HOSTS "host1,host2(5)" = true
+
+test matches_cex HOSTS "" = true
+
+test matches_cex HOSTS "host1(2)" = true
+
+let LOCATION : regexp = HOSTS . ":" . PATH 
+
+let AUTOMOUNTER_ENTRY
+  : regexp =
+  NO_PLUSSTAR_WORD
+    . OPTIONS
+    . AREA . NONEMPTY_SAMELINE_WSP . LOCATION
+    . (AREA . NONEMPTY_SAMELINE_WSP . LOCATION)*  
+
+let MAP_ENTRY : regexp = "+" . STRING 
+
+let AUTOMOUNTER
+  : regexp =
+  (("" | COMMENT | AUTOMOUNTER_ENTRY | MAP_ENTRY) . "\n")*  
+
+test matches_cex
+  AUTOMOUNTER
+  "# \n# This is an automounter map and it has the following format\n# key [ -mount-options-separated-by-comma ] location\n# Details may be found in the autofs(5) manpage\n\n# indirect map\ncd      -fstype=iso9660,ro,nosuid,nodev :/dev/cdrom\nkernel    -ro,soft,intr       ftp.kernel.org:/pub/linux\n*       -fstype=auto,loop,ro    :/srv/distros/isos/&.iso\n\n# direct map\n/nfs/apps/mozilla             bogus:/usr/local/moxill\n\n# replicated server\npath    host1,host2,hostn:/path/path\npath    host1,host2:/blah host3(1):/some/other/path\npath    host1(5),host2(6),host3(1):/path/path\n\n# multi-mount map\nserver    -rw,hard,intr       / -ro myserver.me.org:/\nserver    -rw,hard,intr       / -ro myserver.me.org:/ /usr myserver.me.org:/usr\nserver    -rw,hard,intr       / -ro myserver.me.org:/ \\\n                              /usr myserver.me.org:/usr \\\n                              /home myserver.me.org:/home\n\nserver    -rw,hard,intr       / -ro mywithdashserver.me.org:/\n\n# included maps\n+auto_home\n" = true
+
+let MAP_ENTRY_DICT
+  : regexp =
+  "{\"+\"{\"map\"=\"" . DELIMITED_STRING . "\"}}" 
+
+let LOCATION_DICT
+  : regexp =
+  "{\"location\""
+    . ("{\"host\"=\"" . HOST . "\"}")*  . "{\"path\"=\"" . PATH . "\"}" 
+
+let location_map
+  : (lens in LOCATION <=> LOCATION_DICT) =
+  synth LOCATION <=> LOCATION_DICT using {("host1(5),host2(6),host3(1):/path/path","{\"location\"{\"host\"=\"host1(5)\"}{\"host\"=\"host2(6)\"}{\"host\"=\"host3(1)\"}{\"path\"=\"/path/path\"}")} 
+
+let OPTIONS_DICT
+  : regexp =
+  ""
+    | NONEMPTY_SAMELINE_WSP
+        . "{\"opt\"=\""
+        . NO_COMMA_EQ_WORD
+        . "\"" . ("" | "{\"value\"=\"" . NO_COMMA_EQ_WORD . "\"}") . "}"
+        . ("{\"opt\"=\""
+             . NO_COMMA_EQ_WORD
+             . "\"" . ("" | "{\"value\"=\"" . NO_COMMA_EQ_WORD . "\"}") . "}")*  
+
+let options_map
+  : (lens in OPTIONS <=> OPTIONS_DICT) =
+  synth OPTIONS <=> OPTIONS_DICT 
+
+let AUTOMOUNTER_ENTRY_DICT
+  : regexp =
+  "{\""
+    . NO_PLUSSTAR_WORD
+    . "\""
+    . OPTIONS_DICT
+    . "{"
+    . ("" | NONEMPTY_SAMELINE_WSP . "\"" . PATH . "\"" . OPTIONS_DICT)
+    . NONEMPTY_SAMELINE_WSP . LOCATION_DICT . "}"
+    . ("{"
+         . ("" | NONEMPTY_SAMELINE_WSP . "\"" . PATH . "\"" . OPTIONS_DICT)
+         . NONEMPTY_SAMELINE_WSP . LOCATION_DICT . "}")*  
+
+let AUTOMOUNTER
+  : regexp =
+  (("" | COMMENT | AUTOMOUNTER_ENTRY | MAP_ENTRY) . "\n")*  
+
+let AUTOMOUNTER_DICT
+  : regexp =
+  "{"
+    . ("{ }" | COMMENT_DICT | AUTOMOUNTER_ENTRY_DICT | MAP_ENTRY_DICT)* 
+    . "}" 
+
+let automounter_map
+  : (lens in AUTOMOUNTER <=> AUTOMOUNTER_DICT) =
+  synth AUTOMOUNTER <=> AUTOMOUNTER_DICT using {("# \n# This is an automounter map and it has the following format\n# key [ -mount-options-separated-by-comma ] location\n# Details may be found in the autofs(5) manpage\n\n# indirect map\ncd      -fstype=iso9660,ro,nosuid,nodev :/dev/cdrom\nkernel    -ro,soft,intr       ftp.kernel.org:/pub/linux\n*       -fstype=auto,loop,ro    :/srv/distros/isos/&.iso\n\n# direct map\n/nfs/apps/mozilla             bogus:/usr/local/moxill\n\n# replicated server\npath    host1,host2,hostn:/path/path\npath    host1,host2:/blah host3(1):/some/other/path\npath    host1(5),host2(6),host3(1):/path/path\n\n# multi-mount map\nserver    -rw,hard,intr       / -ro myserver.me.org:/\nserver    -rw,hard,intr       / -ro myserver.me.org:/ /usr myserver.me.org:/usr\nserver    -rw,hard,intr       / -ro myserver.me.org:/ \\\n                              /usr myserver.me.org:/usr \\\n                              /home myserver.me.org:/home\n\nserver    -rw,hard,intr       / -ro mywithdashserver.me.org:/\n\n# included maps\n+auto_home\n","{{\"#comment\"=\"\"}{\"#comment\"=\"This is an automounter map and it has the following format\"}{\"#comment\"=\"key [ -mount-options-separated-by-comma ] location\"}{\"#comment\"=\"Details may be found in the autofs(5) manpage\"}{ }{\"#comment\"=\"indirect map\"}{\"cd\"      {\"opt\"=\"fstype\"{\"value\"=\"iso9660\"}}{\"opt\"=\"ro\"}{\"opt\"=\"nosuid\"}{\"opt\"=\"nodev\"}{ {\"location\"{\"path\"=\"/dev/cdrom\"}}{\"kernel\"    {\"opt\"=\"ro\"}{\"opt\"=\"soft\"}{\"opt\"=\"intr\"}{       {\"location\"{\"host\"=\"ftp.kernel.org\"}{\"path\"=\"/pub/linux\"}}{\"*\"       {\"opt\"=\"fstype\"{\"value\"=\"auto\"}}{\"opt\"=\"loop\"}{\"opt\"=\"ro\"}{    {\"location\"{\"path\"=\"/srv/distros/isos/&.iso\"}}{ }{\"#comment\"=\"direct map\"}{\"/nfs/apps/mozilla\"{             {\"location\"{\"host\"=\"bogus\"}{\"path\"=\"/usr/local/moxill\"}}{ }{\"#comment\"=\"replicated server\"}{\"path\"{    {\"location\"{\"host\"=\"host1\"}{\"host\"=\"host2\"}{\"host\"=\"hostn\"}{\"path\"=\"/path/path\"}}{\"path\"{    {\"location\"{\"host\"=\"host1\"}{\"host\"=\"host2\"}{\"path\"=\"/blah\"}}{ {\"location\"{\"host\"=\"host3(1)\"}{\"path\"=\"/some/other/path\"}}{\"path\"{    {\"location\"{\"host\"=\"host1(5)\"}{\"host\"=\"host2(6)\"}{\"host\"=\"host3(1)\"}{\"path\"=\"/path/path\"}}{ }{\"#comment\"=\"multi-mount map\"}{\"server\"    {\"opt\"=\"rw\"}{\"opt\"=\"hard\"}{\"opt\"=\"intr\"}{       \"/\" {\"opt\"=\"ro\"} {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/\"}}{\"server\"    {\"opt\"=\"rw\"}{\"opt\"=\"hard\"}{\"opt\"=\"intr\"}{       \"/\" {\"opt\"=\"ro\"} {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/\"}}{ \"/usr\" {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/usr\"}}{\"server\"    {\"opt\"=\"rw\"}{\"opt\"=\"hard\"}{\"opt\"=\"intr\"}{       \"/\" {\"opt\"=\"ro\"} {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/\"}}{ \\\n                              \"/usr\" {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/usr\"}}{ \\\n                              \"/home\" {\"location\"{\"host\"=\"myserver.me.org\"}{\"path\"=\"/home\"}}{ }{\"server\"    {\"opt\"=\"rw\"}{\"opt\"=\"hard\"}{\"opt\"=\"intr\"}{       \"/\" {\"opt\"=\"ro\"} {\"location\"{\"host\"=\"mywithdashserver.me.org\"}{\"path\"=\"/\"}}{ }{\"#comment\"=\"included maps\"}{\"+\"{\"map\"=\"auto_home\"}}}")} 

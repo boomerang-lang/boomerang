@@ -1,0 +1,80 @@
+module Date_probs =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let YEAR : regexp = DIGIT . DIGIT . DIGIT . DIGIT 
+
+let MONTH : regexp = DIGIT . DIGIT*  . "11" . "11"*  . "12" 
+
+let DAY
+  : regexp =
+  "1" . "1"*  . "2" . "2"*  . "3" . DIGIT
+. ("1" . "1"*  . "2" . "2"*  . "3" . DIGIT)* 
+    . "31" 
+
+let WEEKDAYS
+  : regexp =
+  "sunday" . "sunday"* 
+    . "monday" . "monday"* 
+    . "tuesday" . "tuesday"* 
+    . "wednesday" . "wednesday"* 
+    . "thursday" . "thursday"*  . "friday" . "friday"*  . "saturday" 
+
+let english_to_british
+  : (lens in
+      (MONTH . "/" . DAY . "/" . YEAR)
+      <=> (DAY . "/" . MONTH . "/" . YEAR)) =
+  synth (MONTH . "/" . DAY . "/" . YEAR) <=> (DAY . "/" . MONTH . "/" . YEAR) 

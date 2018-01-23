@@ -1,0 +1,288 @@
+module Cron =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let QUOTELESS_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " "
+     | "'" | "_" | ":" | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/"
+    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+
+let STRING : regexp = STRING_COMPONENT*  
+
+let NONEMPTY_STRING : regexp = STRING_COMPONENT . STRING_COMPONENT*  
+
+let DELIMITED_STRING
+  : regexp =
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | "\\\""
+     | " "
+     | "'"
+     | "_"
+     | ":"
+     | "/"
+     | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | ",")*  
+
+let string_to_delimited
+  : (lens in STRING <=> DELIMITED_STRING) =
+  synth STRING <=> DELIMITED_STRING 
+
+let NO_STAR_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let NO_STAR_DELIMITED_STRING_COMPONENT
+  : regexp =
+  UPPERCASE
+    | LOWERCASE
+    | DIGIT
+    | "\\\""
+    | " "
+    | "'"
+    | "_"
+    | ":"
+    | "/" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "," 
+
+let STARLESS_STRING : regexp = NO_STAR_STRING_COMPONENT*  
+
+let STARLESS_DELIMITED_STRING
+  : regexp =
+  NO_STAR_DELIMITED_STRING_COMPONENT*  
+
+let starless_string_to_delimited
+  : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+
+let COMMENT : regexp = "# " . STRING 
+
+let COMMENT_DICT : regexp = "{\"#comment\"=\"" . DELIMITED_STRING . "\"}" 
+
+let comment_map
+  : (lens in COMMENT <=> COMMENT_DICT) =
+  synth COMMENT <=> COMMENT_DICT 
+
+let EMPTYDICT : regexp = "{}" 
+
+let NON_WSP_CHAR
+  : regexp =
+  LOWERCASE
+    | UPPERCASE
+    | "_" | "." | "-" | ":" | "/" | "+" | DIGIT | "," | "=" | "*" | "%" 
+
+let ENV_VAR : regexp = (UPPERCASE | "_") . (UPPERCASE | "_")*  
+
+let WORD : regexp = NON_WSP_CHAR . NON_WSP_CHAR*  
+
+let SIMPLE_WORD
+  : regexp =
+  (LOWERCASE | UPPERCASE | DIGIT) . (LOWERCASE | UPPERCASE | DIGIT)*  
+
+let FOLDER
+  : regexp =
+  (WORD . "/")*  . WORD . ("" | "/") | "${" . ENV_VAR . "}" 
+
+let MULTILINE_COMMENT
+  : regexp =
+  "/*" . STARLESS_STRING . ("\n" . STARLESS_STRING)*  . "*/" 
+
+let MULTILINE_COMMENT_DICT
+  : regexp =
+  "{\"#mcomment\""
+    . "{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}"
+    . ("{\"string\"=\"" . STARLESS_DELIMITED_STRING . "\"}")* 
+    . "}" 
+
+let multiline_comment_map
+  : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
+  synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
+
+let INDENT : regexp = (" " | "\t")*  
+
+let INDENT_REQ : regexp = (" " | "\t") . (" " | "\t")*  
+
+let ALPHANUM
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT) . (UPPERCASE | LOWERCASE | DIGIT)*  
+
+let RANGE : regexp = ALPHANUM . "-" . ALPHANUM | ALPHANUM 
+
+let PREFIX : regexp = "-" 
+
+let SCHEDULE_VALUE
+  : regexp =
+  "reboot"
+    | "yearly"
+    | "annually" | "monthly" | "weekly" | "daily" | "midnight" | "hourly" 
+
+let SCHEDULE : regexp = "@" . SCHEDULE_VALUE 
+
+let USER
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT) . (UPPERCASE | LOWERCASE | DIGIT)*  
+
+let TIME
+  : regexp =
+  NUMBER
+    . INDENT_REQ
+    . NUMBER . INDENT_REQ . NUMBER . INDENT_REQ . RANGE . INDENT_REQ . RANGE 
+
+let SHELLCOMMAND_CHAR
+  : regexp =
+  LOWERCASE | UPPERCASE | DIGIT | "_" | "/" | "|" | "." 
+
+let SC_CHAR_OR_SPACE
+  : regexp =
+  LOWERCASE | UPPERCASE | DIGIT | "_" | "/" | "|" | "." | " " 
+
+let SHELLCOMMAND
+  : regexp =
+  SHELLCOMMAND_CHAR . SC_CHAR_OR_SPACE*  . SHELLCOMMAND_CHAR
+    | SHELLCOMMAND_CHAR 
+
+let SHELLVAR_CHAR : regexp = LOWERCASE | UPPERCASE | DIGIT | "_" 
+
+let SHELLVAR_NAME : regexp = SHELLVAR_CHAR . SHELLVAR_CHAR*  
+
+let SHELLVALUE_CHAR
+  : regexp =
+  LOWERCASE | UPPERCASE | DIGIT | "_" | "/" | "|" | "." 
+
+let SHELLVALUE_NAME : regexp = SHELLVALUE_CHAR . SHELLVALUE_CHAR*  
+
+let SHELLVAR : regexp = SHELLVAR_NAME . "=" . SHELLVALUE_NAME . "\n" 
+
+let COMMENTLINE : regexp = COMMENT . "\n" 
+
+let ENTRY
+  : regexp =
+  INDENT
+    . (PREFIX | "")
+    . (TIME | SCHEDULE)
+    . INDENT_REQ . USER . INDENT_REQ . SHELLCOMMAND . "\n" 
+
+let CRON : regexp = ("\n" | SHELLVAR | COMMENTLINE | ENTRY)*  
+
+let PREFIX_DICT : regexp = "{\"prefix\"=" . ("true" | "false") . "}" 
+
+let TIME_DICT
+  : regexp =
+  "{\"minute\"="
+    . NUMBER
+    . ",\"ws1\"="
+    . INDENT_REQ
+    . ",\"hour\"="
+    . NUMBER
+    . ",\"ws2\"="
+    . INDENT_REQ
+    . ",\"dayofmonth\"="
+    . NUMBER
+    . ",\"ws3\"="
+    . INDENT_REQ
+    . ",\"month\"="
+    . RANGE . ",\"ws4\"=" . INDENT_REQ . ",\"dayofweek\"=" . RANGE . "}" 
+
+let SCHEDULE_DICT : regexp = "{\"schedule\"=\"" . SCHEDULE_VALUE . "\"}" 
+
+let ENTRY_DICT
+  : regexp =
+  "{\"indent\"=\""
+    . INDENT
+    . "\","
+    . PREFIX_DICT
+    . ","
+    . (TIME_DICT | SCHEDULE_DICT)
+    . ",\"indent2\"=\""
+    . INDENT_REQ
+    . "\",\"user\"=\""
+    . USER
+    . "\",\"indent3\"=\""
+    . INDENT_REQ . "\",\"command\"=\"" . SHELLCOMMAND . "\"}" 
+
+let SHELL_DICT
+  : regexp =
+  "{\"varname\"=\""
+    . SHELLVAR_NAME . "\",\"value\"=\"" . SHELLVALUE_NAME . "\"}" 
+
+let CRON_DICT
+  : regexp =
+  ((EMPTYDICT | SHELL_DICT | COMMENT_DICT | ENTRY_DICT) . "\n")*  
+
+let cron_lens : (lens in CRON_DICT <=> CRON) = synth CRON_DICT <=> CRON 

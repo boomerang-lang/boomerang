@@ -19,9 +19,6 @@ clean:
 	rm -rf _build *.install *.pdf $(TARGETS)
 
 functionaltest: all
-	for file in *.boom ; do \
-		./boomerang.exe $$file ; \
-	done
 	for file in *.src ; do \
 		./boomerang.exe $$file ; \
 	done
@@ -32,6 +29,9 @@ functionaltest: all
 		./boomerang.exe $$file ; \
 	done
 	for file in examples/*/*.boom ; do \
+		./boomerang.exe $$file ; \
+	done
+	for file in examples/*/*/*.boom ; do \
 		./boomerang.exe $$file ; \
 	done
 

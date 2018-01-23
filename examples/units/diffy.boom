@@ -283,7 +283,7 @@ test put main "aBbBcBeB" "a1c3d4e5" = "a1b3c4e5"
 
 let l = copy [a-z] . del "B"
 
-test (invert <p "":l>) = error (* chunks in invert *)
+(*test (invert <p "":l>) = error (* chunks in invert *)*)
 
 (* default *)
 

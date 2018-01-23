@@ -1,7 +1,7 @@
 module Cap_prob =
 let LOWERCASE
   : regexp =
-  ("a"
+  "a"
     | "b"
     | "c"
     | "d"
@@ -15,11 +15,11 @@ let LOWERCASE
     | "l"
     | "m"
     | "n"
-    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" )
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
 
 let UPPERCASE
   : regexp =
-  ("A"
+  "A"
     | "B"
     | "C"
     | "D"
@@ -33,7 +33,7 @@ let UPPERCASE
     | "L"
     | "M"
     | "N"
-    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" )
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
 
 let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
