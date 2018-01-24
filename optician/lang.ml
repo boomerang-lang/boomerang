@@ -305,7 +305,7 @@ struct
     | LensIterate of t
     | LensIdentity of Regex.t
     | LensInverse of t
-    | LensVariable of Id.t
+    | LensClosed of t
     | LensPermute of (int list) (*Permutation.t*) * (t list)
   [@@deriving ord, show, hash]
 
@@ -357,7 +357,7 @@ struct
       | LensIdentity _ -> 1
       | LensInverse l' ->
         1 + (size l')
-      | LensVariable _ -> 1
+      | LensClosed _ -> 1
       | LensPermute (_,ls) ->
         1 + (List.fold_left
                ~f:(fun acc l' -> acc + (size l'))
@@ -439,7 +439,7 @@ struct
       ~identity_f:(identity_f:Regex.t -> a)
       ~inverse_f:(inverse_f:a -> a)
       ~permute_f:(permute_f:int list -> a list -> a)
-      ~variable_f:(variable_f:Id.t -> a)
+      ~closed_f:(closed_f:a -> a)
       (l:t)
     : a =
     let rec fold_internal
@@ -474,8 +474,8 @@ struct
         | LensPermute (p,ls) ->
           let accs = List.map ~f:fold_internal ls in
           permute_f p accs
-        | LensVariable v ->
-          variable_f v
+        | LensClosed l' ->
+          closed_f (fold_internal l')
       end
     in
     fold_internal l

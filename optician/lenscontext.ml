@@ -9,25 +9,12 @@ module LensContext = struct
 
   module DS = DisjointSetOf(Id)
 
-  type t = { defs     : DefsD.t     ;
-             outgoing : OutgoingD.t ;
+  type t = { outgoing : OutgoingD.t ;
              equivs   : DS.t        ; }
   [@@deriving ord, show, hash]
 
-  let empty = { defs     = DefsD.empty     ;
-                outgoing = OutgoingD.empty ;
+  let empty = { outgoing = OutgoingD.empty ;
                 equivs   = DS.empty        ; }
-
-  let lookup_exn (lc:t) (name:Id.t) : Lens.t*Regex.t*Regex.t =
-    DefsD.lookup_exn lc.defs name
-
-  let lookup_type_exn (lc:t) (name:Id.t) : Regex.t*Regex.t =
-    let (_,r1,r2) = lookup_exn lc name in
-    (r1,r2)
-
-  let lookup_impl_exn (lc:t) (name:Id.t) : Lens.t =
-    let (l,_,_) = lookup_exn lc name in
-    l
 
   let update_defs (defs:DefsD.t)
       (name:Id.t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t)
@@ -58,21 +45,19 @@ module LensContext = struct
       id2
 
   (* TODO: is this the right thing, simpler if just between vars ? *)
-  let insert_exn (lc:t) (name:Id.t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t =
+  let insert (lc:t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t =
     begin match (r1,r2) with
       | (Regex.RegExVariable id1, Regex.RegExVariable id2) ->
-        { defs     = update_defs lc.defs name l r1 r2      ;
-          outgoing = update_outgoing lc.outgoing id1 id2 (Lens.LensVariable name);
+        { outgoing = update_outgoing lc.outgoing id1 id2 (Lens.LensClosed l);
           equivs   = update_equivs lc.equivs id1 id2       ; }
       | _ -> 
-        { defs     = update_defs lc.defs name l r1 r2 ;
-          outgoing = lc.outgoing                      ;
+        { outgoing = lc.outgoing                      ;
           equivs   = lc.equivs                        ; }
     end
 
-  let insert_list_exn (lc:t) (nirsl:(Id.t * Lens.t * Regex.t * Regex.t) list) : t =
+  let insert_list (lc:t) (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
     List.fold_left
-      ~f:(fun acc (name,l,r1,r2) -> insert_exn acc name l r1 r2)
+      ~f:(fun acc (l,r1,r2) -> insert acc l r1 r2)
       ~init:lc
       nirsl
 
@@ -83,8 +68,8 @@ module LensContext = struct
       | Some connections -> connections
     end
 
-  let create_from_list_exn (nirsl:(Id.t * Lens.t * Regex.t * Regex.t) list) : t =
-    insert_list_exn empty nirsl
+  let create_from_list (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
+    insert_list empty nirsl
 
   let shortest_path (lc:t) (regex1_name:Id.t) (regex2_name:Id.t)
     : Lens.t option =
@@ -135,50 +120,6 @@ module LensContext = struct
     let rep_element = DS.find_representative lc.equivs regex_name in
     let shortest_path = shortest_path_exn lc regex_name rep_element in
     (rep_element,shortest_path)
-
-  let autogen_id_from_base (lc:t) (base:string) : Id.t =
-    let rec fresh nopt =
-      let (x,next) =
-        begin match nopt with
-          | None -> (base,Some 1)
-          | Some n -> (Printf.sprintf "%s%d" base n, Some (n+1))
-        end
-      in
-      if DefsD.member lc.defs (Id.Id x) then
-        fresh next
-      else
-        x
-    in
-    Id.Id (fresh None)
-
-  let autogen_id (lc:t) (l:Lens.t) : Id.t =
-    let base = Lens.show l in
-    let rec fresh nopt =
-      let (x,next) =
-        begin match nopt with
-          | None -> (base,Some 1)
-          | Some n -> (Printf.sprintf "%s%d" base n, Some (n+1))
-        end
-      in
-      begin match DefsD.lookup lc.defs (Id.Id x) with
-        | Some (l',_,_) ->
-          if l = l' then
-            x
-          else
-            fresh next
-        | _ -> x
-      end
-    in
-    Id.Id (fresh None)
-      
-  let autogen_fresh_id (lc:t) : Id.t =
-    autogen_id_from_base lc "l"
-
-  let insert_unnamed_list_exn (lc:t) (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
-    List.fold_left
-      ~f:(fun acc (l,r1,r2) -> let name = autogen_fresh_id acc in insert_exn acc name l r1 r2)
-      ~init:lc
-      nirsl
 end
 
 (***** }}} *****)

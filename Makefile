@@ -20,19 +20,19 @@ clean:
 
 functionaltest: all
 	for file in *.src ; do \
-		./boomerang.exe $$file ; \
+		./boomerang.exe $$file || exit ; \
 	done
 	for file in examples/*.boom ; do \
-		./boomerang.exe $$file ; \
+		./boomerang.exe $$file || exit ; \
 	done
 	for file in examples/*.src ; do \
-		./boomerang.exe $$file ; \
+		./boomerang.exe $$file || exit ; \
 	done
 	for file in examples/*/*.boom ; do \
-		./boomerang.exe $$file ; \
+		./boomerang.exe $$file || exit ; \
 	done
 	for file in examples/*/*/*.boom ; do \
-		./boomerang.exe $$file ; \
+		./boomerang.exe $$file || exit ; \
 	done
 
 unittest:

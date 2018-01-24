@@ -52,7 +52,6 @@ let rec to_boomerang_regex
 let rec to_boomerang_lens
     (i:Info.t)
     (rc:RegexContext.t)
-    (lc:LensContext.t)
   : Lens.t -> MLens.t =
   Lens.fold
     ~const_f:(fun s1 s2 ->
@@ -71,12 +70,7 @@ let rec to_boomerang_lens
     ~identity_f:((MLens.copy i) % (to_boomerang_regex rc))
     ~inverse_f:(MLens.invert i)
     ~permute_f:(fun il ml -> MLens.permute i (Permutation.to_int_list il) ml)
-    ~variable_f:(fun v ->
-        to_boomerang_lens
-          i
-          rc
-          lc
-          (LensContext.lookup_impl_exn lc v))
+    ~closed_f:(fun l -> l)
 
 let populate_lens_context
     (relevant_regexps:Brx.t list)
@@ -138,7 +132,7 @@ let populate_lens_context
       optician_lenses_types
   in
 
-  (LensContext.insert_unnamed_list_exn
+  (LensContext.insert_list
      LensContext.empty
      optician_lenses_types
   ,rc)
@@ -159,7 +153,6 @@ let synth
   to_boomerang_lens
     i
     rc
-    lc
     (Option.value_exn
        (Gen.gen_lens
           rc
