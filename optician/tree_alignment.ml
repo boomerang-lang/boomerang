@@ -71,6 +71,7 @@ struct
   module PrioritiedDataTreePairs =
   struct
     include TripleOf(DataTree)(DataTree)(FloatModule)
+    module Priority = FloatModule
     let priority ((_,_,p):t) = p
   end
   module DataTreeDataTreePriorityPQueue = PriorityQueueOf(PrioritiedDataTreePairs)

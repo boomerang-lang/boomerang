@@ -6,12 +6,13 @@ open My_heap
 module type DataWithPriority =
 sig
   type t
+  module Priority : Data
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
-  val priority : t -> float
+  val priority : t -> Priority.t
 end
 
 module PriorityQueueOf(D:DataWithPriority) =
@@ -19,33 +20,26 @@ struct
   module QueueHeap =
     HeapOf(
     struct
-      type t = (D.t * float)
+      type t = (D.t * D.Priority.t)
       [@@deriving show, hash]
 
       let compare =
         (fun (_,f1) (_,f2) ->
-             (Float.compare f1 f2))
+             (D.Priority.compare f1 f2))
       let to_string = fun _ -> "hi"
     end)
 
-  module PushedSet =
-    SetOf(D)
-
-  type t = QueueHeap.t * PushedSet.t
+  type t = QueueHeap.t
   [@@deriving show, hash]
 
   type element = D.t
 
-  let empty = (QueueHeap.empty, PushedSet.empty)
+  let empty = (QueueHeap.empty)
 
-  let push ((h,s):t) (e:element) : t =
-    if PushedSet.member s e then
-      (h,s)
-    else
-      let s' = PushedSet.insert e s in
+  let push (h:t) (e:element) : t =
       let pri = D.priority e in
       let h' = QueueHeap.push h (e,pri) in
-      (h',s')
+      (h')
 
   let push_all (q:t) (es:element list) : t =
     List.fold_left
@@ -59,20 +53,20 @@ struct
   let singleton (e:element) : t =
     from_list [e]
 
-  let pop ((h,s):t) : (D.t * float * t) option =
-    Option.map ~f:(fun ((e,p),h') -> (e,p,(h',s))) (QueueHeap.pop h)
+  let pop ((h):t) : (D.t * D.Priority.t * t) option =
+    Option.map ~f:(fun ((e,p),h') -> (e,p,(h'))) (QueueHeap.pop h)
 
-  let pop_exn (q:t) : D.t * float * t =
+  let pop_exn (q:t) : D.t * D.Priority.t * t =
     begin match pop q with
       | None -> failwith "failure: pop_exn"
       | Some e -> e
     end
 
-  let peek : t -> D.t option =
-    Option.map ~f:fst_trip % pop
+  let peek ((h):t) : D.t option =
+    Option.map ~f:fst (QueueHeap.peek h)
 
-  let peek_exn : t -> D.t =
-    fst_trip % pop_exn
+  let peek_exn (h:t) : D.t =
+    Option.value_exn (peek h)
 
   let delete : t -> t option =
     Option.map ~f:trd_trip % pop
@@ -80,28 +74,38 @@ struct
   let delete_exn : t -> t =
     trd_trip % pop_exn
 
-  let all_remaining ((h,_):t) : (D.t * float) list =
+  let all_remaining ((h):t) : (D.t * D.Priority.t) list =
     QueueHeap.to_list h
 
   let rec pop_until_min_pri_greater_than
       (q:t)
-      (f:float)
-    : (element * float) list * t =
+      (f:D.Priority.t)
+    : (element * D.Priority.t) list * t =
       begin match pop q with
         | None -> ([],q)
         | Some (e,f',q') ->
-          if f' > f then
+          if compare f' f > 0 then
             ([],q)
           else
             let (efs,q'') = pop_until_min_pri_greater_than q' f in
             ((e,f')::efs,q'')
       end
 
+  let rec pop_until_new_priority
+      (q:t)
+    : (D.Priority.t * element list * t) option =
+    begin match (QueueHeap.pop_all_equiv q) with
+      | Some ((pes),q) ->
+        let p = snd (List.hd_exn pes) in
+        let es = List.map ~f:(fst) pes in
+        Some (p,es,q)
+      | None -> None
+    end
 
-  let length ((h,_):t) : int = QueueHeap.size h
+  let length ((h):t) : int = QueueHeap.size h
 
   let compare
-    : (QueueHeap.t * PushedSet.t) comparer =
+    : (QueueHeap.t) comparer =
     let real_heap_compare
         (qh1:QueueHeap.t)
         (qh2:QueueHeap.t)
@@ -121,7 +125,5 @@ struct
         ordered_qhl1
         ordered_qhl2
     in
-    pair_compare
       real_heap_compare
-      PushedSet.compare
 end

@@ -3,7 +3,6 @@ open Lang
 open Eval
 open Lens_put
 open Normalized_lang
-open Regexcontext
 open Lenscontext
 open Consts
 
@@ -13,7 +12,7 @@ let rec clean_exampledness_atom
     (a:exampled_atom)
   : exampled_atom =
   begin match a with
-    | EAVariable (s,sorig,l,el,cs) ->
+    | EAClosed (s,sorig,l,el,cs) ->
       let udef_choice_zip = List.zip_exn el cs in
       let actual_choices =
         List.filter
@@ -21,7 +20,7 @@ let rec clean_exampledness_atom
           udef_choice_zip
       in
       let (strs,cs) = List.unzip actual_choices in
-      EAVariable (s,sorig,l,strs,cs)
+      EAClosed (s,sorig,l,strs,cs)
     | EAStar (r,cs) ->
       
       let actual_choices =
@@ -101,41 +100,40 @@ let exampled_atom_to_exampled_dnf_regex
   : exampled_dnf_regex =
   ([([a],["";""],ill)],ill)
   
-let rec exampled_regex_to_exampled_dnf_regex (rc:RegexContext.t) (lc:LensContext.t) (r:exampled_regex) :
+let rec exampled_regex_to_exampled_dnf_regex (lc:LensContext.t) (r:exampled_regex) :
   exampled_dnf_regex =
   begin match r with
     | ERegExEmpty -> ([],[])
     | ERegExBase (c, ill) -> ([([],[c],ill)],ill)
     | ERegExConcat (r1,r2,ill) ->
       (concat_exampled_dnf_regexs
-         (exampled_regex_to_exampled_dnf_regex rc lc r1)
-         (exampled_regex_to_exampled_dnf_regex rc lc r2),ill)
+         (exampled_regex_to_exampled_dnf_regex lc r1)
+         (exampled_regex_to_exampled_dnf_regex lc r2),ill)
     | ERegExOr (r1,r2,ill) ->
       (or_exampled_dnf_regexs
-         (exampled_regex_to_exampled_dnf_regex rc lc r1)
-         (exampled_regex_to_exampled_dnf_regex rc lc r2),ill)
+         (exampled_regex_to_exampled_dnf_regex lc r1)
+         (exampled_regex_to_exampled_dnf_regex lc r2),ill)
     | ERegExStar (r',ill) ->
       exampled_atom_to_exampled_dnf_regex
-        (EAStar (exampled_regex_to_exampled_dnf_regex rc lc r',ill))
+        (EAStar (exampled_regex_to_exampled_dnf_regex lc r',ill))
         ill
-    | ERegExVariable (s,ss,ill) ->
+    | ERegExClosed (s,ss,ill) ->
       if !use_lens_context then
         let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc s in
-        let ss = List.map ~f:(lens_putr rc lc converter) ss in
+        let ss = List.map ~f:(lens_putr converter) ss in
         exampled_atom_to_exampled_dnf_regex
-          (EAVariable (rep_type,s,converter,ss,ill))
+          (EAClosed (rep_type,s,converter,ss,ill))
           ill
       else
         exampled_atom_to_exampled_dnf_regex
-          (EAVariable (s,s,Lens.LensIdentity (Regex.RegExVariable s),ss,ill))
+          (EAClosed (s,s,Lens.LensIdentity (Regex.RegExClosed s),ss,ill))
           ill
   end
 
 let regex_to_exampled_dnf_regex
-    (c:RegexContext.t)
     (lc:LensContext.t)
     (r:Regex.t)
     (es:string list)
   : exampled_dnf_regex option =
-  let er_option = regex_to_exampled_regex c r es in
-  Option.map ~f:(exampled_regex_to_exampled_dnf_regex c lc) er_option
+  let er_option = regex_to_exampled_regex r es in
+  Option.map ~f:(exampled_regex_to_exampled_dnf_regex lc) er_option

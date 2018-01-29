@@ -28,15 +28,12 @@ open Benv
 
 open Stdlib
 open Optician 
-open Regexcontext
-open Lenscontext
 open Lang
 
 module Info = Hbase.Info
 module MLens = Blenses.MLens
 
 let rec to_boomerang_regex
-    (rc:RegexContext.t)
   : Regex.t -> Brx.t =
   Regex.fold
     ~empty_f:Brx.empty
@@ -44,14 +41,10 @@ let rec to_boomerang_regex
     ~concat_f:Brx.mk_seq
     ~or_f:Brx.mk_alt
     ~star_f:Brx.mk_star
-    ~var_f:(fun v ->
-        to_boomerang_regex
-          rc
-          (RegexContext.lookup_exn rc v))
+    ~closed_f:ident
 
 let rec to_boomerang_lens
     (i:Info.t)
-    (rc:RegexContext.t)
   : Lens.t -> MLens.t =
   Lens.fold
     ~const_f:(fun s1 s2 ->
@@ -67,15 +60,15 @@ let rec to_boomerang_lens
     ~union_f:(MLens.union i)
     ~compose_f:(MLens.compose i)
     ~iterate_f:(MLens.star i)
-    ~identity_f:((MLens.copy i) % (to_boomerang_regex rc))
+    ~identity_f:((MLens.copy i) % to_boomerang_regex)
     ~inverse_f:(MLens.invert i)
     ~permute_f:(fun il ml -> MLens.permute i (Permutation.to_int_list il) ml)
     ~closed_f:(fun l -> l)
 
-let populate_lens_context
+let retrieve_existing_lenses
     (relevant_regexps:Brx.t list)
     (e:CEnv.t)
-  : Lenscontext.LensContext.t * RegexContext.t =
+  : (Lens.t * Regex.t * Regex.t) list =
   let lens_list =
     List.filter_map
       ~f:ident
@@ -109,33 +102,16 @@ let populate_lens_context
       bij_lens_list
   in
 
-  let optician_lenses_types =
-    List.filter_map
-      ~f:(fun (l,s,v) ->
-          let l_o = Blenses.MLens.to_optician_lens l in
-          Option.map
-            ~f:(fun l ->
-                (l
-                ,Brx.to_optician_regexp s
-                ,Brx.to_optician_regexp v))
-            l_o)
-      lenses_types
-  in
-
-  let (rc,optician_lenses_types) =
-    List.fold_left
-      ~f:(fun (rc,acc) (l,r1,r2) ->
-          let (rc,r1) = Regex_utilities.iteratively_deepen rc r1 in
-          let (rc,r2) = Regex_utilities.iteratively_deepen rc r2 in
-          (rc,(l,r1,r2)::acc))
-      ~init:(RegexContext.empty,[])
-      optician_lenses_types
-  in
-
-  (LensContext.insert_list
-     LensContext.empty
-     optician_lenses_types
-  ,rc)
+  List.filter_map
+    ~f:(fun (l,s,v) ->
+        let l_o = Blenses.MLens.to_optician_lens l in
+        Option.map
+          ~f:(fun l ->
+              (l
+              ,Brx.to_optician_regexp s
+              ,Brx.to_optician_regexp v))
+          l_o)
+    lenses_types
 
 let synth
     (i:Info.t)
@@ -145,18 +121,14 @@ let synth
     (exs:(string * string) list)
   : Blenses.MLens.t =
   let subregexps = (Brx.subregexp_list r1)@(Brx.subregexp_list r2) in
-  let (lc,rc) = populate_lens_context subregexps env in
+  let lss = retrieve_existing_lenses subregexps env in
   let r1 = Brx.to_optician_regexp r1 in
   let r2 = Brx.to_optician_regexp r2 in
-  let (rc,r1) = Regex_utilities.iteratively_deepen rc r1 in
-  let (rc,r2) = Regex_utilities.iteratively_deepen rc r2 in
   to_boomerang_lens
     i
-    rc
     (Option.value_exn
        (Gen.gen_lens
-          rc
-          lc
+          lss
           r1
           r2
           exs))

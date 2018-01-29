@@ -1,4 +1,4 @@
-module Xml =
+module Xml_synth =
 let LOWERCASE
   : regexp =
   "a"

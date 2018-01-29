@@ -1,5 +1,6 @@
 open Stdlib
 open Lang
+open Regex_utilities
 
 module QueueElement = struct
   type t = 
@@ -59,8 +60,19 @@ module QueueElement = struct
       (nqe_to_tuple q1)
       (nqe_to_tuple q2)
 
-    let priority
-        (qe : t)
-      : float =
-      Float.of_int qe.expansions_performed
+  module Priority = struct
+    type t = float
+    [@@deriving show, hash]
+
+    let compare
+        (e1:t)
+        (e2:t) 
+      : int =
+      Float.compare e1 e2
+  end
+
+  let priority
+      (qe : t)
+    : Priority.t =
+    Float.of_int qe.expansions_performed
 end

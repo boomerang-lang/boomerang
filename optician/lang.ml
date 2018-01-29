@@ -38,7 +38,7 @@ struct
     | RegExConcat of t * t
     | RegExOr of t * t 
     | RegExStar of t
-    | RegExVariable of Id.t
+    | RegExClosed of t
   [@@deriving ord, show, hash]
 
   let one = RegExBase ""
@@ -69,11 +69,11 @@ struct
       | _ -> None
     end
 
-  let separate_var
+  let separate_closed
       (r:t)
-    : Id.t option =
+    : t option =
     begin match r with
-      | RegExVariable v -> Some v
+      | RegExClosed r -> Some r
       | _ -> None
     end
 
@@ -96,15 +96,10 @@ struct
     : t =
     RegExStar r
 
-  let make_var
-      (v:Id.t)
+  let make_closed
+      (r:t)
     : t =
-    RegExVariable v
-
-  let make_var
-      (v:Id.t)
-    : t =
-    RegExVariable v
+    RegExClosed r
 
   let make_plus = make_or
 
@@ -122,10 +117,11 @@ struct
       ~upward_concat:(upward_concat:'b -> 'a -> 'a -> 'a)
       ~upward_or:(upward_or:'b -> 'a -> 'a -> 'a)
       ~upward_star:(upward_star:'b -> 'a -> 'a)
-      ~upward_var:(upward_var:'b -> Id.t -> 'a)
+      ~upward_closed:(upward_closed:'b -> 'a -> 'a)
       ?downward_concat:(downward_concat:'b -> 'b = ident)
       ?downward_or:(downward_or:'b -> 'b = ident)
       ?downward_star:(downward_star:'b -> 'b = ident)
+      ?downward_closed:(downward_closed:'b -> 'b = ident)
     : t -> 'a =
     let rec fold_downward_upward_internal
         (downward_acc:'b)
@@ -151,8 +147,11 @@ struct
           upward_star
             downward_acc
             (fold_downward_upward_internal downward_acc' r')
-        | RegExVariable v ->
-          upward_var downward_acc v
+        | RegExClosed r' ->
+          let downward_acc' = downward_closed downward_acc in
+          upward_closed
+            downward_acc
+            (fold_downward_upward_internal downward_acc' r')
       end
     in
     fold_downward_upward_internal init
@@ -163,7 +162,7 @@ struct
       ~concat_f:(concat_f:'a -> 'a -> 'a)
       ~or_f:(or_f:'a -> 'a -> 'a)
       ~star_f:(star_f:'a -> 'a)
-      ~var_f:(var_f:Id.t -> 'a)
+      ~closed_f:(closed_f:'a -> 'a)
       (r:t)
     : 'a =
     fold_downward_upward
@@ -173,8 +172,32 @@ struct
       ~upward_concat:(thunk_of concat_f)
       ~upward_or:(thunk_of or_f)
       ~upward_star:(thunk_of star_f)
-      ~upward_var:(thunk_of var_f)
+      ~upward_closed:(thunk_of closed_f)
       r
+
+  let fold_with_subcomponents
+      ~empty_f:(empty_f:'a)
+      ~base_f:(base_f:string -> 'a)
+      ~concat_f:(concat_f:t -> t -> 'a -> 'a -> 'a)
+      ~or_f:(or_f:t -> t -> 'a -> 'a -> 'a)
+      ~star_f:(star_f:t -> 'a -> 'a)
+      ~closed_f:(closed_f:t -> 'a -> 'a)
+      (r:t)
+    : 'a =
+    snd
+      (fold
+         ~empty_f:(RegExEmpty,empty_f)
+         ~base_f:(fun s -> (RegExBase s, base_f s))
+         ~concat_f:(fun (r1,x1) (r2,x2) ->
+             (RegExConcat (r1,r2), concat_f r1 r2 x1 x2))
+         ~or_f:(fun (r1,x1) (r2,x2) ->
+             (RegExOr (r1,r2), or_f r1 r2 x1 x2))
+         ~star_f:(fun (r',x') ->
+             (RegExStar r', star_f r' x'))
+         ~closed_f:(fun (r',x') ->
+             (RegExClosed r', closed_f r' x'))
+         r)
+
 
   let rec apply_at_every_level
       (f:t -> t)
@@ -186,7 +209,7 @@ struct
       ~concat_f:(fun r1 r2 -> f (RegExConcat (r1,r2)))
       ~or_f:(fun r1 r2 -> f (RegExOr (r1,r2)))
       ~star_f:(fun r' -> f (RegExStar r'))
-      ~var_f:(fun v -> f (RegExVariable v))
+      ~closed_f:(fun r' -> f (RegExClosed r'))
       r
 
   let rec applies_for_every_applicable_level
@@ -240,10 +263,15 @@ struct
               r's
           in
           (star_r, level_contribution@recursed_inner))
-      ~var_f:(fun v ->
-          let var_r = RegExVariable v in
-          let level_contribution = option_to_empty_or_singleton (f var_r) in
-          (var_r, level_contribution))
+      ~closed_f:(fun (r',r's) ->
+          let closed_r = RegExClosed r' in
+          let level_contribution = option_to_empty_or_singleton (f closed_r) in
+          let recursed_inner =
+            List.map
+              ~f:(fun r'' -> RegExClosed r'')
+              r's
+          in
+          (closed_r, level_contribution@recursed_inner))
 
   let rec size
     : t -> int =
@@ -253,7 +281,7 @@ struct
       ~concat_f:(fun n1 n2 -> 1+n1+n2)
       ~or_f:(fun n1 n2 -> 1+n1+n2)
       ~star_f:(fun n -> 1+n)
-      ~var_f:(fun _ -> 1)
+      ~closed_f:(fun n -> n+1)
 
 
   let from_char_set (l : (int * int) list) : t =

@@ -64,7 +64,7 @@ let rec apply_at_every_level_lens (f:Lens.t -> Lens.t) (l:Lens.t) : Lens.t =
   in
   f l
 
-let rec make_lens_safe_in_smaller_context
+(*let rec make_lens_safe_in_smaller_context
     (rc_smaller:RegexContext.t)
     (rc_larger:RegexContext.t)
     (l:Lens.t)
@@ -105,7 +105,7 @@ let rec make_lens_safe_in_smaller_context
     | Lens.LensClosed l' ->
       let l' = make_lens_safe_in_smaller_context rc_smaller rc_larger l' in
       Lens.LensClosed l'
-  end
+  end*)
 
 let distribute_inverses : Lens.t -> Lens.t =
   let distribute_inverses_current_level (l:Lens.t) : Lens.t =

@@ -16,7 +16,6 @@ module PQ = PriorityQueueOf(QueueElement)
 module type LENS_SYNTHESIZER =
 sig
   val gen_lens :
-    RegexContext.t ->
     LensContext.t ->
     Regex.t ->
     Regex.t ->
@@ -56,7 +55,7 @@ struct
       (atom2:ordered_exampled_atom)
     : atom_lens =
     begin match (atom1,atom2) with
-      | (OEAVar (_,sorig1,_,_),OEAVar (_,sorig2,_,_)) ->
+      | (OEAClosed (_,sorig1,_,_),OEAClosed (_,sorig2,_,_)) ->
         AtomLensVariable (LensContext.shortest_path_exn lc sorig1 sorig2)
       | (OEAStar r1, OEAStar r2) ->
         AtomLensIterate (gen_dnf_lens_zipper_internal lc r1 r2)
@@ -114,7 +113,6 @@ struct
     (clause_lenses,Permutation.create_from_doubles_unsafe perm_parts)
 
   let rigid_synth
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (qe:QueueElement.t)
       (exs:examples)
@@ -126,8 +124,8 @@ struct
       None
     else
       let (lexs,rexs) = List.unzip exs in
-      let exampled_r1_opt = regex_to_exampled_dnf_regex rc lc r1 lexs in
-      let exampled_r2_opt = regex_to_exampled_dnf_regex rc lc r2 rexs in
+      let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
+      let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
       begin match (exampled_r1_opt,exampled_r2_opt) with
         | (Some exampled_r1,Some exampled_r2) ->
           let e_o_r1 = to_ordered_exampled_dnf_regex exampled_r1 in
@@ -149,7 +147,6 @@ struct
       end
 
   let gen_dnf_lens_and_info_zipper
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
@@ -159,45 +156,52 @@ struct
     let rec gen_dnf_lens_zipper_queueing
         (queue:PQ.t)
       : synthesis_info option =
-      begin match PQ.pop queue with
+      begin match PQ.pop_until_new_priority queue with
         | None -> None
-        | Some (qe,_,q) ->
-          incr(count);
+        | Some (f,qes,q) ->
+          count := !count + (List.length qes);
           if !verbose then
             (print_endline "popped";
-             print_endline ("r1: " ^ Regex.show (QueueElement.get_r1 qe));
+             (*print_endline ("r1: " ^ Regex.show (QueueElement.get_r1 qe));
              print_endline "\n\n";
              print_endline ("r2: " ^ Regex.show (QueueElement.get_r2 qe));
-             print_endline "\n\n";
+             print_endline "\n\n";*)
              print_endline ("count: " ^ (string_of_int !count));
              print_endline "\n\n";
-             print_endline ("exps_perfed: " ^ (string_of_int (QueueElement.get_expansions_performed qe)));
+             print_endline ("priority: " ^ (QueueElement.Priority.show f));
+             print_endline "\n\n";
+             (*print_endline ("exps_perfed: " ^ (string_of_int (QueueElement.get_expansions_performed qe)));
              print_endline "\n\n";
              print_endline ("exps_inferred: " ^ (string_of_int (QueueElement.get_expansions_inferred qe)));
              print_endline "\n\n";
-             print_endline ("exps_forced: " ^ (string_of_int (QueueElement.get_expansions_forced qe)));
+             print_endline ("exps_forced: " ^ (string_of_int (QueueElement.get_expansions_forced qe)));*)
              print_endline ("\n\n\n"));
           let result_o =
-            rigid_synth
-              rc
-              lc
-              qe
-              exs
-              !count
+            List.find_map
+              ~f:(fun qe ->
+                  rigid_synth
+                    lc
+                    qe
+                    exs
+                    !count)
+              qes
           in
           begin match result_o with
             | Some _ -> result_o
             | None ->
-              let queue_elements = 
-                expand
-                  rc
-                  lc
-                  qe
+              let queue_elements =
+                List.concat_map
+                  ~f:(fun qe ->
+                      expand
+                        lc
+                        qe)
+                  (List.dedup ~compare:QueueElement.compare qes)
               in
-              gen_dnf_lens_zipper_queueing
-                (PQ.push_all
+              let pq' = PQ.push_all
                    q
-                   queue_elements)
+                   queue_elements in
+              gen_dnf_lens_zipper_queueing
+                pq'
           end
       end
     in
@@ -213,61 +217,55 @@ struct
            ])
 
 
-  let gen_dnf_lens (rc:RegexContext.t) (lc:LensContext.t) (r1:Regex.t) (r2:Regex.t)
+  let gen_dnf_lens (lc:LensContext.t) (r1:Regex.t) (r2:Regex.t)
       (exs:examples)
     : dnf_lens option =
-    Option.map ~f:(fun x -> x.l) (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+    Option.map ~f:(fun x -> x.l) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let expansions_performed_for_gen
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
     : int option =
-    Option.map ~f:(fun x -> x.expansions_performed) (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+    Option.map ~f:(fun x -> x.expansions_performed) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let specs_visited_for_gen
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
     : int option =
-    Option.map ~f:(fun x -> x.specs_visited) (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+    Option.map ~f:(fun x -> x.specs_visited) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let expansions_inferred_for_gen
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
     : int option =
-    Option.map ~f:(fun x -> x.expansions_inferred) (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+    Option.map ~f:(fun x -> x.expansions_inferred) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let expansions_forced_for_gen
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
     : int option =
-    Option.map ~f:(fun x -> x.expansions_forced) (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+    Option.map ~f:(fun x -> x.expansions_forced) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let gen_lens
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
     : Lens.t option =
-      let dnf_lens_option = gen_dnf_lens rc lc r1 r2 exs in
+      let dnf_lens_option = gen_dnf_lens lc r1 r2 exs in
       Option.map
         ~f:dnf_lens_to_lens
         dnf_lens_option
 
   let num_possible_choices
-      (rc:RegexContext.t)
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
@@ -297,14 +295,14 @@ struct
         (oea:ordered_exampled_atom)
       : float =
       begin match oea with
-      | OEAVar _ -> 1.0
+      | OEAClosed _ -> 1.0
       | OEAStar dr ->
         get_possibible_lenses_oedr dr
       end
     in
     Option.map
       ~f:(fun x -> get_possibible_lenses_oedr x.oedr1)
-      (gen_dnf_lens_and_info_zipper rc lc r1 r2 exs)
+      (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 end
 
 let expansions_performed_for_gen = DNFSynth.expansions_performed_for_gen
@@ -314,24 +312,28 @@ let expansions_forced_for_gen = DNFSynth.expansions_forced_for_gen
 let num_possible_choices = DNFSynth.num_possible_choices
 
 let gen_lens
-    (rc:RegexContext.t)
-    (lc:LensContext.t)
+    (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
     (exs:examples)
   : Lens.t option =
+  let existing_lenses =
+    List.map
+      ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1, iteratively_deepen r2))
+      existing_lenses
+  in
+  let lc = LensContext.insert_list LensContext.empty existing_lenses in
+  let r1 = iteratively_deepen r1 in
+  let r2 = iteratively_deepen r2 in
   if !verbose then
     print_endline "Synthesis Start";
-  let rc_orig = rc in
-  let lens_option = DNFSynth.gen_lens rc lc r1 r2 exs in
+  let lens_option = DNFSynth.gen_lens lc r1 r2 exs in
   if !verbose then
     print_endline "Synthesis End";
   if !simplify_generated_lens then
     Option.map
-      ~f:(simplify_lens % (make_lens_safe_in_smaller_context rc_orig rc))
+      ~f:(simplify_lens)
       lens_option
   else
-    Option.map
-      ~f:((make_lens_safe_in_smaller_context rc_orig rc))
-      lens_option
-
+    lens_option
+        

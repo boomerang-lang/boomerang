@@ -10,13 +10,13 @@ struct
 
   type t =
     | Leaf
-    | Node of t * element * t * int
+    | Node of t * (element list) * t * int
   [@@deriving show, hash]
 
   let empty : t = Leaf
 
   let singleton (e:element) : t =
-    Node(Leaf,e,Leaf,1)
+    Node(Leaf,[e],Leaf,1)
 
   let rank (h:t) : int =
     begin match h with
@@ -28,18 +28,24 @@ struct
     begin match (h1,h2) with
       | (Leaf,_) -> h2
       | (_,Leaf) -> h1
-      | (Node(lh,e1,rh,_), Node(_,e2,_,_)) ->
-        let cmp = D.compare e1 e2 in
-        if (is_gt cmp) then
-          merge h2 h1
-        else
-          let merged = merge rh h2 in
-          let rank_left = rank lh in
-          let rank_right = rank merged in
-          if rank_left >= rank_right then
-            Node (lh, e1, merged, rank_right+1)
-          else
-            Node (merged, e1, lh, rank_left+1)
+      | (Node(lh1,e1,rh1,_), Node(lh2,e2,rh2,i)) ->
+        let cmp = D.compare (List.hd_exn e1) (List.hd_exn e2) in
+        begin match make_matchable cmp with
+          | GT ->
+            merge h2 h1
+          | LT ->
+            let merged = merge rh1 h2 in
+            let rank_left = rank lh1 in
+            let rank_right = rank merged in
+            if rank_left >= rank_right then
+              Node (lh1, e1, merged, rank_right+1)
+            else
+              Node (merged, e1, lh1, rank_left+1)
+          | EQ ->
+            let h2 = Node(lh2,e2@e1,rh2,i) in
+            let merged_once = merge lh1 h2 in
+            merge lh2 merged_once
+        end
     end
     
   let push (h:t) (e:element) : t =
@@ -48,13 +54,22 @@ struct
   let pop (h:t) : (element * t) option =
     begin match h with
       | Leaf -> None
-      | Node (lh, e, rh, _) -> Some (e, merge lh rh)
+      | Node (lh, [e], rh, _) -> Some (e, merge lh rh)
+      | Node (lh, e::es, rh, i) -> Some (e, Node (lh, es, rh, i))
+      | _ -> failwith "bad heap"
+    end
+
+  let pop_all_equiv (h:t) : (element list * t) option =
+    begin match h with
+      | Leaf -> None
+      | Node (lh, es, rh, _) -> Some (es, merge lh rh)
     end
 
   let peek (h:t) : element option =
     begin match h with
       | Leaf -> None
-      | Node (_, e, _, _) -> Some e
+      | Node (_, e::_, _, _) -> Some e
+      | Node (_, _, _, _) -> failwith "bad heap"
     end
 
   (*let rec to_string (h:heap) : string =
@@ -79,7 +94,7 @@ struct
   let rec to_list (h:t) : element list =
     begin match h with
       | Leaf -> []
-      | Node(lh,e,rh,_) -> e::((to_list lh)@(to_list rh))
+      | Node(lh,es,rh,_) -> es@((to_list lh)@(to_list rh))
     end
 
   let compare (h1:t) (h2:t) : comparison =

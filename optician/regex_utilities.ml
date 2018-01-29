@@ -2,24 +2,6 @@ open Stdlib
 open Lang
 open Regexcontext
 
-let rec make_regex_safe_in_smaller_context
-    (rc_smaller:RegexContext.t)
-    (rc_larger:RegexContext.t)
-  : Regex.t -> Regex.t =
-  fold_until_fixpoint
-    (Regex.fold
-       ~empty_f:Regex.zero
-       ~concat_f:Regex.make_times
-       ~or_f:Regex.make_plus
-       ~star_f:Regex.make_star
-       ~base_f:Regex.make_base
-       ~var_f:(fun v ->
-           begin match (RegexContext.lookup rc_smaller v) with
-             | None ->
-               RegexContext.lookup_exn rc_larger v
-             | Some _ -> Regex.make_var v
-           end))
-
 let simplify_regex : Regex.t -> Regex.t =
   let maximally_factor_regex : Regex.t -> Regex.t =
     Semiring.maximally_factor_element
@@ -114,74 +96,49 @@ let simplify_regex : Regex.t -> Regex.t =
 
 
 let rec iteratively_deepen
-    (rc:RegexContext.t)
     (r:Regex.t)
-  : RegexContext.t * Regex.t =
-  let regex_name =
-    RegexContext.autogen_id
-      rc
-      r
-  in
-  let new_r =
-    Regex.make_var regex_name
-  in
-  if (RegexContext.contains rc regex_name) then
-    (rc, new_r)
-  else
-    begin match r with
-      | Regex.RegExEmpty -> (rc,r)
-      | Regex.RegExBase _ -> (rc,r)
-      | Regex.RegExConcat (r1,r2) ->
-        let (rc,r1) = iteratively_deepen rc r1 in
-        let (rc,r2) = iteratively_deepen rc r2 in
-        let regex_definition = Regex.make_concat r1 r2 in
-        let rc =
-          RegexContext.insert_exn
-            rc
-            regex_name
-            regex_definition
-            false
-        in
-        (rc, new_r)
-      | Regex.RegExOr (r1,r2) ->
-        let (rc,r1) = iteratively_deepen rc r1 in
-        let (rc,r2) = iteratively_deepen rc r2 in
-        let regex_definition = Regex.make_or r1 r2 in
-        let rc =
-          RegexContext.insert_exn
-            rc
-            regex_name
-            regex_definition
-            false
-        in
-        (rc, new_r)
-      | Regex.RegExStar r' ->
-        let (rc,r') = iteratively_deepen rc r' in
-        let regex_definition = Regex.RegExStar r' in
-        let rc =
-          RegexContext.insert_exn
-            rc
-            regex_name
-            regex_definition
-            false
-        in
-        (rc, new_r)
-      | Regex.RegExVariable _ ->
-        (rc,r)
-    end
+  : Regex.t =
+  begin match r with
+    | Regex.RegExEmpty -> r
+    | Regex.RegExBase _ -> r
+    | Regex.RegExConcat (r1,r2) ->
+      let r1 = iteratively_deepen r1 in
+      let r2 = iteratively_deepen r2 in
+      Regex.make_closed (Regex.make_concat r1 r2)
+    | Regex.RegExOr (r1,r2) ->
+      let r1 = iteratively_deepen r1 in
+      let r2 = iteratively_deepen r2 in
+      Regex.make_closed (Regex.make_or r1 r2)
+    | Regex.RegExStar r' ->
+      let r' = iteratively_deepen r' in
+      Regex.make_closed (Regex.RegExStar r')
+    | Regex.RegExClosed _ ->
+      failwith "shouldn't happen"
+  end
 
-let rec get_dnf_size
-  : Regex.t -> int =
-  fst
-  %
-  Regex.fold
-    ~empty_f:(0,0)
-    ~base_f:(fun _ -> (0,1))
-    ~concat_f:(fun (size1,or_size1) (size2,or_size2) ->
-        (size1*or_size2 + size2*or_size1, or_size1 * or_size2))
-    ~or_f:(fun (size1,or_size1) (size2,or_size2) ->
-        (size1+size2,or_size1+or_size2))
-    ~star_f:(fun (size,_) ->
-        (size+1,1))
-    ~var_f:(fun _ -> (1,1))
+let get_dnf_size
+    (r:Regex.t)
+  : int =
+  let rec get_dnf_size_internal
+      (r:Regex.t)
+    : int * int =
+    begin match r with
+      | Regex.RegExEmpty -> (0,0)
+      | Regex.RegExBase _ -> (0,1)
+      | Regex.RegExConcat (r1,r2) ->
+        let (size1,or_size1) = get_dnf_size_internal r1 in
+        let (size2,or_size2) = get_dnf_size_internal r2 in
+        (size1*or_size2 + size2*or_size1, or_size1 * or_size2) 
+      | Regex.RegExOr (r1,r2) ->
+        let (size1,or_size1) = get_dnf_size_internal r1 in
+        let (size2,or_size2) = get_dnf_size_internal r2 in
+        (size1+size2,or_size1+or_size2)
+      | Regex.RegExStar r' ->
+        let (size,_) = get_dnf_size_internal r' in
+        (size+1,1)
+      | Regex.RegExClosed _ ->
+        (1,1)
+    end
+  in
+  fst (get_dnf_size_internal r)
 

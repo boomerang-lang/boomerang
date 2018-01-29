@@ -1,13 +1,10 @@
 open Stdlib
-open Regexcontext
-open Lenscontext
 open Lang
 open Eval
 open Normalized_lang
 open Typing
 
 let rec lens_putl_internal
-    (rc:RegexContext.t)
     (l:Lens.t)
     (er:exampled_regex)
     (iteration:int list)
@@ -22,33 +19,31 @@ let rec lens_putl_internal
       let relevant_string = extract_string er iteration in
       let (_,limpl_rregex) = type_lens l' in
       let er = Option.value_exn (regex_to_exampled_regex
-          rc
           limpl_rregex
           [relevant_string])
       in
-      lens_putl_internal rc l' er [0]
+      lens_putl_internal l' er [0]
     | (Lens.LensConcat (l1,l2), ERegExConcat (er1,er2,_)) ->
-        (lens_putl_internal rc l1 er1 iteration) ^
-        (lens_putl_internal rc l2 er2 iteration)
+        (lens_putl_internal l1 er1 iteration) ^
+        (lens_putl_internal l2 er2 iteration)
     | (Lens.LensSwap (l1,l2), ERegExConcat (er1,er2,_)) ->
-        (lens_putl_internal rc l1 er2 iteration) ^
-        (lens_putl_internal rc l2 er1 iteration)
+        (lens_putl_internal l1 er2 iteration) ^
+        (lens_putl_internal l2 er1 iteration)
     | (Lens.LensUnion (l1,l2), ERegExOr (er1,er2,_)) ->
         if took_regex er1 iteration then
-          lens_putl_internal rc l1 er1 iteration
+          lens_putl_internal l1 er1 iteration
         else
-          lens_putl_internal rc l2 er2 iteration
+          lens_putl_internal l2 er2 iteration
     | (Lens.LensCompose (l1,l2),_) ->
-      let intermediary_string = lens_putl_internal rc l1 er iteration in
+      let intermediary_string = lens_putl_internal l1 er iteration in
       let (_,intermediary_regex) = type_lens l2 in
       let intermediary_er_o = regex_to_exampled_regex
-          rc
           intermediary_regex
           [intermediary_string]
       in
       begin match intermediary_er_o with
         | None -> failwith "bad input to lens"
-        | Some intermediary_er -> lens_putl_internal rc l2 intermediary_er [0]
+        | Some intermediary_er -> lens_putl_internal l2 intermediary_er [0]
       end
     | (Lens.LensIterate l', ERegExStar (er',_)) ->
         let valid_iterations =
@@ -58,12 +53,12 @@ let rec lens_putl_internal
               (extract_iterations_consumed er')) in
         String.concat
           (List.map
-            ~f:(lens_putl_internal rc l' er')
+            ~f:(lens_putl_internal l' er')
             valid_iterations)
     | (Lens.LensIdentity _, _) ->
       extract_string er iteration
     | (Lens.LensInverse l', _) ->
-      lens_putr_internal rc l' er iteration
+      lens_putr_internal l' er iteration
     | (Lens.LensPermute (p,ls), _) ->
       let rec extract_reversed_concat_list
           (er:exampled_regex)
@@ -92,14 +87,13 @@ let rec lens_putl_internal
       let er_l_list = List.zip_exn permed_concat_list ls in
       List.fold
         ~f:(fun s (er,l) ->
-            s ^ (lens_putl_internal rc l er iteration))
+            s ^ (lens_putl_internal l er iteration))
         ~init:""
         er_l_list
     | _ -> failwith "bad typecheck disagreeing types"
   end
 
 and lens_putr_internal
-    (rc:RegexContext.t)
     (l:Lens.t)
     (er:exampled_regex)
     (iteration:int list)
@@ -114,33 +108,31 @@ and lens_putr_internal
       let relevant_string = extract_string er iteration in
       let (limpl_lregex,_) = type_lens l' in
       let er = Option.value_exn (regex_to_exampled_regex
-          rc
           limpl_lregex
           [relevant_string])
       in
-      lens_putr_internal rc l' er [0]
+      lens_putr_internal l' er [0]
     | (Lens.LensConcat (l1,l2), ERegExConcat (er1,er2,_)) ->
-        (lens_putr_internal rc l1 er1 iteration) ^
-        (lens_putr_internal rc l2 er2 iteration)
+        (lens_putr_internal l1 er1 iteration) ^
+        (lens_putr_internal l2 er2 iteration)
     | (Lens.LensSwap (l1,l2), ERegExConcat (er1,er2,_)) ->
-        (lens_putr_internal rc l2 er2 iteration) ^
-        (lens_putr_internal rc l1 er1 iteration)
+        (lens_putr_internal l2 er2 iteration) ^
+        (lens_putr_internal l1 er1 iteration)
     | (Lens.LensUnion (l1,l2), ERegExOr (er1,er2,_)) ->
         if took_regex er1 iteration then
-          lens_putr_internal rc l1 er1 iteration
+          lens_putr_internal l1 er1 iteration
         else
-          lens_putr_internal rc l2 er2 iteration
+          lens_putr_internal l2 er2 iteration
     | (Lens.LensCompose (l1,l2),_) ->
-      let intermediary_string = lens_putr_internal rc l2 er iteration in
+      let intermediary_string = lens_putr_internal l2 er iteration in
       let (intermediary_regex,_) = type_lens l1 in
       let intermediary_er_o = regex_to_exampled_regex
-          rc
           intermediary_regex
           [intermediary_string]
       in
       begin match intermediary_er_o with
         | None -> failwith "bad input to lens"
-        | Some intermediary_er -> lens_putr_internal rc l1 intermediary_er [0]
+        | Some intermediary_er -> lens_putr_internal l1 intermediary_er [0]
       end
     | (Lens.LensIterate l', ERegExStar (er',_)) ->
         let valid_iterations =
@@ -150,12 +142,12 @@ and lens_putr_internal
               (extract_iterations_consumed er')) in
         String.concat
           (List.map
-            ~f:(lens_putr_internal rc l' er')
+            ~f:(lens_putr_internal l' er')
             valid_iterations)
     | (Lens.LensIdentity _, _) ->
       extract_string er iteration
     | (Lens.LensInverse l', _) ->
-      lens_putl_internal rc l' er iteration
+      lens_putl_internal l' er iteration
     | (Lens.LensPermute (p,ls), _) ->
       let rec extract_reversed_concat_list
           (er:exampled_regex)
@@ -184,32 +176,30 @@ and lens_putr_internal
       in
       List.fold
         ~f:(fun s (er,l) ->
-            s ^ (lens_putl_internal rc l er iteration))
+            s ^ (lens_putl_internal l er iteration))
         ~init:""
         permed_er_l_list
     | _ -> failwith "bad typecheck disagreeing types"
   end
 
-let lens_putr (rc:RegexContext.t)
-    (lc:LensContext.t)
+let lens_putr
     (l:Lens.t)
     (s:string)
   : string =
   let (sr,_) = type_lens l in
-  let exampled_sr_o = regex_to_exampled_regex rc sr [s] in
+  let exampled_sr_o = regex_to_exampled_regex sr [s] in
   begin match exampled_sr_o with
     | None -> failwith ("bad input to lens" ^ s)
-    | Some exampled_sr -> lens_putr_internal rc l exampled_sr [0]
+    | Some exampled_sr -> lens_putr_internal l exampled_sr [0]
   end
 
-let lens_putl (rc:RegexContext.t)
-    (lc:LensContext.t)
+let lens_putl
     (l:Lens.t)
     (s:string)
   : string =
   let (_,tr) = type_lens l in
-  let exampled_sr_o = regex_to_exampled_regex rc tr [s] in
+  let exampled_sr_o = regex_to_exampled_regex tr [s] in
   begin match exampled_sr_o with
     | None -> failwith ("bad input to lens: " ^ s)
-    | Some exampled_sr -> lens_putl_internal rc l exampled_sr [0]
+    | Some exampled_sr -> lens_putl_internal l exampled_sr [0]
   end
