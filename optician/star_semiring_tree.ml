@@ -1,10 +1,10 @@
 open Stdlib
 
 module NonemptyLabelledPlusTimesStarTreeOf
-    (BD : Data)
     (PD : Data)
     (TD : Data)
     (SD : Data)
+    (BD : Data)
     (L  : Data) =
 struct
   type t =
@@ -115,10 +115,10 @@ end
 
 
 module PlusTimesStarTreeOf
-    (BD : Data)
     (PD : Data)
     (TD : Data)
-    (SD : Data) =
+    (SD : Data)
+    (BD : Data) =
 struct
   type nonempty_t =
     | Base of BD.t
@@ -206,10 +206,10 @@ struct
 end
 
 module NormalizedPlusTimesStarTreeOf
-    (BD : Data)
     (PD : Data)
     (TD : Data)
-    (SD : Data) =
+    (SD : Data)
+    (BD : Data) =
 struct
   module NormalizationScript =
   struct
@@ -234,19 +234,19 @@ struct
     end
 
     include PlusTimesStarTreeOf
-        (BD)
         (PD_NormalizationLabel)
         (TD_NormalizationLabel)
         (SD)
+        (BD)
   end
 
-  module NonNormalizedTree = PlusTimesStarTreeOf(BD)(PD)(TD)(SD)
+  module NonNormalizedTree = PlusTimesStarTreeOf(PD)(TD)(SD)(BD)
 
   include LabelledPlusTimesStarTreeOf
-      (BD)
       (PD)
       (TD)
       (SD)
+      (BD)
       (IntModule)
 
   let from_tree : NonNormalizedTree.t -> t * NormalizationScript.t =

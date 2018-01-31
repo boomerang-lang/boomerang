@@ -1,5 +1,7 @@
 open Core
 
+let compare _ _ = failwith "don't be so lazy"
+
 let random_char () =
   let random_int = Random.int 256 in
   Char.of_int_exn random_int

@@ -1,6 +1,6 @@
 open Stdlib
 open Ounit_general_extensions
-open Symsynth
+open Optician
 open Star_semiring_tree
 open Star_semiring_tree_alignment
 
@@ -32,6 +32,8 @@ module IntNormalizedPTST =
     (IntModule)
     (BaseIntModule)
 
+module IPTST = IntNormalizedPTST.NonNormalizedTree
+
 module FromTreeResponse =
   PairOf
     (IntNormalizedPTST)
@@ -42,9 +44,16 @@ let assert_normalized_tree_script_equal =
     ~printer:(FromTreeResponse.show)
     ~cmp:(FromTreeResponse.compare)
 
-module IntNormalizedPTSTAlignment =
+module IntPTSTAlignment =
   PlusTimesStarTreeAlignmentOf
     (IntModule)
     (IntModule)
     (IntModule)
     (BaseIntModule)
+
+module IntPTSTAlignmentOption = OptionOf(IntPTSTAlignment)
+
+let assert_alignment_option_equal =
+  assert_equal
+    ~printer:(IntPTSTAlignmentOption.show)
+    ~cmp:(IntPTSTAlignmentOption.compare)
