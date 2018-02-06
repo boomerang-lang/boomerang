@@ -583,6 +583,15 @@ let test_get_minimal_alignment_hard_times_bijection _ =
              (1
              ,[IPTST.Times (2,[]);IPTST.Times (1,[])]))))
 
+let test_distance_emptyplus_emptyplus _ =
+  assert_float_equal
+    0.
+    (IPTSTA.get_alignment_distance
+       (IntNormalizedPTST.NonNormalizedTree.Nonempty
+          (IntNormalizedPTST.NonNormalizedTree.Plus (1,[])))
+       (IntNormalizedPTST.NonNormalizedTree.Nonempty
+          (IntNormalizedPTST.NonNormalizedTree.Plus (1,[]))))
+
 let alignment_distance_suite = "Test get_minimal_alignment" >:::
   [
     "test_get_minimal_alignment_empty" >:: test_get_minimal_alignment_empty;
@@ -591,17 +600,8 @@ let alignment_distance_suite = "Test get_minimal_alignment" >:::
     "test_get_minimal_alignment_emptytimes_emptytimes" >:: test_get_minimal_alignment_emptytimes_emptytimes;
     "test_get_minimal_alignment_times_emptytimes" >:: test_get_minimal_alignment_times_emptytimes;
     "test_get_minimal_alignment_easy_times_bijection" >:: test_get_minimal_alignment_easy_times_bijection;
-    "test_get_minimal_alignment_hard_times_bijection" >:: test_get_minimal_alignment_hard_times_bijection;
-    (*"test_distance_emptyplus_emptyplus" >:: test_distance_emptyplus_emptyplus;*)
+    (*"test_get_minimal_alignment_hard_times_bijection" >:: test_get_minimal_alignment_hard_times_bijection;*)
+    "test_distance_emptyplus_emptyplus" >:: test_distance_emptyplus_emptyplus;
   ]
 
 let _ = run_test_tt_main alignment_distance_suite
-
-(*let test_distance_emptyplus_emptyplus _ =
-  assert_float_equal
-    0.
-    (INPTSTA.get_alignment_distance
-       (IntNormalizedPTST.NonNormalizedTree.Nonempty
-          (IntNormalizedPTST.NonNormalizedTree.Plus (1,[])))
-       (IntNormalizedPTST.NonNormalizedTree.Nonempty
-          (IntNormalizedPTST.NonNormalizedTree.Plus (1,[]))))*)

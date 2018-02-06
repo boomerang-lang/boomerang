@@ -1,4 +1,4 @@
-open Core.Std
+open Stdlib
 
 type entry =
   { mutable laps : float list

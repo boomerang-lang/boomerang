@@ -87,7 +87,7 @@ struct
       NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> t option
 
     val get_alignment_distance :
-      NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> float
+      NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> float option
   end
 
   module rec NonemptyPlusStarTreeAlignment : NonemptyPlusStarTreeAlignmentType =
@@ -209,28 +209,33 @@ struct
       end
 
    (* Anders apologizes to whoever reads this code *)
-   module PrioritiedDataTreePairs =
-   struct
-     include TripleOf
-         (NormalizedTree.Nonempty)
-         (NormalizedTree.Nonempty)
-         (FloatModule)
-     module Priority = FloatModule
-     let priority ((_,_,p):t) = p
-   end
    module ProcessedTreeInfo = TripleOf(IntModule)(IntModule)(IntModule)
    module DataTreeProcessedInfoDict =
      DictOf(NormalizedTree.Nonempty)(ProcessedTreeInfo)
-   module DataTreeDataTreePriorityPQueue =
-     PriorityQueueOf(PrioritiedDataTreePairs)
+   module DataTreeMappingCostDict =
+     DictOf
+       (PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty))
+       (FloatModule)
+   module PrioritiedRemainingElements =
+   struct
+     include QuintupleOf
+         (ListOf(PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty)))
+         (ListOf(TripleOf(Position)(Position)(NonemptyPlusStarTreeAlignment)))
+         (DataTreeProcessedInfoDict)
+         (DataTreeProcessedInfoDict)
+         (FloatModule)
+     module Priority = FloatModule
+     let priority ((_,_,_,_,p):t) = p
+   end
+   module RemainingElementsPQueue =
+     PriorityQueueOf(PrioritiedRemainingElements)
    let rec get_alignment_distance
        (t1:NormalizedTree.Nonempty.t)
        (t2:NormalizedTree.Nonempty.t)
-     : float =
-     begin match (get_minimal_alignment t1 t2) with
-       | None -> 1.
-       | Some al -> cost al
-     end
+     : float option =
+     Option.map
+       ~f:(fun al -> cost al)
+       (get_minimal_alignment t1 t2)
 
    and get_minimal_alignment_times
        (tl1:TD.t)
@@ -238,8 +243,6 @@ struct
        (tts1:NormalizedTree.Nonempty.l list)
        (tts2:NormalizedTree.Nonempty.l list)
      : t option =
-     (*| Times of TD.t * Permutation.t * position list * position list
-      * t list*)
      if not (is_equal (TD.compare tl1 tl2)) then
        None
      else
@@ -260,14 +263,118 @@ struct
        let d2 = list_to_dict tts2 in
        let t1_keys = DataTreeProcessedInfoDict.key_list d1 in
        let t2_keys = DataTreeProcessedInfoDict.key_list d2 in
-       let pq =
-         DataTreeDataTreePriorityPQueue.from_list
-           (cartesian_map
-              ~f:(fun t1 t2 -> (t1,t2,get_alignment_distance t1 t2))
+       let tree_priorities =
+         DataTreeMappingCostDict.from_kvp_list
+           (cartesian_filter_map
+              ~f:(fun t1 t2 ->
+                  Option.map
+                    ~f:(fun d -> ((t1,t2),d))
+                    (get_alignment_distance t1 t2))
               t1_keys
               t2_keys)
        in
-       let (indices_and_alignments,pleft,pright) =
+       let pq =
+         RemainingElementsPQueue.singleton
+           ((DataTreeMappingCostDict.key_list tree_priorities)
+           ,[]
+           ,d1
+           ,d2
+           ,0.)
+       in
+       let alignment_info_option =
+         fold_until_completion
+           ~f:(fun pq ->
+               begin match RemainingElementsPQueue.pop pq with
+                 | None -> Right None
+                 | Some (([],aligns,d1,d2,_),f,_) ->
+                   let leftover_left =
+                     List.concat_map
+                       ~f:(fun (i1,p,c) ->
+                           List.map
+                             ~f:(fun i2 -> (i1,i2))
+                             (range p c))
+                       (DataTreeProcessedInfoDict.value_list d1)
+                   in
+                   let leftover_right =
+                     List.concat_map
+                       ~f:(fun (i1,p,c) ->
+                           List.map
+                             ~f:(fun i2 -> (i1,i2))
+                             (range p c))
+                       (DataTreeProcessedInfoDict.value_list d2)
+                   in
+                   Right (Some (aligns,leftover_left,leftover_right))
+                 | Some ((t1t2s,aligns,d1,d2,_),f,pq) ->
+                   let to_add = remove_all_elements t1t2s in
+                   let queue_elements =
+                     List.map
+                       ~f:(fun ((t1,t2),t1t2s) ->
+                           let l1o = DataTreeProcessedInfoDict.lookup d1 t1 in
+                           let l2o = DataTreeProcessedInfoDict.lookup d2 t2 in
+                           begin match (l1o,l2o) with
+                             | (None   ,_       ) ->
+                               (t1t2s,aligns,d1,d2,f)
+                             | (_      ,    None) ->
+                               (t1t2s,aligns,d1,d2,f)
+                             | (Some (i1,p1,c1), Some (i2,p2,c2)) ->
+                               let alignment_cost =
+                                 (DataTreeMappingCostDict.lookup_exn
+                                    tree_priorities
+                                    (t1,t2))
+                               in
+                               let alignment =
+                                 Option.value_exn
+                                   (get_minimal_alignment
+                                      t1
+                                      t2)
+                               in
+                               let index_to = max (c1-p1) (c2-p2) in
+                               let p1_new = p1 + index_to in
+                               let p2_new = p2 + index_to in
+                               let ranges =
+                                 List.zip_exn
+                                   (range p1 p1_new)
+                                   (range p2 p2_new)
+                               in
+                               let updater_with_replacement
+                                   ((index,current,total):int*int*int)
+                                   (_:int*int*int)
+                                 : (int * int * int) option =
+                                 if (current = total) then
+                                   None
+                                 else
+                                   Some (index,current,total)
+                               in
+                               let d1 =
+                                 DataTreeProcessedInfoDict.remove_or_update
+                                   ~updater:(updater_with_replacement (i1,p1_new,c1))
+                                   d1
+                                   t1
+                               in
+                               let d2 =
+                                 DataTreeProcessedInfoDict.remove_or_update
+                                   ~updater:(updater_with_replacement (i2,p2_new,c2))
+                                   d2
+                                   t2
+                               in
+                               let new_aligns =
+                                 List.map
+                                   ~f:(fun (p1,p2) -> ((i1,p1),(i2,p2),alignment))
+                                   ranges
+                               in
+                               (t1t2s
+                               ,new_aligns@aligns
+                               ,d1
+                               ,d2
+                               ,f +. alignment_cost)
+                           end)
+                       to_add
+                   in
+                   Left (RemainingElementsPQueue.push_all pq queue_elements)
+               end)
+           pq
+       in
+       (*let (indices_and_alignments,pleft,pright) =
          fold_until_completion
            ~f:(fun (pq,d1,d2,indices_and_alignments) ->
                begin match DataTreeDataTreePriorityPQueue.pop pq with
@@ -361,7 +468,22 @@ struct
             (PositionPermutation.create_from_doubles perm_doubles)
             pleft
             pright
-            alignments)
+            alignments)*)
+       Option.map
+         ~f:(fun (aligns,pleft,pright) ->
+             let (perm_doubles,alignments) =
+               List.unzip
+                 (List.map
+                    ~f:(fun (x,y,z) -> ((x,y),z))
+                    aligns)
+             in
+             mk_times
+               tl1
+               (PositionPermutation.create_from_doubles perm_doubles)
+               pleft
+               pright
+               alignments)
+         alignment_info_option
 
    and get_minimal_alignment
        (t1:NormalizedTree.Nonempty.t)

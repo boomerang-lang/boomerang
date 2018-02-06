@@ -218,6 +218,29 @@ struct
   [@@deriving ord, show, hash]
 end
 
+module QuadrupleOf
+    (D1:Data)
+    (D2:Data)
+    (D3:Data)
+    (D4:Data)
+  : Data with type t = (D1.t * D2.t * D3.t * D4.t) =
+struct
+  type t = (D1.t * D2.t * D3.t * D4.t)
+  [@@deriving ord, show, hash]
+end
+
+module QuintupleOf
+    (D1:Data)
+    (D2:Data)
+    (D3:Data)
+    (D4:Data)
+    (D5:Data)
+  : Data with type t = (D1.t * D2.t * D3.t * D4.t * D5.t) =
+struct
+  type t = (D1.t * D2.t * D3.t * D4.t * D5.t)
+  [@@deriving ord, show, hash]
+end
+
 module ListOf
     (D:Data)
   : Data with type t = D.t list =
@@ -367,6 +390,29 @@ let cartesian_map ~f:(f:'a -> 'b -> 'c) (l1:'a list) (l2:'b list) : 'c list =
         l2)@acc)
     ~init:[]
     l1)
+
+let cartesian_filter_map
+    ~f:(f:'a -> 'b -> 'c option)
+    (l1:'a list)
+    (l2:'b list)
+  : 'c list =
+  List.filter_map
+    ~f:ident
+    (cartesian_map
+       ~f:f
+       l1
+       l2)
+
+let remove_all_elements
+    (l:'a list)
+  : ('a * 'a list) list =
+  fst
+    (List.fold_right
+       ~f:(fun x (acc,l) ->
+           ((x,l)::(List.map ~f:(fun (y,l) -> (y,x::l)) acc)
+           ,x::l))
+       ~init:([],[])
+       l)
 
 let range (i:int) (j:int) : int list =
   let rec aux n acc =
