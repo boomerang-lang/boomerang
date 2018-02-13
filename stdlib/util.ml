@@ -241,6 +241,33 @@ struct
   [@@deriving ord, show, hash]
 end
 
+module SextupleOf
+    (D1:Data)
+    (D2:Data)
+    (D3:Data)
+    (D4:Data)
+    (D5:Data)
+    (D6:Data)
+  : Data with type t = (D1.t * D2.t * D3.t * D4.t * D5.t * D6.t) =
+struct
+  type t = (D1.t * D2.t * D3.t * D4.t * D5.t * D6.t)
+  [@@deriving ord, show, hash]
+end
+
+module SeptupleOf
+    (D1:Data)
+    (D2:Data)
+    (D3:Data)
+    (D4:Data)
+    (D5:Data)
+    (D6:Data)
+    (D7:Data)
+  : Data with type t = (D1.t * D2.t * D3.t * D4.t * D5.t * D6.t * D7.t) =
+struct
+  type t = (D1.t * D2.t * D3.t * D4.t * D5.t * D6.t * D7.t)
+  [@@deriving ord, show, hash]
+end
+
 module ListOf
     (D:Data)
   : Data with type t = D.t list =
@@ -894,11 +921,12 @@ let partition_dictionary_order (f:'a comparer)
     compare_list
       ~cmp:(fun x y -> f (List.hd_exn x) (List.hd_exn y))
 
-let ordered_partition_dictionary_order (f:'a -> 'a -> comparison)
+let ordered_partition_dictionary_order
+    (f:'a -> 'a -> comparison)
   : (('a * int) list list) comparer =
   compare_list
     ~cmp:(fun x y ->
-        let cmp = compare (List.length x) (List.length y) in
+        let cmp = Int.compare (List.length x) (List.length y) in
         if is_equal cmp then
           f (fst (List.hd_exn x)) (fst (List.hd_exn y))
         else

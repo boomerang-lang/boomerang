@@ -208,7 +208,7 @@ struct
         Some
           (Node
              (create_alignment_node
-                ~perm:(Permutation.create_from_doubles perm_doubles)
+                ~perm:(Permutation.create_from_pairs perm_doubles)
                 ~pleft:pleft
                 ~pright:pright,
               alignments))

@@ -163,7 +163,7 @@ let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
         let cmp = Regex.compare s1 s2 in
         if (is_equal cmp) then
           ordered_partition_order
-            compare
+            String.compare
             el1
             el2
         else
@@ -178,7 +178,7 @@ and compare_exampled_clauses ((atoms1,_,ints1):exampled_clause)
   let cmp = ordered_partition_order compare_exampled_atoms atoms1 atoms2 in
   if (is_equal cmp) then
     ordered_partition_order
-      (fun x y -> (compare x y))
+      (fun x y -> failwith "BREAK PLZ"(*(compare x y)*))
       ints1
       ints2
   else
@@ -195,10 +195,10 @@ let rec compare_ordered_exampled_atoms (a1:ordered_exampled_atom)
                                      : comparison =
     begin match (a1,a2) with
       | (OEAClosed (s1,_,_,el1), OEAClosed (s2,_,_,el2)) ->
-        let cmp = compare s1 s2 in
+        let cmp = Regex.compare s1 s2 in
         if is_equal cmp then
           compare_list
-            ~cmp:compare
+            ~cmp:(String.compare)
             el1
             el2
         else
@@ -220,7 +220,7 @@ and compare_ordered_exampled_clauses
   in
   if is_equal cmp then
     compare_list
-      ~cmp:(compare)
+      ~cmp:(compare_list ~cmp:Int.compare)
       ints1
       ints2
   else
@@ -245,7 +245,7 @@ and to_ordered_exampled_clause ((atoms,strings,exnums):exampled_clause) : ordere
     sort_and_partition_with_indices
       compare_ordered_exampled_atoms
       ordered_atoms in
-  (ordered_ordered_atoms,strings,(List.sort ~cmp:compare exnums))
+  (ordered_ordered_atoms,strings,(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums))
 
 and to_ordered_exampled_dnf_regex ((r,_):exampled_dnf_regex)
         : ordered_exampled_dnf_regex =
@@ -384,7 +384,7 @@ let singleton_atom (a:atom) : dnf_regex =
 
 let rec compare_atoms (a1:atom) (a2:atom) : comparison =
   begin match (a1,a2) with
-  | (AClosed s1, AClosed s2) -> compare s1 s2
+  | (AClosed s1, AClosed s2) -> Regex.compare s1 s2
   | (AClosed  _, AStar         _) -> -1
   | (AStar         _, AClosed  _) -> 1
   | (AStar        r1, AStar        r2) -> compare_dnf_regexs r1 r2

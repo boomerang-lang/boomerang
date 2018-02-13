@@ -62,7 +62,7 @@ let rec to_boomerang_lens
     ~iterate_f:(MLens.star i)
     ~identity_f:((MLens.copy i) % to_boomerang_regex)
     ~inverse_f:(MLens.invert i)
-    ~permute_f:(fun il ml -> MLens.permute i (Permutation.to_int_list il) ml)
+    ~permute_f:(fun il ml -> MLens.permute i (Permutation.as_int_list il) ml)
     ~closed_f:(fun l -> l)
 
 let retrieve_existing_lenses

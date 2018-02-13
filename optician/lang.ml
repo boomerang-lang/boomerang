@@ -334,7 +334,7 @@ struct
     | LensIdentity of Regex.t
     | LensInverse of t
     | LensClosed of t
-    | LensPermute of (int list) (*Permutation.t*) * (t list)
+    | LensPermute of Permutation.t * (t list)
   [@@deriving ord, show, hash]
 
 
@@ -466,7 +466,7 @@ struct
       ~iterate_f:(iterate_f:a -> a)
       ~identity_f:(identity_f:Regex.t -> a)
       ~inverse_f:(inverse_f:a -> a)
-      ~permute_f:(permute_f:int list -> a list -> a)
+      ~permute_f:(permute_f:Permutation.t -> a list -> a)
       ~closed_f:(closed_f:a -> a)
       (l:t)
     : a =

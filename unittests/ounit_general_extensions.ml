@@ -43,7 +43,12 @@ let assert_int_equal = assert_equal ~printer:string_of_int ~cmp:compare_int
 let assert_float_equal =
   assert_equal
     ~printer:Float.to_string
-    ~cmp:Float.compare
+    ~cmp:(fun x y ->
+        let z = Float.abs (x -. y) in
+        if z > 0.00000000001 then
+          1
+        else
+          0)
 
 let assert_int_option_equal =
   assert_equal

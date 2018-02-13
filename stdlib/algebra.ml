@@ -186,259 +186,93 @@ end
 
 
 module Permutation = struct
-  type t = int list
-  [@@deriving show, hash]
+  module IntIntDict = DictOf(IntModule)(IntModule)
 
-  let create (mapping:int list) =
+  type t =
+    {
+      forward : IntIntDict.t ;
+      reverse : IntIntDict.t ;
+    }
+  [@@deriving show, hash, ord]
+
+  let create_dict_of_pairs
+      (len:int)
+      (mapping:(int * int) list)
+    : IntIntDict.t =
+    List.fold_left
+      ~f:(fun acc (x,y) ->
+          if ((IntIntDict.member acc x) || (x >= len) || (x < 0)) then
+            failwith "Not Bijection"
+          else
+            IntIntDict.insert acc x y)
+      ~init:IntIntDict.empty
+      mapping
+
+  let create_from_pairs
+      (mapping:(int * int) list)
+    : t =
     let len = List.length mapping in
-    List.rev
-      (List.fold_left
-         ~f:(fun acc x ->
-             if ((List.mem ~equal:(=) acc x) || (x >= len) || (x < 0)) then
-               failwith "Not Bijection"
-             else
-               x::acc)
-         ~init:[]
-         mapping)
+    let reverse_mapping = List.map ~f:(fun (x,y) -> (y,x)) mapping in
+    {
+      forward = create_dict_of_pairs len mapping;
+      reverse = create_dict_of_pairs len reverse_mapping;
+    }
 
-  let create_unsafe (mapping:int list) = mapping
+  let create
+      (mapping:int list)
+    : t =
+    let pair_mapping = List.mapi ~f:(fun i x -> (i,x)) mapping in
+    create_from_pairs pair_mapping
 
-  let create_from_doubles (mapping:(int*int) list) : t =
-    let len = List.length mapping in
-    let (mapping_ls,mapping_rs) = List.unzip mapping in
-    let contains_dup_l = List.contains_dup
-        ~compare:(fun x y -> x - y)
-        mapping_ls in
-    let contains_dup_r = List.contains_dup
-        ~compare:(fun x y -> x - y)
-        mapping_rs in
-    let out_of_range = List.exists
-        ~f:(fun (x,y) -> x >= len || x < 0 || y >= len || y < 0)
-        mapping in
-    if contains_dup_l || contains_dup_r || out_of_range then
-      failwith "Not Bijection"
-    else
-      let sorted_by_second = List.sort
-          ~cmp:(fun (_,x) (_,y) -> x - y)
-          mapping in
-      List.map ~f:(fun (x,_) -> x) sorted_by_second
-
-  let create_from_doubles_unsafe (mapping:(int*int) list) : t =
-    let sorted_by_second = List.sort
-        ~cmp:(fun (_,x) (_,y) -> x - y)
-        mapping in
-    List.map ~f:(fun (x,_) -> x) sorted_by_second
-
-  let create_from_constraints (len:int) (invalid_parts:(int*int) list)
-      (required_parts:(int*int) list)
-    : (t * ((int*int) list)) option =
-
-    let rec create_from_constraints_internal (len:int)
-        (invalid_parts:(int*int) list)
-        (required_parts:(int*int) list)
-        (unused_partsl:int list)
-        (unused_partsr:int list)
-        (guessed_parts:(int*int) list)
-        (continuation:
-           ((t * ((int*int) list)) option)
-         -> ((t * ((int*int) list)) option))
-        (unused_l:int)
-      : (t * ((int*int) list)) option =
-      begin match unused_partsl with
-        | [] -> Some (create_from_doubles required_parts, guessed_parts)
-        | hl::tl ->
-          let choice = split_by_first_satisfying
-              (fun x -> not (List.mem ~equal:(=) invalid_parts (hl,x)))
-              unused_partsr in
-          begin match choice with
-            | None -> continuation None
-            | Some (hr,tr) ->
-              let ctn = (fun potential_solution ->
-                  begin match potential_solution with
-                    | None ->
-                      create_from_constraints_internal
-                        len
-                        ((hl,hr)::invalid_parts)
-                        required_parts
-                        unused_partsl
-                        unused_partsr
-                        guessed_parts
-                        continuation
-                        unused_l
-                    | Some _ -> continuation(potential_solution)
-                  end) in
-              create_from_constraints_internal
-                len
-                invalid_parts
-                ((hl,hr)::required_parts)
-                tl
-                tr
-                ((hl,hr)::guessed_parts)
-                ctn
-                (unused_l-1)
-          end
-      end in
-    if (List.exists
-          ~f:(fun invalid_part -> List.mem ~equal:(=) required_parts invalid_part)
-          invalid_parts) then
-      None
-    else
-      let available_parts = range 0 len in
-      let (used_partsl,used_partsr) = List.unzip required_parts in
-      let (unused_partsl,unused_partsr) = List.fold_left
-          ~f:(fun (l,r) x ->
-              let unused_in_left = not (List.mem ~equal:(=) used_partsl x) in
-              let unused_in_right = not (List.mem ~equal:(=) used_partsr x) in
-              let l' = if unused_in_left then x::l else l in
-              let r' = if unused_in_right then x::r else r in
-              (l',r'))
-          ~init:([],[])
-          available_parts in
-      create_from_constraints_internal
-        len
-        invalid_parts
-        required_parts
-        unused_partsl
-        unused_partsr
-        []
-        (fun x -> x)
-        (List.length unused_partsl)
-
-  let rm x l = List.filter ~f:((<>) x) l  
-
-  let create_all (n:int) : t list =
-    let rec permutations = function  
-      | [] -> []
-      | x::[] -> [[x]]
-      | l -> List.fold_left ~f:(fun acc x -> acc @ List.map ~f:(fun p -> x::p)
-                                               (permutations (rm x l))) ~init:[] l
-    in
-    permutations (range 0 n)
-
-  let inverse (p:t) : t =
-    let mapped_doubles =
-      List.mapi
-        ~f:(fun y x -> (x,y))
-        p
-    in
-    let sorted_doubles =
-      List.sort
-        ~cmp:(fun (x1,_) (x2,_) -> x1 - x2)
-        mapped_doubles
-    in
-    List.map ~f:snd sorted_doubles
+  let inverse
+      (p:t)
+    : t =
+    {
+      forward = p.reverse ;
+      reverse = p.forward ;
+    }
 
   let identity
       (n:int)
     : t =
-    range 0 n
+    create (range 0 n)
 
-  let permutation_of_subset
-      (p:t)
-      (s:int list)
-    : t =
-    let module IntSet = SetOf(IntModule) in
-    let module IntIntDict = DictOf(IntModule)(IntModule) in
-    let index_to_element =
-      IntIntDict.from_kvp_list
-        (List.mapi ~f:(fun i x -> (i,x)) p)
-    in
-    let p_init =
-      List.map
-        ~f:(IntIntDict.lookup_exn index_to_element)
-        (List.sort ~cmp:Int.compare s)
-    in
-    let subset_positions = List.sort ~cmp:Int.compare p_init in
-    let elements_and_positions =
-      List.mapi
-        ~f:(fun i x -> (x,i))
-        subset_positions
-    in
-    let d = IntIntDict.from_kvp_list elements_and_positions in
-    List.map ~f:(IntIntDict.lookup_exn d) p_init
+  let apply_exn
+      (permutation:t)
+      (n:int)
+    : int =
+    IntIntDict.lookup_exn permutation.forward n
 
-  let permutation_of_target_subset
-      (p:t)
-      (s:int list)
-    : t =
-    let p_inverse = inverse p in
-    let subset_permutation_inverse = permutation_of_subset p_inverse s in
-    inverse (subset_permutation_inverse)
-
-  let apply (permutation:t) (n:int) =
-    let rec find x lst =
-      begin match lst with
-        | [] -> failwith "out of range"
-        | h::t -> if x = h then 0 else 1 + find x t
-      end in
-    find n permutation
-
-  let apply_inverse (permutation:t) (n:int) =
-    begin match (List.nth permutation n) with
-      | None -> failwith "out of range"
-      | Some i -> i
-    end
-
-  let compose (p1:t) (p2:t) : t =
-    let l1 = List.length p1 in
-    let l2 = List.length p2 in
-    if (l1 <> l2) then
-      failwith
-        ("cannot compose "
-         ^ (string_of_int l1)
-         ^ " and "
-         ^ (string_of_int l2))
-    else
-      let module IntIntDict = DictOf(IntModule)(IntModule) in
-      let elements_to_producer_1 =
-        IntIntDict.from_kvp_list
-          (List.mapi ~f:(fun i x -> (i,x)) p1)
-      in
-      let elements_to_producer_2 =
-        IntIntDict.from_kvp_list
-          (List.mapi ~f:(fun i x -> (i,x)) p2)
-      in
-      List.map
-        ~f:(fun i ->
-            IntIntDict.lookup_exn
-              elements_to_producer_2
-              (IntIntDict.lookup_exn elements_to_producer_1 i))
-        (range 0 l1)
-
-  let sequence : t -> t -> t = Fn.flip compose
+  let apply_inverse_exn
+      (permutation:t)
+      (n:int)
+    : int =
+    IntIntDict.lookup_exn permutation.reverse n
 
   let apply_to_list_exn (permutation:t) (l:'a list) : 'a list =
+    let perm_pos_l = List.mapi ~f:(fun i x -> (apply_exn permutation i,x)) l in
     List.map
-      ~f:(fun x -> List.nth_exn l x)
-      permutation
+      ~f:snd
+      (List.sort
+         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         perm_pos_l)
 
   let apply_inverse_to_list_exn (permutation:t) (l:'a list) : 'a list =
-    let permutation_list_combo = List.zip_exn permutation l in
-    let sorted_by_perm = List.sort
-        ~cmp:(fun (p1,_) (p2,_) -> p1 - p2)
-        permutation_list_combo in
-    let (_,l') = List.unzip sorted_by_perm in
-    l'
-
-  let to_int_list : t -> int list = inverse
-
-  let hash (p:t) : int =
-    let l = to_int_list p in
-    List.foldi
-      ~f:(fun i acc n ->
-          (Int.hash n)
-          lxor (Int.hash i)
-          lxor acc)
-      ~init:509223028
-      l
-
-  let compare : t -> t -> comparison =
-    compare_list ~cmp:compare_int
+    let perm_pos_l =
+      List.mapi
+        ~f:(fun i x -> (apply_inverse_exn permutation i,x))
+        l
+    in
+    List.map
+      ~f:snd
+      (List.sort
+         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         perm_pos_l)
 
   let size
       (p:t)
     : int =
-    List.length p
+    IntIntDict.size p.forward
 
   type swap_concat_compose_tree =
     | SCCTSwap of swap_concat_compose_tree * swap_concat_compose_tree
@@ -484,8 +318,17 @@ module Permutation = struct
       | SCCTLeaf -> "."
     end
 
-  let rec to_swap_concat_compose_tree (l:t) : swap_concat_compose_tree =
-    let stupidconcat (l:t) : swap_concat_compose_tree =
+  let as_int_list
+      (perm:t)
+    : int list =
+    List.map
+      ~f:snd
+      (List.sort
+         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         (IntIntDict.as_kvp_list perm.reverse))
+
+  let rec to_swap_concat_compose_tree (l:int list) : swap_concat_compose_tree =
+    let stupidconcat (l:int list) : swap_concat_compose_tree =
       let (_,t) = split_by_first_exn l in
       List.fold_left
         ~f:(fun acc _ ->
@@ -545,7 +388,6 @@ module Permutation = struct
               (to_swap_concat_compose_tree l2
               ,to_swap_concat_compose_tree l1)
       end
-
 end
 
 
@@ -560,6 +402,28 @@ struct
 
   type t = element list
   [@@deriving ord, show, hash]
+
+  let apply_exn
+      (p:t)
+      (i:int)
+    : int * int =
+    let e =
+      List.find_exn
+        ~f:(fun e -> e.old_index = i)
+        p
+    in
+    e.new_index
+
+  let apply_inverse_exn
+      (p:t)
+      (ij:int * int)
+    : int =
+    let e =
+      List.find_exn
+        ~f:(fun e -> e.new_index = ij)
+        p
+    in
+    e.old_index
 
   let sorting
       ~cmp:(cmp:'a comparer)

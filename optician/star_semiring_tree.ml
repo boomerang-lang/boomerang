@@ -221,6 +221,16 @@ struct
           perm  : CountedPermutation.t ;
         }
       [@@deriving ord, show, hash, make]
+
+      let get_label
+          (nl:t)
+        : PD.t =
+        nl.label
+
+      let get_perm
+          (nl:t)
+        : CountedPermutation.t =
+        nl.perm
     end
 
     module TD_NormalizationLabel =
@@ -231,6 +241,16 @@ struct
           perm  : CountedPermutation.t ;
         }
       [@@deriving ord, show, hash, make]
+
+      let get_label
+          (nl:t)
+        : TD.t =
+        nl.label
+
+      let get_perm
+          (nl:t)
+        : CountedPermutation.t =
+        nl.perm
     end
 
     include PlusTimesStarTreeOf
@@ -253,11 +273,11 @@ struct
     NonNormalizedTree.fold
       ~empty_f:(Empty,NormalizationScript.Empty)
       ~nonempty_f:(fun (nt,nns) ->
-          (Nonempty nt,
-           NormalizationScript.Nonempty nns))
+          (Nonempty nt
+          ,NormalizationScript.Nonempty nns))
       ~base_f:(fun bl ->
-          (Base bl,
-           NormalizationScript.Base bl))
+          (Base bl
+          ,NormalizationScript.Base bl))
       ~plus_f:(fun p nsnts ->
           let (nts,nss) = List.unzip nsnts in
           let (perm,sv) =

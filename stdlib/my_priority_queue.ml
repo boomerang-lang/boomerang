@@ -84,7 +84,7 @@ struct
       begin match pop q with
         | None -> ([],q)
         | Some (e,f',q') ->
-          if compare f' f > 0 then
+          if D.Priority.compare f' f > 0 then
             ([],q)
           else
             let (efs,q'') = pop_until_min_pri_greater_than q' f in

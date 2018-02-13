@@ -1998,7 +1998,7 @@ module MLens = struct
                 | ([0;1],[l1;l2]) -> Lens.LensConcat (l1,l2)
                 | ([1;0],[l1;l2]) -> Lens.LensSwap (l1,l2)
                 | (sigma,_) ->
-                  Lens.LensPermute (sigma,ls)
+                  Lens.LensPermute (Permutation.create sigma,ls)
               end)
           ls_o
       | _ -> None

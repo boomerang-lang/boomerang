@@ -80,11 +80,11 @@ struct
     let atom_lens_perm_part_list = List.concat atom_lens_perm_part_list_list in
     let atom_lens_perm_part_list_by_left_atom =
       List.sort
-        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> compare x y)
+        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
         atom_lens_perm_part_list in
     let (atom_lenses,perm_parts) = List.unzip
         atom_lens_perm_part_list_by_left_atom in
-    (atom_lenses,Permutation.create_from_doubles_unsafe perm_parts,strs1,strs2)
+    (atom_lenses,Permutation.create_from_pairs perm_parts,strs1,strs2)
 
 
   and gen_dnf_lens_zipper_internal
@@ -106,11 +106,11 @@ struct
     let clause_lens_perm_part_list = List.concat clause_lens_perm_part_list_list in
     let clause_lens_perm_part_list_by_left_clause =
       List.sort
-        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> compare x y)
+        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
         clause_lens_perm_part_list in
     let (clause_lenses,perm_parts) = List.unzip
         clause_lens_perm_part_list_by_left_clause in
-    (clause_lenses,Permutation.create_from_doubles_unsafe perm_parts)
+    (clause_lenses,Permutation.create_from_pairs perm_parts)
 
   let rigid_synth
       (lc:LensContext.t)

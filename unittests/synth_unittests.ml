@@ -205,7 +205,7 @@ let normalize_from_tree_suite = "Test NormalizedPTST from_tree" >:::
 let _ = run_test_tt_main normalize_from_tree_suite
 
 module IPTSTA = IntPTSTAlignment
-module IPTSTANE = IPTSTA.NonemptyPlusStarTreeAlignment
+module IPTSTANE = IntPTSTAlignment.NonemptyNormalizedPlusStarTreeAlignment
 
 let test_cost_none _ =
   assert_float_equal
@@ -220,233 +220,200 @@ let test_cost_empty _ =
 let test_cost_base _ =
   assert_float_equal
     0.5
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_base 2))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_base 2))
 
 let test_cost_star _ =
   assert_float_equal
     0.25
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_star
-                2
-                (IPTSTA.NonemptyPlusStarTreeAlignment.mk_base 4)))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_star
+          2
+          (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_base 4)))
 
 let test_cost_times_singleton _ =
   assert_float_equal
     0.0
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                5
-                (PositionPermutation.create_from_doubles [])
-                []
-                []
-                []))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+          5
+          []
+          []
+          []))
 
 let test_cost_times_unmapped_left _ =
   assert_float_equal
     0.5
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                5
-                (PositionPermutation.create_from_doubles [])
-                [(0,0)]
-                []
-                []))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+          5
+          []
+          [(0,0)]
+          []))
 
 let test_cost_times_unmapped_right _ =
   assert_float_equal
     0.5
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                5
-                (PositionPermutation.create_from_doubles [])
-                []
-                [(0,0)]
-                []))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+          5
+          []
+          []
+          [(0,0)]))
 
 let test_cost_times_recursive _ =
   assert_float_equal
     (1. /. 3.)
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                5
-                (PositionPermutation.create_from_doubles [])
-                []
-                [(1,0)]
-                [IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                    5
-                    (PositionPermutation.create_from_doubles [])
-                    []
-                    []
-                    []]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+          5
+          [((0,0),(0,0),IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+              5
+              []
+              []
+              [])]
+          []
+          [(1,0)]))
 
 let test_cost_times_imperfect_rec _ =
   assert_float_equal
     (1. /. 4.)
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                5
-                (PositionPermutation.create_from_doubles [])
-                []
-                []
-                [IPTSTA.NonemptyPlusStarTreeAlignment.mk_times
-                    8
-                    (PositionPermutation.create_from_doubles [])
-                    []
-                    [(0,0)]
-                    []]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+          5
+          [((0,0)
+           ,(0,0)
+           ,IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
+              8
+              []
+              [(0,0)]
+              [])]
+          []
+          []))
 
 let test_cost_plus_singleton _ =
   assert_float_equal
     0.
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                []
-                []
-                []))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          []
+          []
+          []))
 
 let test_cost_plus_single_rec _ =
   assert_float_equal
     0.
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])]
-                [((0,0),(0,0))]
-                [((0,0),(0,0))]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])]
+          [((0,0),(0,0))]
+          [((0,0),(0,0))]))
 
 let test_cost_plus_double_rec _ =
   assert_float_equal
     0.
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])]
-                [((0,0),(0,0))]
-                [((0,0),(0,0))]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])]
+          [((0,0),(0,0))]
+          [((0,0),(0,0))]))
 
 let test_cost_plus_double_rec _ =
   assert_float_equal
     0.
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(1,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])
-                ;(1,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])]
-                [((0,0),(1,0));((1,0),(0,0))]
-                [((0,0),(1,0));((1,0),(0,0))]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(1,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])
+          ;(1,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])]
+          [((0,0),(1,0));((1,0),(0,0))]
+          [((0,0),(1,0));((1,0),(0,0))]))
 
 let test_cost_plus_double_rec _ =
   assert_float_equal
     0.
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(1,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])
-                ;(1,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])]
-                [((0,0),(1,0));((1,0),(0,0))]
-                [((0,0),(1,0));((1,0),(0,0))]))))
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(1,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])
+          ;(1,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])]
+          [((0,0),(1,0));((1,0),(0,0))]
+          [((0,0),(1,0));((1,0),(0,0))]))
 
 let test_cost_plus_single_merge _ =
   assert_float_equal
-    0.5
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])
-                ;(0,0),(0,1),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])]
-                [((0,0),(0,1))]
-                [((0,0),(0,0));((0,1),(0,0))]))))
+    (1. /. 3.)
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])
+          ;(0,0),(0,1),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])]
+          [((0,0),(0,1))]
+          [((0,0),(0,0));((0,1),(0,0))]))
 
 let test_cost_plus_crossing_merge _ =
   assert_float_equal
-    0.5
-    (IPTSTA.cost
-       (Some
-          (IPTSTA.NonemptyTree
-             (IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                5
-                [(0,0),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                5
-                                []
-                                []
-                                [])
-                ;(0,0),(0,1),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])
-                ;(0,1),(0,0),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])
-                ;(0,1),(0,1),(IPTSTA.NonemptyPlusStarTreeAlignment.mk_plus
-                                8
-                                []
-                                []
-                                [])]
-                [((0,0),(0,0));((0,1),(0,1))]
-                [((0,0),(0,0));((0,1),(0,1))]))))
+    (8. /. 15.)
+    (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
+       (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+          5
+          [(0,0),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          5
+                          []
+                          []
+                          [])
+          ;(0,0),(0,1),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])
+          ;(0,1),(0,0),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])
+          ;(0,1),(0,1),(IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
+                          8
+                          []
+                          []
+                          [])]
+          [((0,0),(0,0));((0,1),(0,1))]
+          [((0,0),(0,0));((0,1),(0,1))]))
 
 let cost_suite = "Test PTSTAlignment cost" >:::
   [
@@ -496,12 +463,12 @@ let test_get_minimal_alignment_emptytimes_emptytimes _ =
   assert_alignment_option_equal
     (Some
        (IPTSTA.NonemptyTree
-          (IPTSTANE.mk_times
-             1
-             (PositionPermutation.create_from_doubles [])
-             []
-             []
-             [])))
+          (IPTSTA.Nonempty.Times
+             (1
+             ,Permutation.create []
+             ,[]
+             ,[]
+             ,[]))))
     (IPTSTA.get_minimal_alignment
        (IPTST.Nonempty
           (IPTST.Times (1,[])))
@@ -512,12 +479,12 @@ let test_get_minimal_alignment_times_emptytimes _ =
   assert_alignment_option_equal
     (Some
        (IPTSTA.NonemptyTree
-          (IPTSTANE.mk_times
-             1
-             (PositionPermutation.create_from_doubles [])
-             [(0,0)]
-             []
-             [])))
+          (IPTSTA.Nonempty.Times
+             (1
+             ,Permutation.create []
+             ,[0]
+             ,[]
+             ,[]))))
     (IPTSTA.get_minimal_alignment
        (IPTST.Nonempty
           (IPTST.Times
@@ -530,17 +497,17 @@ let test_get_minimal_alignment_easy_times_bijection _ =
   assert_alignment_option_equal
     (Some
        (IPTSTA.NonemptyTree
-          (IPTSTANE.mk_times
-             1
-             (PositionPermutation.create_from_doubles [((0,0),(0,0))])
-             []
-             []
-             [IPTSTANE.mk_times
-                1
-                (PositionPermutation.create_from_doubles [])
-                []
-                []
-                []])))
+          (IPTSTA.Nonempty.Times
+             (1
+             ,Permutation.create [0]
+             ,[]
+             ,[]
+             ,[IPTSTA.Nonempty.Times
+                (1
+                ,Permutation.create []
+                ,[]
+                ,[]
+                ,[])]))))
     (IPTSTA.get_minimal_alignment
        (IPTST.Nonempty
           (IPTST.Times
@@ -551,28 +518,52 @@ let test_get_minimal_alignment_easy_times_bijection _ =
              (1
              ,[IPTST.Times (1,[])]))))
 
+let test_get_minimal_alignment_easy_times_project_left _ =
+  assert_alignment_option_equal
+    (Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Times
+             (1
+             ,Permutation.create [0]
+             ,[0]
+             ,[]
+             ,[IPTSTA.Nonempty.Times
+                 (1
+                 ,Permutation.create []
+                 ,[]
+                 ,[]
+                 ,[])]))))
+    (IPTSTA.get_minimal_alignment
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Times (2,[]);IPTST.Times (1,[])])))
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Times (1,[])]))))
+
 let test_get_minimal_alignment_hard_times_bijection _ =
   assert_alignment_option_equal
     (Some
        (IPTSTA.NonemptyTree
-          (IPTSTANE.mk_times
-             1
-             (PositionPermutation.create_from_doubles
-                [((0,0),(1,0));((1,0),(0,0))])
-             []
-             []
-             [IPTSTANE.mk_times
-                1
-                (PositionPermutation.create_from_doubles [])
-                []
-                []
-                []
-             ;IPTSTANE.mk_times
-                2
-                (PositionPermutation.create_from_doubles [])
-                []
-                []
-                []])))
+          (IPTSTA.Nonempty.Times
+             (1
+             ,Permutation.create [1;0]
+             ,[]
+             ,[]
+             ,[IPTSTA.Nonempty.Times
+                 (1
+                 ,Permutation.create []
+                 ,[]
+                 ,[]
+                 ,[])
+               ;IPTSTA.Nonempty.Times
+                 (2
+                 ,Permutation.create []
+                 ,[]
+                 ,[]
+                 ,[])]))))
     (IPTSTA.get_minimal_alignment
        (IPTST.Nonempty
           (IPTST.Times
@@ -583,14 +574,56 @@ let test_get_minimal_alignment_hard_times_bijection _ =
              (1
              ,[IPTST.Times (2,[]);IPTST.Times (1,[])]))))
 
-let test_distance_emptyplus_emptyplus _ =
-  assert_float_equal
-    0.
-    (IPTSTA.get_alignment_distance
+let test_get_minimal_alignment_emptyplus_emptyplus _ =
+  assert_alignment_option_equal
+    (Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Plus
+             (1
+             ,[]
+             ,[]
+             ,[]))))
+    (IPTSTA.get_minimal_alignment
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus (1,[])))
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus (1,[]))))
+
+let test_get_minimal_alignment_plus_emptyplus _ =
+  assert_alignment_option_equal
+    None
+    (IPTSTA.get_minimal_alignment
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Plus (1,[])])))
+       (IPTST.Nonempty
+          (IPTST.Plus (1,[]))))
+
+let test_get_minimal_alignment_easy_plus_bijection _ =
+  assert_alignment_option_equal
+    (Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Plus
+             (1
+             ,[(0
+               ,0
+               ,IPTSTA.Nonempty.Plus
+                 (1
+                 ,[]
+                 ,[]
+                 ,[]))]
+             ,[0]
+             ,[0]))))
+    (IPTSTA.get_minimal_alignment
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Plus (1,[])])))
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Plus (1,[])]))))
 
 let alignment_distance_suite = "Test get_minimal_alignment" >:::
   [
@@ -600,8 +633,11 @@ let alignment_distance_suite = "Test get_minimal_alignment" >:::
     "test_get_minimal_alignment_emptytimes_emptytimes" >:: test_get_minimal_alignment_emptytimes_emptytimes;
     "test_get_minimal_alignment_times_emptytimes" >:: test_get_minimal_alignment_times_emptytimes;
     "test_get_minimal_alignment_easy_times_bijection" >:: test_get_minimal_alignment_easy_times_bijection;
-    (*"test_get_minimal_alignment_hard_times_bijection" >:: test_get_minimal_alignment_hard_times_bijection;*)
-    "test_distance_emptyplus_emptyplus" >:: test_distance_emptyplus_emptyplus;
+    "test_get_minimal_alignment_easy_times_project_left" >:: test_get_minimal_alignment_easy_times_project_left;
+    "test_get_minimal_alignment_hard_times_bijection" >:: test_get_minimal_alignment_hard_times_bijection;
+    "test_get_minimal_alignment_emptyplus_emptyplus" >:: test_get_minimal_alignment_emptyplus_emptyplus;
+    "test_get_minimal_alignment_plus_emptyplus" >:: test_get_minimal_alignment_plus_emptyplus;
+    "test_get_minimal_alignment_easy_plus_bijection" >:: test_get_minimal_alignment_easy_plus_bijection;
   ]
 
 let _ = run_test_tt_main alignment_distance_suite
