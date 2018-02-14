@@ -449,11 +449,13 @@ let toplevel' progName () =
   (fun () -> Util.flush ())
 
 let toplevel progName =
+  Printexc.record_backtrace true;
   try
     exit 
       (Unix.handle_unix_error 
          (fun () -> Error.exit_on_error (toplevel' progName))
          ())
-  with e -> 
+  with e ->
+    Printexc.print_backtrace stdout;
     Printf.printf "Uncaught exception %s" (Printexc.to_string e); 
     exit 2

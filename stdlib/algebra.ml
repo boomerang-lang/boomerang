@@ -21,6 +21,7 @@ struct
   let maximally_factor_element
       (type t)
       (module S : Sig with type t = t)
+      ~is_eq:(is_eq:t -> t -> bool)
     : S.t -> S.t =
     let rec separate_into_sum
         (r:S.t)
@@ -74,7 +75,11 @@ struct
           ~f:product_splitter
           sum_product_list_list
       in
-      let grouped_assoc_list = group_by_keys product_keyed_sum_list in
+      let grouped_assoc_list =
+        group_by_keys
+          ~is_eq:is_eq
+          product_keyed_sum_list
+      in
       let keyed_sum_list =
         List.map
           ~f:(fun (k,all) ->
@@ -106,11 +111,13 @@ struct
     in
     Fn.compose
       (fold_until_fixpoint
+        ~is_eq:is_eq
          (S.apply_at_every_level
             (maximally_factor_current_level
                (Fn.compose swap_double split_by_last_exn)
                (Fn.flip S.make_times))))
       (fold_until_fixpoint
+        ~is_eq:is_eq
          (S.apply_at_every_level
             (maximally_factor_current_level
                split_by_first_exn

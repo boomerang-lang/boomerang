@@ -388,7 +388,7 @@ let regex_star_semiring = (module Regex : StarSemiring.Sig with type t = Regex.t
 module Lens =
 struct
   type t =
-    | Disconnect of Regex.t * Regex.t * string * string
+    | Disconnect of Regex.t * Regex.t * (string -> string) * (string -> string)
     | Concat of t * t
     | Swap of t * t
     | Union of t * t
@@ -398,7 +398,63 @@ struct
     | Inverse of t
     | Closed of t
     | Permute of Permutation.t * (t list)
-  [@@deriving ord, show, hash]
+  [@@deriving show]
+
+  let hash_fold_t
+      _
+      _
+    : Base__Hash.state = failwith "no hashing on lenses"
+
+  let hash
+      _
+    : int = failwith "no hashing on lenses"
+
+  let rec is_eq
+      (l:t)
+      (m:t)
+    : bool =
+    begin match (l,l) with
+      | (Disconnect (r1,r2,f1,f2),Disconnect (t1,t2,g1,g2)) ->
+        is_equal (Regex.compare r1 t1)
+        && is_equal (Regex.compare r2 t2)
+        && (phys_equal f1 g1)
+        && (phys_equal f2 g2)
+      | (Concat (l1,l2),Concat (m1,m2)) ->
+        is_eq l1 m1
+        && is_eq l2 m2
+      | (Swap (l1,l2),Swap (m1,m2)) ->
+        is_eq l1 m1
+        && is_eq l2 m2
+      | (Union (l1,l2),Union (m1,m2)) ->
+        is_eq l1 m1
+        && is_eq l2 m2
+      | (Compose (l1,l2),Compose (m1,m2)) ->
+        is_eq l1 m1
+        && is_eq l2 m2
+      | (Iterate l',Iterate m') ->
+        is_eq l' m'
+      | (Identity r,Identity t) ->
+        is_equal (Regex.compare r t)
+      | (Inverse l',Inverse m') ->
+        is_eq l' m'
+      | (Closed l',Closed m') ->
+        is_eq l' m'
+      | (Permute (p,ls),Permute (s,ms)) ->
+        is_equal (Permutation.compare p s)
+        && (begin match List.zip ls ms with
+            | None -> false
+            | Some lms ->
+              List.for_all
+                ~f:(uncurry is_eq)
+                lms
+          end)
+      | _ -> false
+    end
+
+  let compare
+      _
+      _
+    : int = failwith "no compare lenses"
 
   let one = Identity (Regex.one)
 
@@ -521,7 +577,12 @@ struct
 
   let fold
       (type a)
-      ~disc_f:(disc_f:Regex.t -> Regex.t -> string -> string -> a)
+      ~disc_f:(disc_f:
+               Regex.t ->
+               Regex.t ->
+               (string -> string) ->
+               (string -> string) ->
+               a)
       ~concat_f:(concat_f:a -> a -> a)
       ~swap_f:(swap_f:a -> a -> a)
       ~union_f:(union_f:a -> a -> a)

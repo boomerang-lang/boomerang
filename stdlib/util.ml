@@ -398,11 +398,14 @@ let rec fold_until_completion ~f:(f: 'a -> ('a,'b) either) (acc:'a) : 'b =
   | Right answer -> answer
   end
 
-let fold_until_fixpoint (f:'a -> 'a) : 'a -> 'a =
+let fold_until_fixpoint
+    ~is_eq:(is_eq:'a -> 'a -> bool)
+    (f:'a -> 'a)
+  : 'a -> 'a =
   fold_until_completion
     ~f:(fun x ->
        let x' = f x in
-       if x = x' then
+       if is_eq x x' then
          Right x
        else
          Left x')
@@ -1058,15 +1061,19 @@ let rec assoc_value_mem (value:'b) (l:('a * 'b) list) : 'a option =
   | [] -> None
   end
 
-let rec insert_into_correct_list (l:('a * 'b list) list) (k:'a) (v:'b)
+let rec insert_into_correct_list
+    ~is_eq:(is_eq:'a -> 'a -> bool)
+    (l:('a * 'b list) list)
+    (k:'a)
+    (v:'b)
     : ('a * 'b list) list =
   begin match l with
   | ((k',vlist)::kvplist) ->
-      if k = k' then
+      if is_eq k k' then
         (k',v::vlist)::kvplist
       else
-        (k',vlist)::(insert_into_correct_list kvplist k v)
-  | [] -> failwith "bad list"
+        (k',vlist)::(insert_into_correct_list ~is_eq:is_eq kvplist k v)
+  | [] -> [(k,[v])]
   end
 
 let rec append_into_correct_list ((k,v):'a * 'b list) (l:('a * 'b list) list)
@@ -1090,12 +1097,14 @@ let group_by_values (l:('a list * 'b) list) : ('a list * 'b) list =
   in
   List.map ~f:(fun (x,y) -> (y,x)) l'
 
-let group_by_keys (kvl:('a * 'b) list) : ('a * 'b list) list =
-  let empty_key_list = List.dedup (List.map ~f:(fun v -> (fst v,[])) kvl) in
+let group_by_keys
+    ~is_eq:(is_eq:'a -> 'a -> bool)
+    (kvl:('a * 'b) list)
+  : ('a * 'b list) list =
   List.fold_left
     ~f:(fun acc (k,v) ->
-        insert_into_correct_list acc k v)
-    ~init:empty_key_list
+        insert_into_correct_list ~is_eq:is_eq acc k v)
+    ~init:[]
     kvl
 
 

@@ -10,8 +10,8 @@ let rec lens_putl_internal
     (iteration:int list)
   : string =
   begin match (l,er) with
-    | (Lens.Disconnect (s1,s2,u1,u2), ERegExBase (s2',_)) ->
-      u1
+    | (Lens.Disconnect (s1,s2,f1,f2), ERegExBase (s2',_)) ->
+      f1 s2'
     | (Lens.Closed l', _) ->
       let relevant_string = extract_string er iteration in
       let (_,limpl_rregex) = type_lens l' in
@@ -96,8 +96,8 @@ and lens_putr_internal
     (iteration:int list)
   : string =
   begin match (l,er) with
-    | (Lens.Disconnect (s1,s2,u1,u2), ERegExBase (s2',_)) ->
-      u2
+    | (Lens.Disconnect (s1,s2,f1,f2), ERegExBase (s2',_)) ->
+      f2 s2'
     | (Lens.Closed l', _) ->
       let relevant_string = extract_string er iteration in
       let (limpl_lregex,_) = type_lens l' in

@@ -5,6 +5,7 @@ open Regexcontext
 let simplify_regex : Regex.t -> Regex.t =
   let maximally_factor_regex : Regex.t -> Regex.t =
     Semiring.maximally_factor_element
+      ~is_eq:(comparer_to_equality_check Regex.compare)
       regex_semiring
   in
   let rec clean_regex (r:Regex.t) : Regex.t =
@@ -90,6 +91,7 @@ let simplify_regex : Regex.t -> Regex.t =
   in
 
   fold_until_fixpoint
+    ~is_eq:(comparer_to_equality_check Regex.compare)
     (merge_concated_bases
      % clean_regex
      % maximally_factor_regex)

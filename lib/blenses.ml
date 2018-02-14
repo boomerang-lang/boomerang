@@ -1978,15 +1978,15 @@ module MLens = struct
             (Lens.Disconnect
                (Brx.to_optician_regexp r1
                ,Brx.to_optician_regexp r2
-               ,Option.value_exn (Brx.representative r1)
-               ,Option.value_exn (Brx.representative r2)))
+               ,f1
+               ,f2))
         else
           None
       | Merge r ->
         if Brx.is_singleton r then
           let w = Option.value_exn (Brx.representative r) in
           let r_opt = Brx.to_optician_regexp r in
-          Some (Lens.Disconnect (Regex.RegExConcat (r_opt,r_opt), r_opt, w^w,w))
+          Some (Lens.Disconnect (Regex.RegExConcat (r_opt,r_opt), r_opt, (fun _ -> w^w),(fun _ -> w)))
         else
           None
 	    | Permute ((_, sigma, _, _, _) , mls) ->
