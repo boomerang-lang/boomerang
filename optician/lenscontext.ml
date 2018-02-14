@@ -22,8 +22,8 @@ module LensContext = struct
       | Some ol -> OutgoingD.insert outgoing r1 ((l,r2)::ol)
     end in
     let outgoing = begin match OutgoingD.lookup outgoing r2 with
-      | None -> OutgoingD.insert outgoing r2 [(Lens.LensInverse l,r1)]
-      | Some ol -> OutgoingD.insert outgoing r2 ((Lens.LensInverse l,r1)::ol)
+      | None -> OutgoingD.insert outgoing r2 [(Lens.Inverse l,r1)]
+      | Some ol -> OutgoingD.insert outgoing r2 ((Lens.Inverse l,r1)::ol)
     end in
     outgoing
 
@@ -38,7 +38,7 @@ module LensContext = struct
   let insert (lc:t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t =
     begin match (r1,r2) with
       | (Regex.RegExClosed r1, Regex.RegExClosed r2) ->
-        { outgoing = update_outgoing lc.outgoing r1 r2 (Lens.LensClosed l);
+        { outgoing = update_outgoing lc.outgoing r1 r2 (Lens.Closed l);
           equivs   = update_equivs lc.equivs r1 r2       ; }
       | _ ->
         failwith "something went wrong"
@@ -80,7 +80,7 @@ module LensContext = struct
                       (get_outgoing_edges outgoing n)
                   in
                   List.map
-                    ~f:(fun (l',n') -> (Lens.LensCompose (l',l),n'))
+                    ~f:(fun (l',n') -> (Lens.Compose (l',l),n'))
                     valid_outgoing_edges)
               accums
           in
@@ -93,7 +93,7 @@ module LensContext = struct
     if regex1_rep <> regex2_rep then
       None
     else if r1 = r2 then
-      Some (Lens.LensIdentity r1)
+      Some (Lens.Identity r1)
     else
       Some (shortest_path_internal (get_outgoing_edges outgoing r1))
 

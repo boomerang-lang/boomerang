@@ -1941,48 +1941,52 @@ module MLens = struct
 		begin match l.desc with
 		  | Copy r ->
         let r = Brx.to_optician_regexp r in
-        Some (Lens.LensIdentity r)
+        Some (Lens.Identity r)
       | Invert ml ->
         let ml_o = to_optician_lens ml in
         Option.map
-          ~f:(fun ml -> Lens.LensInverse ml)
+          ~f:(fun ml -> Lens.Inverse ml)
           ml_o
 		  | Compose (ml1, ml2) ->
         let ml1_o = to_optician_lens ml1 in
         let ml2_o = to_optician_lens ml2 in
         begin match (ml1_o,ml2_o) with
-          | (Some ml1,Some ml2) -> Some (Lens.LensCompose (ml1,ml2))
+          | (Some ml1,Some ml2) -> Some (Lens.Compose (ml1,ml2))
           | _ -> None
         end
 	    | Concat (ml1, ml2) ->
         let ml1_o = to_optician_lens ml1 in
         let ml2_o = to_optician_lens ml2 in
         begin match (ml1_o,ml2_o) with
-          | (Some ml1,Some ml2) -> Some (Lens.LensConcat (ml1,ml2))
+          | (Some ml1,Some ml2) -> Some (Lens.Concat (ml1,ml2))
           | _ -> None
         end
 	    | Union (ml1, ml2) ->
         let ml1_o = to_optician_lens ml1 in
         let ml2_o = to_optician_lens ml2 in
         begin match (ml1_o,ml2_o) with
-          | (Some ml1,Some ml2) -> Some (Lens.LensUnion (ml1,ml2))
+          | (Some ml1,Some ml2) -> Some (Lens.Union (ml1,ml2))
           | _ -> None
         end
       | Star ml ->
         let l_o = to_optician_lens ml in
-        Option.map ~f:(fun l -> Lens.LensIterate l) l_o
+        Option.map ~f:(fun l -> Lens.Iterate l) l_o
       | Disconnect(r1,r2,f1,f2) ->
+        (* TODO alter disconnect *)
         if Brx.is_singleton r1 && Brx.is_singleton r2 then
           Some
-            (Lens.LensConst
-               (Option.value_exn (Brx.representative r1)
+            (Lens.Disconnect
+               (Brx.to_optician_regexp r1
+               ,Brx.to_optician_regexp r2
+               ,Option.value_exn (Brx.representative r1)
                ,Option.value_exn (Brx.representative r2)))
         else
           None
       | Merge r ->
         if Brx.is_singleton r then
           let w = Option.value_exn (Brx.representative r) in
-          Some (Lens.LensConst (w^w,w))
+          let r_opt = Brx.to_optician_regexp r in
+          Some (Lens.Disconnect (Regex.RegExConcat (r_opt,r_opt), r_opt, w^w,w))
         else
           None
 	    | Permute ((_, sigma, _, _, _) , mls) ->
@@ -1995,10 +1999,10 @@ module MLens = struct
         Option.map
           ~f:(fun ls ->
               begin match (Array.to_list sigma,ls) with
-                | ([0;1],[l1;l2]) -> Lens.LensConcat (l1,l2)
-                | ([1;0],[l1;l2]) -> Lens.LensSwap (l1,l2)
+                | ([0;1],[l1;l2]) -> Lens.Concat (l1,l2)
+                | ([1;0],[l1;l2]) -> Lens.Swap (l1,l2)
                 | (sigma,_) ->
-                  Lens.LensPermute (Permutation.create sigma,ls)
+                  Lens.Permute (Permutation.create sigma,ls)
               end)
           ls_o
       | _ -> None

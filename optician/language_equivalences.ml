@@ -23,7 +23,7 @@ let rec to_dnf_regex (r:Regex.t) : dnf_regex =
 
 let rec atom_lens_to_lens (a:atom_lens) : Lens.t =
   begin match a with
-    | AtomLensIterate d -> Lens.LensIterate (dnf_lens_to_lens d)
+    | AtomLensIterate d -> Lens.Iterate (dnf_lens_to_lens d)
     | AtomLensVariable l -> l
   end
 
@@ -43,7 +43,7 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
             combine_scct_and_atom_lenses
               remaining_left
               s2 in
-          (Lens.LensSwap(l1,l2),remaining_total)
+          (Lens.Swap(l1,l2),remaining_total)
       | SCCTConcat (s1,s2) ->
           let (l1,remaining_left) =
             combine_scct_and_atom_lenses
@@ -53,7 +53,7 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
             combine_scct_and_atom_lenses
               remaining_left
               s2 in
-          (Lens.LensConcat(l1,l2),remaining_total)
+          (Lens.Concat(l1,l2),remaining_total)
       | SCCTCompose _ ->
         failwith "compose is too ugly, should have failed faster"
           (*let s2size = size_scct s2 in
@@ -77,28 +77,34 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
         permutation
         string2t
     in
-    let string_lss_hd = Lens.LensConst (string1h, string2h) in
+    let string_lss_hd =
+      Lens.Disconnect
+        (Regex.make_base string1h
+        ,Regex.make_base string2h
+        ,string1h
+        ,string2h)
+    in
     let string_tl_combos = List.zip_exn string1t string2t_invperm in
     let string_lss_tl =
       List.map
-        ~f:(fun (x,y) -> Lens.LensConst (x,y))
+        ~f:(fun (x,y) -> Lens.Disconnect (Regex.make_base x,Regex.make_base y,x,y))
         string_tl_combos
     in
     let atom_lenses =
       List.map ~f:atom_lens_to_lens atoms in
     let atom_string_zips = List.zip_exn atom_lenses string_lss_tl in
     let atom_string_concats =
-      List.map ~f:(fun (x,y) -> Lens.LensConcat (x,y)) atom_string_zips in
+      List.map ~f:(fun (x,y) -> Lens.Concat (x,y)) atom_string_zips in
     begin match atom_string_concats with
     | [] -> string_lss_hd
     | _ ->
       let permutation_scct =
         Permutation.to_swap_concat_compose_tree (Permutation.as_int_list permutation) in
       if has_compose permutation_scct then
-        Lens.LensConcat(string_lss_hd,
-                   Lens.LensPermute (permutation,atom_string_concats))
+        Lens.Concat(string_lss_hd,
+                   Lens.Permute (permutation,atom_string_concats))
       else
-        Lens.LensConcat(string_lss_hd,
+        Lens.Concat(string_lss_hd,
                    (fst (combine_scct_and_atom_lenses
                            atom_string_concats
                            permutation_scct)))
@@ -107,6 +113,6 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
 and dnf_lens_to_lens ((clauses,_):dnf_lens) : Lens.t =
   let clause_lenses = List.map ~f:clause_lens_to_lens clauses in
   List.fold_left
-    ~f:(fun acc l -> Lens.LensUnion (acc, l))
-    ~init:(Lens.LensIdentity (Regex.RegExEmpty))
+    ~f:(fun acc l -> Lens.Union (acc, l))
+    ~init:(Lens.Identity (Regex.RegExEmpty))
     clause_lenses

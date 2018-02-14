@@ -309,8 +309,71 @@ struct
 	  let rec helper (index : int) (temp : t) : t =
 		  if index > n then temp else
 			  helper (index + 1) (RegExOr(temp, iterate_n_times index r)) in
-	  if n < m then RegExEmpty else helper (m + 1) (iterate_n_times m r)
+	 if n < m then RegExEmpty else helper (m + 1) (iterate_n_times m r)
 
+  let rec is_empty
+      (r:t)
+    : bool =
+    begin match r with
+      | RegExConcat (r1,r2) ->
+        is_empty r1 || is_empty r2
+      | RegExOr (r1,r2) ->
+        is_empty r1 && is_empty r2
+      | RegExEmpty ->
+        true
+      | RegExClosed r ->
+        is_empty r
+      | RegExStar r ->
+        false
+      | RegExBase _ ->
+        false
+    end
+
+  let rec is_singleton
+      (r:t)
+    : bool =
+    begin match r with
+      | RegExBase _ ->
+        true
+      | RegExStar r ->
+        is_empty r
+      | RegExClosed r ->
+        is_singleton r
+      | RegExEmpty ->
+        false
+      | RegExOr (r1,r2) ->
+        (is_singleton r1 && is_empty r2)
+        || (is_singleton r2 && is_empty r1)
+      | RegExConcat (r1,r2) ->
+        is_singleton r1 && is_singleton r2
+    end
+
+  let rec representative
+      (r:t)
+    : string option =
+    begin match r with
+      | RegExConcat (r1,r2) ->
+        option_bind
+          ~f:(fun s ->
+              Option.map
+                ~f:(fun s' -> s^s')
+                (representative r2))
+          (representative r1)
+      | RegExOr (r1,r2) ->
+        begin match representative r1 with
+          | Some s -> Some s
+          | None -> representative r2
+        end
+      | RegExEmpty -> None
+      | RegExClosed r -> representative r
+      | RegExBase s -> Some s
+      | RegExStar _ -> Some ""
+    end
+
+  let rec representative_exn
+      (r:t)
+    : string =
+    Option.value_exn (representative r)
 end
 
 let regex_semiring = (module Regex : Semiring.Sig with type t = Regex.t)
@@ -325,68 +388,68 @@ let regex_star_semiring = (module Regex : StarSemiring.Sig with type t = Regex.t
 module Lens =
 struct
   type t =
-    | LensConst of string * string
-    | LensConcat of t * t
-    | LensSwap of t * t
-    | LensUnion of t * t
-    | LensCompose of t * t
-    | LensIterate of t
-    | LensIdentity of Regex.t
-    | LensInverse of t
-    | LensClosed of t
-    | LensPermute of Permutation.t * (t list)
+    | Disconnect of Regex.t * Regex.t * string * string
+    | Concat of t * t
+    | Swap of t * t
+    | Union of t * t
+    | Compose of t * t
+    | Iterate of t
+    | Identity of Regex.t
+    | Inverse of t
+    | Closed of t
+    | Permute of Permutation.t * (t list)
   [@@deriving ord, show, hash]
 
+  let one = Identity (Regex.one)
 
-  let one = LensIdentity (Regex.one)
-
-  let zero = LensIdentity (Regex.zero)
+  let zero = Identity (Regex.zero)
 
   let separate_plus (l:t) : (t * t) option =
     begin match l with
-      | LensUnion (l1,l2) -> Some (l1,l2)
+      | Union (l1,l2) -> Some (l1,l2)
       | _ -> None
     end
 
   let separate_times (l:t) : (t * t) option =
     begin match l with
-      | LensConcat (l1,l2) -> Some (l1,l2)
+      | Concat (l1,l2) -> Some (l1,l2)
       | _ -> None
     end
 
   let separate_star (l:t) : t option =
     begin match l with
-      | LensIterate l' -> Some l'
+      | Iterate l' -> Some l'
       | _ -> None
     end
 
   let make_plus (l1:t) (l2:t) : t =
-    LensUnion (l1,l2)
+    Union (l1,l2)
 
   let make_times (l1:t) (l2:t) : t =
-    LensConcat (l1,l2)
+    Concat (l1,l2)
 
   let make_star (l:t) : t =
-    LensIterate l
+    Iterate l
 
   let rec size (l:t) : int =
     begin match l with
-      | LensConst _ -> 1
-      | LensConcat (l1,l2) ->
+      | Disconnect (r1,r2,_,_) ->
+        1 + (Regex.size r1) + (Regex.size r2)
+      | Concat (l1,l2) ->
         1 + (size l1) + (size l2)
-      | LensCompose (l1,l2) ->
+      | Compose (l1,l2) ->
         1 + (size l1) + (size l2)
-      | LensSwap (l1,l2) ->
+      | Swap (l1,l2) ->
         1 + (size l1) + (size l2)
-      | LensUnion (l1,l2) ->
+      | Union (l1,l2) ->
         1 + (size l1) + (size l2)
-      | LensIterate (l') ->
+      | Iterate (l') ->
         1 + (size l')
-      | LensIdentity _ -> 1
-      | LensInverse l' ->
+      | Identity _ -> 1
+      | Inverse l' ->
         1 + (size l')
-      | LensClosed _ -> 1
-      | LensPermute (_,ls) ->
+      | Closed _ -> 1
+      | Permute (_,ls) ->
         1 + (List.fold_left
                ~f:(fun acc l' -> acc + (size l'))
                ~init:0
@@ -398,34 +461,34 @@ struct
       true
     else
       begin match suplens with
-        | LensConcat (l1,l2) ->
+        | Concat (l1,l2) ->
           (is_sublens sublens l1) || (is_sublens sublens l2)
-        | LensSwap (l1,l2) ->
+        | Swap (l1,l2) ->
           (is_sublens sublens l1) || (is_sublens sublens l2)
-        | LensUnion (l1,l2) ->
+        | Union (l1,l2) ->
           (is_sublens sublens l1) || (is_sublens sublens l2)
-        | LensCompose (l1,l2) ->
+        | Compose (l1,l2) ->
           (is_sublens sublens l1) || (is_sublens sublens l2)
-        | LensIterate l' ->
+        | Iterate l' ->
           is_sublens sublens l'
-        | LensInverse l' ->
+        | Inverse l' ->
           is_sublens sublens l'
         | _ -> false
       end
 
   let rec has_common_sublens (l1:t) (l2:t) : bool =
     begin match l1 with
-      | LensConcat (l11,l12) ->
+      | Concat (l11,l12) ->
         (has_common_sublens l11 l2) || (has_common_sublens l12 l2)
-      | LensSwap (l11,l12) ->
+      | Swap (l11,l12) ->
         (has_common_sublens l11 l2) || (has_common_sublens l12 l2)
-      | LensUnion (l11,l12) ->
+      | Union (l11,l12) ->
         (has_common_sublens l11 l2) || (has_common_sublens l12 l2)
-      | LensCompose (l11,l12) ->
+      | Compose (l11,l12) ->
         (has_common_sublens l11 l2) || (has_common_sublens l12 l2)
-      | LensIterate l1' ->
+      | Iterate l1' ->
         has_common_sublens l1' l2
-      | LensInverse l1' ->
+      | Inverse l1' ->
         has_common_sublens l1' l2
       | _ -> is_sublens l1 l2
     end
@@ -433,18 +496,18 @@ struct
   let rec apply_at_every_level (f:t -> t) (l:t) : t =
     let l =
       begin match l with
-        | LensConcat (l1,l2) ->
-          LensConcat (apply_at_every_level f l1, apply_at_every_level f l2)
-        | LensSwap (l1,l2) ->
-          LensSwap (apply_at_every_level f l1, apply_at_every_level f l2)
-        | LensUnion (l1,l2) ->
-          LensUnion (apply_at_every_level f l1, apply_at_every_level f l2)
-        | LensCompose (l1,l2) ->
-          LensCompose (apply_at_every_level f l1, apply_at_every_level f l2)
-        | LensIterate (l') ->
-          LensIterate (apply_at_every_level f l')
-        | LensInverse (l') ->
-          LensInverse (apply_at_every_level f l')
+        | Concat (l1,l2) ->
+          Concat (apply_at_every_level f l1, apply_at_every_level f l2)
+        | Swap (l1,l2) ->
+          Swap (apply_at_every_level f l1, apply_at_every_level f l2)
+        | Union (l1,l2) ->
+          Union (apply_at_every_level f l1, apply_at_every_level f l2)
+        | Compose (l1,l2) ->
+          Compose (apply_at_every_level f l1, apply_at_every_level f l2)
+        | Iterate (l') ->
+          Iterate (apply_at_every_level f l')
+        | Inverse (l') ->
+          Inverse (apply_at_every_level f l')
         | _ -> l
       end
     in
@@ -458,7 +521,7 @@ struct
 
   let fold
       (type a)
-      ~const_f:(const_f:string -> string -> a)
+      ~disc_f:(disc_f:Regex.t -> Regex.t -> string -> string -> a)
       ~concat_f:(concat_f:a -> a -> a)
       ~swap_f:(swap_f:a -> a -> a)
       ~union_f:(union_f:a -> a -> a)
@@ -474,35 +537,35 @@ struct
         (l:t)
       : a =
       begin match l with
-        | LensConst(s1,s2) -> const_f s1 s2
-        | LensConcat(l1,l2) ->
+        | Disconnect(r1,r2,s1,s2) -> disc_f r1 r2 s1 s2
+        | Concat(l1,l2) ->
           let acc1 = fold_internal l1 in
           let acc2 = fold_internal l2 in
           concat_f acc1 acc2
-        | LensSwap(l1,l2) ->
+        | Swap(l1,l2) ->
           let acc1 = fold_internal l1 in
           let acc2 = fold_internal l2 in
           swap_f acc1 acc2
-        | LensUnion(l1,l2) ->
+        | Union(l1,l2) ->
           let acc1 = fold_internal l1 in
           let acc2 = fold_internal l2 in
           union_f acc1 acc2
-        | LensCompose(l1,l2) ->
+        | Compose(l1,l2) ->
           let acc1 = fold_internal l1 in
           let acc2 = fold_internal l2 in
           compose_f acc1 acc2
-        | LensIterate l -> 
+        | Iterate l -> 
           let acc = fold_internal l in
           iterate_f acc
-        | LensIdentity r ->
+        | Identity r ->
           identity_f r
-        | LensInverse l ->
+        | Inverse l ->
           let acc = fold_internal l in
           inverse_f acc
-        | LensPermute (p,ls) ->
+        | Permute (p,ls) ->
           let accs = List.map ~f:fold_internal ls in
           permute_f p accs
-        | LensClosed l' ->
+        | Closed l' ->
           closed_f (fold_internal l')
       end
     in

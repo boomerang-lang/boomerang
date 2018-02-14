@@ -47,11 +47,11 @@ let rec to_boomerang_lens
     (i:Info.t)
   : Lens.t -> MLens.t =
   Lens.fold
-    ~const_f:(fun s1 s2 ->
+    ~disc_f:(fun r1 r2 s1 s2 ->
         Blenses.MLens.disconnect
           i
-          (Brx.mk_string s1)
-          (Brx.mk_string s2)
+          (to_boomerang_regex r1)
+          (to_boomerang_regex r2)
           (fun _ -> s1)
           (fun _ -> s2))
     ~concat_f:(Blenses.MLens.concat i)

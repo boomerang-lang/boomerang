@@ -126,7 +126,7 @@ let rec exampled_regex_to_exampled_dnf_regex (lc:LensContext.t) (r:exampled_rege
           ill
       else
         exampled_atom_to_exampled_dnf_regex
-          (EAClosed (s,s,Lens.LensIdentity (Regex.RegExClosed s),ss,ill))
+          (EAClosed (s,s,Lens.Identity (Regex.RegExClosed s),ss,ill))
           ill
   end
 

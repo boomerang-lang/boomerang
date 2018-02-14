@@ -132,6 +132,39 @@ struct
     | Nonempty of nonempty_t
   [@@deriving ord, show, hash]
 
+  let mk_base
+      (b:BD.t)
+    : nonempty_t =
+    Base b
+
+  let mk_plus
+      (p:PD.t)
+      (ts:nonempty_t list)
+    : nonempty_t =
+    Plus (p,ts)
+
+  let mk_times
+      (t:TD.t)
+      (ts:nonempty_t list)
+    : nonempty_t =
+    Times (t,ts)
+
+  let mk_star
+      (s:SD.t)
+      (t:nonempty_t)
+    : nonempty_t =
+    Star (s,t)
+
+  let mk_nonempty
+      (t:nonempty_t)
+    : t =
+    Nonempty t
+
+  let mk_empty
+      (t:nonempty_t)
+    : t =
+    Nonempty t
+
   let fold_downward_upward
       ~init:(init:'b)
       ~upward_empty:(upward_empty:'c)

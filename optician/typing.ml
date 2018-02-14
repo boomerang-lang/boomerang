@@ -6,35 +6,35 @@ let rec type_lens
     (l:Lens.t)
   : Regex.t * Regex.t =
   begin match l with
-    | Lens.LensConst(s1,s2) -> (Regex.RegExBase s1, Regex.RegExBase s2)
-    | Lens.LensConcat(l1,l2) ->
+    | Lens.Disconnect(r1,r2,s1,s2) -> (r1, r2)
+    | Lens.Concat(l1,l2) ->
       let (r1,s1) = type_lens l1 in
       let (r2,s2) = type_lens l2 in
       (Regex.RegExConcat (r1,r2), Regex.RegExConcat (s1,s2))
-    | Lens.LensSwap(l1,l2) ->
+    | Lens.Swap(l1,l2) ->
       let (r1,s1) = type_lens l1 in
       let (r2,s2) = type_lens l2 in
       (Regex.RegExConcat (r1,r2), Regex.RegExConcat (s2,s1))
-    | Lens.LensUnion(l1,l2) ->
+    | Lens.Union(l1,l2) ->
       let (r1,s1) = type_lens l1 in
       let (r2,s2) = type_lens l2 in
       (Regex.RegExOr (r1,r2), Regex.RegExOr (s1,s2))
-    | Lens.LensCompose(l1,l2) ->
+    | Lens.Compose(l1,l2) ->
       let (_,s2) = type_lens l1 in
       let (r1,_) = type_lens l2 in
       (* TODO, check r2 = s1 *)
       (r1,s2)
-    | Lens.LensIterate (l') ->
+    | Lens.Iterate (l') ->
       let (r',s') = type_lens l' in
       (Regex.RegExStar r', Regex.RegExStar s')
-    | Lens.LensIdentity r ->
+    | Lens.Identity r ->
       (r,r)
-    | Lens.LensInverse l' ->
+    | Lens.Inverse l' ->
       let (r,s) = type_lens l' in
       (s,r)
-    | Lens.LensClosed l ->
+    | Lens.Closed l ->
       type_lens l
-    | Lens.LensPermute (p,ls) ->
+    | Lens.Permute (p,ls) ->
       let rdl = List.map ~f:(type_lens) ls in
       let (r1s,r2s) = List.unzip rdl in
       let r1 =
