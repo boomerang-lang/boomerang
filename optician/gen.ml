@@ -112,6 +112,36 @@ struct
         clause_lens_perm_part_list_by_left_clause in
     (clause_lenses,Permutation.create_from_pairs perm_parts)
 
+  let kinda_rigid_synth
+      (lc:LensContext.t)
+      (r1:Regex.t)
+      (r2:Regex.t)
+      (exs:examples)
+    : StarSemiringTreeRep.Alignment.t =
+    let (lexs,rexs) = List.unzip exs in
+    let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
+    let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
+    begin match (exampled_r1_opt,exampled_r2_opt) with
+      | (Some exampled_r1, Some exampled_r2) ->
+        let exampled_r1_tree =
+          StarSemiringTreeRep.exampled_dnf_regex_to_tree
+            exampled_r1
+        in
+        let exampled_r2_tree =
+          StarSemiringTreeRep.exampled_dnf_regex_to_tree
+            exampled_r2
+        in
+        print_endline (StarSemiringTreeRep.Tree.show exampled_r1_tree);
+        print_endline (StarSemiringTreeRep.Tree.show exampled_r2_tree);
+        let alignment_opt =
+          StarSemiringTreeRep.Alignment.get_minimal_alignment
+            exampled_r1_tree
+            exampled_r2_tree
+        in
+        Option.value_exn alignment_opt
+      | _ -> failwith "ah"
+    end
+
   let rigid_synth
       (lc:LensContext.t)
       (qe:QueueElement.t)

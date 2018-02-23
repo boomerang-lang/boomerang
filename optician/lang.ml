@@ -387,8 +387,19 @@ let regex_star_semiring = (module Regex : StarSemiring.Sig with type t = Regex.t
 
 module Lens =
 struct
+  type function_container =
+    {
+      rr:Regex.t;
+      rl:Regex.t;
+      creater:string -> string;
+      createl:string -> string;
+      putr:string -> string -> string;
+      putl:string -> string -> string;
+    }
+  [@@deriving show]
+
   type t =
-    | Disconnect of Regex.t * Regex.t * (string -> string) * (string -> string)
+    | Disconnect of Regex.t * Regex.t * string * string
     | Concat of t * t
     | Swap of t * t
     | Union of t * t
@@ -396,9 +407,24 @@ struct
     | Iterate of t
     | Identity of Regex.t
     | Inverse of t
-    | Closed of t
+    | Closed of int * function_container
     | Permute of Permutation.t * (t list)
   [@@deriving show]
+
+  let get_left_right_regex_closed
+      (fc:function_container)
+    : Regex.t * Regex.t =
+    (fc.rl,fc.rr)
+
+  let get_left_create_closed
+      (fc:function_container)
+    : string -> string =
+    fc.createl
+
+  let get_right_create_closed
+      (fc:function_container)
+    : string -> string =
+    fc.creater
 
   let hash_fold_t
       _
@@ -437,8 +463,8 @@ struct
         is_equal (Regex.compare r t)
       | (Inverse l',Inverse m') ->
         is_eq l' m'
-      | (Closed l',Closed m') ->
-        is_eq l' m'
+      | (Closed (i,l'),Closed (j,m')) ->
+        is_equal (Int.compare i j)
       | (Permute (p,ls),Permute (s,ms)) ->
         is_equal (Permutation.compare p s)
         && (begin match List.zip ls ms with
@@ -486,6 +512,44 @@ struct
 
   let make_star (l:t) : t =
     Iterate l
+
+  let make_ident (r:Regex.t) : t =
+    Identity r
+
+  let make_disconnect
+      (r1:Regex.t)
+      (r2:Regex.t)
+      (s1:string)
+      (s2:string)
+    : t =
+    Disconnect (r1,r2,s1,s2)
+
+  let make_permute
+      (p:Permutation.t)
+      (ls:t list)
+    : t =
+    Permute (p,ls)
+
+  let make_closed
+      ~rr:rr
+      ~rl:rl
+      ~creater:creater
+      ~createl:createl
+      ~putr:putr
+      ~putl:putl
+      (i:int)
+    : t =
+    let fc =
+      {
+        rr = rr;
+        rl = rl;
+        creater = creater;
+        createl = createl;
+        putr = putr;
+        putl = putl;
+      }
+    in
+    Closed (i,fc)
 
   let rec size (l:t) : int =
     begin match l with
@@ -580,8 +644,8 @@ struct
       ~disc_f:(disc_f:
                Regex.t ->
                Regex.t ->
-               (string -> string) ->
-               (string -> string) ->
+               string ->
+               string ->
                a)
       ~concat_f:(concat_f:a -> a -> a)
       ~swap_f:(swap_f:a -> a -> a)
@@ -591,7 +655,7 @@ struct
       ~identity_f:(identity_f:Regex.t -> a)
       ~inverse_f:(inverse_f:a -> a)
       ~permute_f:(permute_f:Permutation.t -> a list -> a)
-      ~closed_f:(closed_f:a -> a)
+      ~closed_f:(closed_f:int -> function_container -> a)
       (l:t)
     : a =
     let rec fold_internal
@@ -626,8 +690,8 @@ struct
         | Permute (p,ls) ->
           let accs = List.map ~f:fold_internal ls in
           permute_f p accs
-        | Closed l' ->
-          closed_f (fold_internal l')
+        | Closed (i,l') ->
+          closed_f i l'
       end
     in
     fold_internal l

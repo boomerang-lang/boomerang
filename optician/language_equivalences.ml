@@ -81,8 +81,8 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
       Lens.Disconnect
         (Regex.make_base string1h
         ,Regex.make_base string2h
-        ,(fun _ -> string1h)
-        ,(fun _ -> string2h))
+        ,string1h
+        ,string2h)
     in
     let string_tl_combos = List.zip_exn string1t string2t_invperm in
     let string_lss_tl =
@@ -91,8 +91,8 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
             Lens.Disconnect
               (Regex.make_base x
               ,Regex.make_base y
-              ,(fun _ -> x)
-              ,(fun _ -> y)))
+              ,x
+              ,y))
         string_tl_combos
     in
     let atom_lenses =

@@ -10,16 +10,11 @@ let rec lens_putl_internal
     (iteration:int list)
   : string =
   begin match (l,er) with
-    | (Lens.Disconnect (s1,s2,f1,f2), ERegExBase (s2',_)) ->
-      f1 s2'
-    | (Lens.Closed l', _) ->
+    | (Lens.Disconnect (r1,r2,s1,s2), ERegExBase (s2',_)) ->
+      s1
+    | (Lens.Closed (_,l'), _) ->
       let relevant_string = extract_string er iteration in
-      let (_,limpl_rregex) = type_lens l' in
-      let er = Option.value_exn (regex_to_exampled_regex
-          limpl_rregex
-          [relevant_string])
-      in
-      lens_putl_internal l' er [0]
+      Lens.get_left_create_closed l' relevant_string
     | (Lens.Concat (l1,l2), ERegExConcat (er1,er2,_)) ->
         (lens_putl_internal l1 er1 iteration) ^
         (lens_putl_internal l2 er2 iteration)
@@ -96,16 +91,11 @@ and lens_putr_internal
     (iteration:int list)
   : string =
   begin match (l,er) with
-    | (Lens.Disconnect (s1,s2,f1,f2), ERegExBase (s2',_)) ->
-      f2 s2'
-    | (Lens.Closed l', _) ->
+    | (Lens.Disconnect (r1,r2,s1,s2), ERegExBase (s2',_)) ->
+      s2
+    | (Lens.Closed (_,l'), _) ->
       let relevant_string = extract_string er iteration in
-      let (limpl_lregex,_) = type_lens l' in
-      let er = Option.value_exn (regex_to_exampled_regex
-          limpl_lregex
-          [relevant_string])
-      in
-      lens_putr_internal l' er [0]
+      Lens.get_right_create_closed l' relevant_string
     | (Lens.Concat (l1,l2), ERegExConcat (er1,er2,_)) ->
         (lens_putr_internal l1 er1 iteration) ^
         (lens_putr_internal l2 er2 iteration)
@@ -183,7 +173,7 @@ let lens_putr
   let (sr,_) = type_lens l in
   let exampled_sr_o = regex_to_exampled_regex sr [s] in
   begin match exampled_sr_o with
-    | None -> failwith ("bad input to lens" ^ s)
+    | None -> failwith ("bad input to lens~: " ^ s ^ " " ^ (Regex.show sr))
     | Some exampled_sr -> lens_putr_internal l exampled_sr [0]
   end
 

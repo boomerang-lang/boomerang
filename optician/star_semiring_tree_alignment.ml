@@ -24,6 +24,39 @@ sig
   val get_alignment : t -> t -> Alignment.t option
 end
 
+module type PlusData =
+sig
+  type t
+  val show : t shower
+  val pp : t pper
+  val compare : t comparer
+  val hash : t hasher
+  val hash_fold_t : t hash_folder
+  val are_compatible : t -> t -> bool
+end
+
+module type TimesData =
+sig
+  type t
+  val show : t shower
+  val pp : t pper
+  val compare : t comparer
+  val hash : t hasher
+  val hash_fold_t : t hash_folder
+  val are_compatible : t -> t -> bool
+end
+
+module type StarData =
+sig
+  type t
+  val show : t shower
+  val pp : t pper
+  val compare : t comparer
+  val hash : t hasher
+  val hash_fold_t : t hash_folder
+  val are_compatible : t -> t -> bool
+end
+
 module Position = PairOf(IntModule)(IntModule)
 module IntIntDict = DictOf(IntModule)(IntModule)
 
@@ -43,9 +76,9 @@ struct
 end
 
 module PlusTimesStarTreeAlignmentOf
-    (PD : Data)
-    (TD : Data)
-    (SD : Data)
+    (PD : PlusData)
+    (TD : TimesData)
+    (SD : StarData)
     (BD : BaseData) =
 struct
   module NormalizedTree = NormalizedPlusTimesStarTreeOf(PD)(TD)(SD)(BD)
@@ -53,13 +86,15 @@ struct
   module Nonempty =
   struct
     type t =
-      | Plus of PD.t * (int * int * t) list * int list * int list
-      | Times of TD.t
-                  * Permutation.t
+      | Plus of PD.t * PD.t
+                * (int * int * t) list
+                * int list
+                * int list
+      | Times of TD.t * TD.t
+                  * (int * int * t) list
                   * int list
                   * int list
-                  * t list
-      | Star of SD.t * t
+      | Star of SD.t * SD.t * t
       | Base of BD.Alignment.t
     [@@deriving ord, show, hash]
   end
@@ -77,6 +112,7 @@ struct
 
     val mk_plus :
       PD.t ->
+      PD.t ->
       ((position) * (position) * t) list ->
       ((position) * (position)) list ->
       ((position) * (position)) list ->
@@ -84,12 +120,14 @@ struct
 
     val mk_times :
       TD.t ->
+      TD.t ->
       (position * position * t) list ->
       position list ->
       position list ->
       t
 
     val mk_star :
+      SD.t ->
       SD.t ->
       t ->
       t
@@ -314,17 +352,18 @@ struct
         (IntPair)
 
     type t =
-      | Plus of PD.t * MappingDict.t * CreateDict.t * CreateDict.t
-      | Times of TD.t
+      | Plus of PD.t * PD.t * MappingDict.t * CreateDict.t * CreateDict.t
+      | Times of TD.t * TD.t
                  * (position * position * t) list
                  * position list
                  * position list
-      | Star of SD.t * t
+      | Star of SD.t * SD.t * t
       | Base of BD.Alignment.t
     [@@deriving ord, show, hash]
 
     let mk_plus
-        (pd:PD.t)
+        (pd1:PD.t)
+        (pd2:PD.t)
         (mls:((position) * (position) * t) list)
         (left_creates:((position) * (position)) list)
         (right_creates:((position) * (position)) list)
@@ -342,18 +381,19 @@ struct
           right_creates
       in
       Plus 
-        (pd,md,cld,crd)
+        (pd1,pd2,md,cld,crd)
 
     let mk_times
-        (td:TD.t)
+        (td1:TD.t)
+        (td2:TD.t)
         (ms:(position * position * t) list)
         (p1:position list)
         (p2:position list)
       : t =
-      Times (td,ms,p1,p2)
+      Times (td1,td2,ms,p1,p2)
 
-    let mk_star (sd:SD.t) (nt:t) : t =
-      Star (sd,nt)
+    let mk_star (sd1:SD.t) (sd2:SD.t) (nt:t) : t =
+      Star (sd1,sd2,nt)
 
     let mk_base (b:BD.Alignment.t) : t =
       Base b
@@ -362,7 +402,7 @@ struct
         (nt:t)
       : float =
       begin match nt with
-        | Plus (_,md,cdl,cdr) ->
+        | Plus (_,_,md,cdl,cdr) ->
           let all_matches = MappingDict.all_alignments md in
           let associated_edge_count
               (pleft:position)
@@ -386,7 +426,7 @@ struct
               (List.map ~f:(cost_of_edge) all_matches)
           in
           edge_cost /. ((Float.of_int (List.length all_matches) +. 1.))
-        | Times (_,als,pleft,pright) ->
+        | Times (_,_,als,pleft,pright) ->
           let mapped_count = List.length als in
           let unmapped_left_count = List.length pleft in
           let unmapped_right_count = List.length pright in
@@ -411,7 +451,7 @@ struct
             unnormalized_recursive_cost
           in
           (unnormalized_cost /. total_size)
-        | Star (_,a) ->
+        | Star (_,_,a) ->
           cost a
         | Base (a) ->
           BD.Alignment.cost a
@@ -480,7 +520,7 @@ struct
         (tts1:NormalizedTree.Nonempty.l list)
         (tts2:NormalizedTree.Nonempty.l list)
       : t option =
-      if not (is_equal (PD.compare pl1 pl2)) then
+      if not (PD.are_compatible pl1 pl2) then
         None
       else
         let list_to_dict
@@ -716,7 +756,7 @@ struct
                   cd2
                   (MappingDict.indirect_mapping_right aligns)
               in
-              Plus (pl1,aligns,cd1,cd2))
+              Plus (pl1,pl2,aligns,cd1,cd2))
           alignment_info_option
 
     and get_minimal_alignment_times
@@ -725,7 +765,7 @@ struct
         (tts1:NormalizedTree.Nonempty.l list)
         (tts2:NormalizedTree.Nonempty.l list)
       : t option =
-      if not (is_equal (TD.compare tl1 tl2)) then
+      if not (TD.are_compatible tl1 tl2) then
         None
       else
         let list_to_dict
@@ -860,6 +900,7 @@ struct
           ~f:(fun (aligns,pleft,pright) ->
               mk_times
                 tl1
+                tl2
                 aligns
                 pleft
                 pright)
@@ -878,11 +919,11 @@ struct
           get_minimal_alignment_times tl1 tl2 tts1 tts2
         | (NormalizedTree.Nonempty.Star (sl1,(sts1,_)),
            NormalizedTree.Nonempty.Star (sl2,(sts2,_))) ->
-          if (sl1 <> sl2) then
+          if not (SD.are_compatible sl1 sl2) then
             None
           else
             Option.map
-              ~f:(fun a -> Star (sl1,a))
+              ~f:(fun a -> Star (sl1,sl2,a))
               (get_minimal_alignment sts1 sts2)
         | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
           Option.map ~f:(fun a -> Base a) (BD.get_alignment bd1 bd2)
@@ -895,7 +936,7 @@ struct
         (ns2:NormalizedTree.NormalizationScript.nonempty_t)
       : Nonempty.t =
       begin match (nta,ns1,ns2) with
-        | (Plus (pl,md,cd1,cd2),Plus(pnl1,nsl1),Plus(pnl2,nsl2)) ->
+        | (Plus (pl1,pl2,md,cd1,cd2),Plus(pnl1,nsl1),Plus(pnl2,nsl2)) ->
           let createdict_to_createlist
               (cd:CreateDict.t)
               (left_perm:CountedPermutation.t)
@@ -917,11 +958,11 @@ struct
               ~f:snd
               sorted_clp
           in
-          let pl' =
+          let pl1' =
             NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
               pnl1
           in
-          let pl'' =
+          let pl2' =
             NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
               pnl2
           in
@@ -933,7 +974,7 @@ struct
             NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_perm
               pnl2
           in
-          if pl <> pl' || pl <> pl'' then
+          if pl1 <> pl1' || pl2 <> pl2' then
             failwith "bad application of normalization script"
           else
             let cl1 = createdict_to_createlist cd1 perm1 perm2 in
@@ -956,8 +997,8 @@ struct
                     (i1,i2,to_nonempty nta ns1 ns2))
                 (MappingDict.all_alignments md)
             in
-            Plus (pl,all_aligns,cl1,cl2)
-        | (Times(tl,als,pl1,pl2)
+            Plus (pl1,pl2,all_aligns,cl1,cl2)
+        | (Times(tl1,tl2,als,pl1,pl2)
           ,Times(tnl1,nsl1)
           ,Times(tnl2,nsl2)) ->
           let transform_projection_list
@@ -968,11 +1009,11 @@ struct
               ~f:(CountedPermutation.apply_inverse_exn perm)
               plist
           in
-          let tl' =
+          let tl1' =
             NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
               tnl1
           in
-          let tl'' =
+          let tl2' =
             NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
               tnl2
           in
@@ -984,7 +1025,7 @@ struct
             NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
               tnl2
           in
-          if tl <> tl' || tl <> tl'' then
+          if tl1 <> tl1' || tl2 <> tl2' then
             failwith "bad application of normalization script"
           else
             let projs1 = transform_projection_list perm1 pl1 in
@@ -1039,12 +1080,12 @@ struct
                 ~f:trd_trip
                 ordered_aligns
             in
-            Times (tl,perm,projs1,projs2,alignments)
-        | (Star (sl,ns'),Star (sl',ns1'), Star (sl'',ns2')) ->
-          if (sl <> sl') || (sl <> sl'') then
+            Times (tl1,tl2,aligns,projs1,projs2)
+        | (Star (sl1,sl2,ns'),Star (sl1',ns1'), Star (sl2',ns2')) ->
+          if (sl1 <> sl1') || (sl2 <> sl2') then
             failwith "bad application of normalization script"
           else
-            Star (sl,to_nonempty ns' ns1' ns2')
+            Star (sl1,sl2,to_nonempty ns' ns1' ns2')
         | (Base ba,Base bl,Base bl') ->
           Base ba
         | _ -> failwith "bad application of normalization script"

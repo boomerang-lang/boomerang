@@ -3,6 +3,7 @@ open Ounit_general_extensions
 open Optician
 open Star_semiring_tree
 open Star_semiring_tree_alignment
+open Synth_structs
 
 module BaseIntModule =
 struct
@@ -25,11 +26,17 @@ struct
       None
 end
 
+module CompatibilityIntModule =
+struct
+  include IntModule
+  let are_compatible = is_equal %% compare
+end
+
 module IntNormalizedPTST =
   NormalizedPlusTimesStarTreeOf
-    (IntModule)
-    (IntModule)
-    (IntModule)
+    (CompatibilityIntModule)
+    (CompatibilityIntModule)
+    (CompatibilityIntModule)
     (BaseIntModule)
 
 module IPTST = IntNormalizedPTST.NonNormalizedTree
@@ -46,9 +53,9 @@ let assert_normalized_tree_script_equal =
 
 module IntPTSTAlignment =
   PlusTimesStarTreeAlignmentOf
-    (IntModule)
-    (IntModule)
-    (IntModule)
+    (CompatibilityIntModule)
+    (CompatibilityIntModule)
+    (CompatibilityIntModule)
     (BaseIntModule)
 
 module IntPTSTAlignmentOption = OptionOf(IntPTSTAlignment)
@@ -57,3 +64,13 @@ let assert_alignment_option_equal =
   assert_equal
     ~printer:(IntPTSTAlignmentOption.show)
     ~cmp:(IntPTSTAlignmentOption.compare)
+
+let assert_rxtree_equal =
+  assert_equal
+    ~printer:StarSemiringTreeRep.Tree.show
+    ~cmp:StarSemiringTreeRep.Tree.compare
+
+let assert_alignment_equal =
+  assert_equal
+    ~printer:StarSemiringTreeRep.Alignment.show
+    ~cmp:StarSemiringTreeRep.Alignment.compare

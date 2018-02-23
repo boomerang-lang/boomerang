@@ -101,12 +101,24 @@ let rec exampled_regex_to_string (r:exampled_regex) : string =
 (**** Exampled DNF Regex {{{ *****)
 
 type exampled_atom =
-  | EAClosed of Regex.t * Regex.t * Lens.t * string list * int list list
-  | EAStar of exampled_dnf_regex * int list list
+  | EAClosed of Regex.t *
+                Regex.t *
+                Lens.t *
+                string list *
+                int list list *
+                string list
+  | EAStar of exampled_dnf_regex * int list list * Regex.t
 
 and exampled_clause = (exampled_atom) list * string list * (int list list)
 
 and exampled_dnf_regex = exampled_clause list * int list list
+
+let get_atom_regex (ea:exampled_atom) : Regex.t =
+  begin match ea with
+    | EAClosed (_,r,_,_,_,_) ->
+      Regex.make_closed r
+    | EAStar (_,_,r) -> r
+  end
 
 let rec exampled_dnf_regex_to_string ((r,ill):exampled_dnf_regex) : string =
   paren ((String.concat
@@ -135,14 +147,14 @@ and exampled_clause_to_string ((atoms,strings,examples):exampled_clause) : strin
 
 and exampled_atom_to_string (a:exampled_atom) : string =
   begin match a with
-  | EAClosed (s,_,_,sl,ill) -> paren (
+  | EAClosed (s,_,_,sl,ill,_) -> paren (
       (Regex.show s) ^ "," ^
       bracket (
         String.concat
         ~sep:";"
         sl) ^ "," ^ string_of_int_list_list ill
       )
-  | EAStar (r,ill) -> (paren ((exampled_dnf_regex_to_string r) ^ (string_of_int_list_list ill))) ^ "*"
+  | EAStar (r,ill,_) -> (paren ((exampled_dnf_regex_to_string r) ^ (string_of_int_list_list ill))) ^ "*"
   end
 
 (***** }}} *****)
@@ -159,7 +171,7 @@ and ordered_exampled_dnf_regex = (ordered_exampled_clause * int) list list
 let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
   comparison =
     begin match (a1,a2) with
-      | (EAClosed (s1,_,_,el1,_), EAClosed (s2,_,_,el2,_)) ->
+      | (EAClosed (s1,_,_,el1,_,_), EAClosed (s2,_,_,el2,_,_)) ->
         let cmp = Regex.compare s1 s2 in
         if (is_equal cmp) then
           ordered_partition_order
@@ -168,7 +180,7 @@ let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
             el2
         else
           cmp
-    | (EAStar (r1,_), EAStar (r2,_)) -> compare_exampled_dnf_regexs r1 r2
+    | (EAStar (r1,_,_), EAStar (r2,_,_)) -> compare_exampled_dnf_regexs r1 r2
     | _ -> 0
     end 
 
@@ -235,8 +247,8 @@ and compare_ordered_exampled_dnf_regexs (r1:ordered_exampled_dnf_regex)
 
 let rec to_ordered_exampled_atom (a:exampled_atom) : ordered_exampled_atom =
   begin match a with
-  | EAClosed (s,sorig,lmap,el,_) -> OEAClosed (s,sorig,lmap,el)
-  | EAStar (r,_) -> OEAStar (to_ordered_exampled_dnf_regex r)
+  | EAClosed (s,sorig,lmap,el,_,_) -> OEAClosed (s,sorig,lmap,el)
+  | EAStar (r,_,_) -> OEAStar (to_ordered_exampled_dnf_regex r)
   end
 
 and to_ordered_exampled_clause ((atoms,strings,exnums):exampled_clause) : ordered_exampled_clause =
@@ -344,6 +356,7 @@ type atom =
 and clause = atom list * string list
 
 and dnf_regex = clause list
+[@@deriving ord, show, hash]
 
 let empty_dnf_string : dnf_regex = [([],[""])]
 

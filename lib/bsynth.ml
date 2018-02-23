@@ -33,6 +33,18 @@ open Lang
 module Info = Hbase.Info
 module MLens = Blenses.MLens
 
+module LensModule =
+struct
+  type t = Blenses.MLens.t
+  let hash_fold_t _ _ = failwith "unimplemented"
+  let hash _ = failwith "unimplemented"
+  let compare _ _ = failwith "unimplemented"
+  let pp _ _ = failwith "unimplemented"
+  let show _ = failwith "unimplemented"
+end
+
+module IntToLens = DictOf(IntModule)(LensModule)
+
 let rec to_boomerang_regex
   : Regex.t -> Brx.t =
   Regex.fold
@@ -45,15 +57,16 @@ let rec to_boomerang_regex
 
 let rec to_boomerang_lens
     (i:Info.t)
+    (d:IntToLens.t)
   : Lens.t -> MLens.t =
   Lens.fold
-    ~disc_f:(fun r1 r2 f1 f2 ->
+    ~disc_f:(fun r1 r2 s1 s2 ->
         Blenses.MLens.disconnect
           i
           (to_boomerang_regex r1)
           (to_boomerang_regex r2)
-          f1
-          f2)
+          (fun _ -> s1)
+          (fun _ -> s2))
     ~concat_f:(Blenses.MLens.concat i)
     ~swap_f:(fun l1 l2 ->
         MLens.permute i [1;0] [l1;l2])
@@ -63,12 +76,12 @@ let rec to_boomerang_lens
     ~identity_f:((MLens.copy i) % to_boomerang_regex)
     ~inverse_f:(MLens.invert i)
     ~permute_f:(fun il ml -> MLens.permute i (Permutation.as_int_list il) ml)
-    ~closed_f:(fun l -> l)
+    ~closed_f:(fun i _ -> IntToLens.lookup_exn d i)
 
 let retrieve_existing_lenses
     (relevant_regexps:Brx.t list)
     (e:CEnv.t)
-  : (Lens.t * Regex.t * Regex.t) list =
+  : (Lens.t * Regex.t * Regex.t) list * IntToLens.t =
   let lens_list =
     List.filter_map
       ~f:ident
@@ -102,16 +115,55 @@ let retrieve_existing_lenses
       bij_lens_list
   in
 
-  List.filter_map
-    ~f:(fun (l,s,v) ->
-        let l_o = Blenses.MLens.to_optician_lens l in
-        Option.map
-          ~f:(fun l ->
-              (l
-              ,Brx.to_optician_regexp s
-              ,Brx.to_optician_regexp v))
-          l_o)
-    lenses_types
+  let (_,d,lens_list) =
+    List.fold_left
+      ~f:(fun (i,d,lens_list) (l,s,v) ->
+          let rr = Brx.to_optician_regexp v in
+          let rl = Brx.to_optician_regexp s in
+          let creater =
+            (fun s ->
+               (Blenses.MLens.rcreater
+                  l
+                  (Bstring.of_string s)))
+          in
+          let createl =
+            (fun s ->
+               (Blenses.MLens.rcreatel
+                  l
+                  (Bstring.of_string s)))
+          in
+          let putr =
+            (fun s v ->
+               (Blenses.MLens.rputr
+                  l
+                  (Bstring.of_string s)
+                  (Bstring.of_string v)))
+          in
+          let putl =
+            (fun v s ->
+               (Blenses.MLens.rputl
+                  l
+                  (Bstring.of_string v)
+                  (Bstring.of_string s)))
+          in
+          let lens =
+            Lens.make_closed
+              ~rr:rr
+              ~rl:rl
+              ~creater:creater
+              ~createl:createl
+              ~putr:putr
+              ~putl:putl
+              i
+          in
+          let d = IntToLens.insert d i l in
+          let i = i + 1 in
+          let lens_list = (lens,rl,rr)::lens_list in
+          (i,d,lens_list))
+      ~init:(0,IntToLens.empty,[])
+      lenses_types
+  in
+  (lens_list,d)
 
 let synth
     (i:Info.t)
@@ -121,11 +173,12 @@ let synth
     (exs:(string * string) list)
   : Blenses.MLens.t =
   let subregexps = (Brx.subregexp_list r1)@(Brx.subregexp_list r2) in
-  let lss = retrieve_existing_lenses subregexps env in
+  let (lss,d) = retrieve_existing_lenses subregexps env in
   let r1 = Brx.to_optician_regexp r1 in
   let r2 = Brx.to_optician_regexp r2 in
   to_boomerang_lens
     i
+    d
     (Option.value_exn
        (Gen.gen_lens
           lss

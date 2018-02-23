@@ -32,8 +32,8 @@ let rec type_lens
     | Lens.Inverse l' ->
       let (r,s) = type_lens l' in
       (s,r)
-    | Lens.Closed l ->
-      type_lens l
+    | Lens.Closed (_,l) ->
+      Lens.get_left_right_regex_closed l
     | Lens.Permute (p,ls) ->
       let rdl = List.map ~f:(type_lens) ls in
       let (r1s,r2s) = List.unzip rdl in

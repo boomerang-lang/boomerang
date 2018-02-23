@@ -36,9 +36,13 @@ module LensContext = struct
 
   (* TODO: is this the right thing, simpler if just between vars ? *)
   let insert (lc:t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t =
+    begin match l with
+      | Lens.Closed _ -> ()
+      | _ -> failwith "not closed into lens context"
+    end;
     begin match (r1,r2) with
       | (Regex.RegExClosed r1, Regex.RegExClosed r2) ->
-        { outgoing = update_outgoing lc.outgoing r1 r2 (Lens.Closed l);
+        { outgoing = update_outgoing lc.outgoing r1 r2 l;
           equivs   = update_equivs lc.equivs r1 r2       ; }
       | _ ->
         failwith "something went wrong"

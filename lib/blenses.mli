@@ -124,6 +124,4 @@ module MLens : sig
     -> Brx.t -> (string -> (string * string) option -> string)
     -> Brx.t -> (string -> (string * string) option -> string)
     -> t -> t
-  val to_optician_lens : t -> Optician.Lang.Lens.t option
-  val to_optician_lens : t -> Optician.Lang.Lens.t option
 end
