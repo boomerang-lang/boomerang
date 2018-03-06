@@ -104,7 +104,7 @@ and clause_lens_to_lens ((atoms,permutation,strings1,strings2):clause_lens)
     | [] -> string_lss_hd
     | _ ->
       let permutation_scct =
-        Permutation.to_swap_concat_compose_tree (Permutation.as_int_list permutation) in
+        Permutation.to_swap_concat_compose_tree permutation in
       if has_compose permutation_scct then
         Lens.Concat(string_lss_hd,
                    Lens.Permute (permutation,atom_string_concats))

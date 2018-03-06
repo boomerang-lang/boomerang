@@ -1,6 +1,8 @@
 open Stdlib
 open Star_semiring_tree
 
+module type DefaultInfo = Data
+
 module type BaseAlignment =
 sig
   type t
@@ -15,6 +17,7 @@ end
 module type BaseData =
 sig
   type t
+  module Default : DefaultInfo
   module Alignment : BaseAlignment
   val show : t shower
   val pp : t pper
@@ -27,34 +30,40 @@ end
 module type PlusData =
 sig
   type t
+  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val combine_defaults : Default.t list -> Default.t
 end
 
 module type TimesData =
 sig
   type t
+  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val combine_defaults : Default.t list -> Default.t
 end
 
 module type StarData =
 sig
   type t
+  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val combine_defaults : Default.t -> Default.t
 end
 
 module Position = PairOf(IntModule)(IntModule)
@@ -77,11 +86,12 @@ end
 
 module PlusTimesStarTreeAlignmentOf
     (PD : PlusData)
-    (TD : TimesData)
-    (SD : StarData)
-    (BD : BaseData) =
+    (TD : TimesData with module Default = PD.Default)
+    (SD : StarData with module Default = PD.Default)
+    (BD : BaseData with module Default = PD.Default) =
 struct
   module NormalizedTree = NormalizedPlusTimesStarTreeOf(PD)(TD)(SD)(BD)
+  module Default = SD.Default
 
   module Nonempty =
   struct
@@ -113,9 +123,9 @@ struct
     val mk_plus :
       PD.t ->
       PD.t ->
-      ((position) * (position) * t) list ->
-      ((position) * (position)) list ->
-      ((position) * (position)) list ->
+      (position * position * t) list ->
+      (position * position) list ->
+      (position * position) list ->
       t
 
     val mk_times :
@@ -141,11 +151,11 @@ struct
     val get_alignment_distance :
       NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> float option
 
-    val to_nonempty :
+    val to_nonempty_and_cost :
       t ->
       NormalizedTree.NormalizationScript.nonempty_t ->
       NormalizedTree.NormalizationScript.nonempty_t ->
-      Nonempty.t
+      Nonempty.t * float
   end
 
   module rec NonemptyNormalizedPlusStarTreeAlignment : NonemptyNormalizedPlusStarTreeAlignmentType =
@@ -930,166 +940,138 @@ struct
         | _ -> None
       end
 
-    let rec to_nonempty
+    let rec to_nonempty_and_cost
         (nta:NonemptyNormalizedPlusStarTreeAlignment.t)
         (ns1:NormalizedTree.NormalizationScript.nonempty_t)
         (ns2:NormalizedTree.NormalizationScript.nonempty_t)
-      : Nonempty.t =
-      begin match (nta,ns1,ns2) with
-        | (Plus (pl1,pl2,md,cd1,cd2),Plus(pnl1,nsl1),Plus(pnl2,nsl2)) ->
-          let createdict_to_createlist
-              (cd:CreateDict.t)
-              (left_perm:CountedPermutation.t)
-              (right_perm:CountedPermutation.t)
-            : int list =
-            let unsorted_clp =
+      : Nonempty.t * float =
+      let cost = cost nta in
+      let al:Nonempty.t =
+        begin match (nta,ns1,ns2) with
+          | (Plus (pl1,pl2,md,cd1,cd2),Plus(pnl1,nsl1),Plus(pnl2,nsl2)) ->
+            let createdict_to_createlist
+                (cd:CreateDict.t)
+                (left_perm:CountedPermutation.t)
+                (right_perm:CountedPermutation.t)
+              : int list =
+              let unsorted_clp =
+                List.map
+                  ~f:(fun (s,t) ->
+                      (CountedPermutation.apply_inverse_exn left_perm s
+                      ,CountedPermutation.apply_inverse_exn right_perm t))
+                  (CreateDict.as_kvp_list cd1)
+              in
+              let sorted_clp =
+                List.sort
+                  ~cmp:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
+                  unsorted_clp
+              in
               List.map
-                ~f:(fun (s,t) ->
-                    (CountedPermutation.apply_inverse_exn left_perm s
-                    ,CountedPermutation.apply_inverse_exn right_perm t))
-                (CreateDict.as_kvp_list cd1)
+                ~f:snd
+                sorted_clp
             in
-            let sorted_clp =
-              List.sort
-                ~cmp:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
-                unsorted_clp
+            let pl1' =
+              NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
+                pnl1
             in
-            List.map
-              ~f:snd
-              sorted_clp
-          in
-          let pl1' =
-            NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
-              pnl1
-          in
-          let pl2' =
-            NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
-              pnl2
-          in
-          let perm1 =
-            NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_perm
-              pnl1
-          in
-          let perm2 =
-            NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_perm
-              pnl2
-          in
-          if pl1 <> pl1' || pl2 <> pl2' then
-            failwith "bad application of normalization script"
-          else
-            let cl1 = createdict_to_createlist cd1 perm1 perm2 in
-            let cl2 = createdict_to_createlist cd2 perm2 perm1 in
-            let all_aligns =
+            let pl2' =
+              NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_label
+                pnl2
+            in
+            let perm1 =
+              NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_perm
+                pnl1
+            in
+            let perm2 =
+              NormalizedTree.NormalizationScript.PD_NormalizationLabel.get_perm
+                pnl2
+            in
+            if pl1 <> pl1' || pl2 <> pl2' then
+              failwith "bad application of normalization script"
+            else
+              let cl1 = createdict_to_createlist cd1 perm1 perm2 in
+              let cl2 = createdict_to_createlist cd2 perm2 perm1 in
+              let all_aligns =
+                List.map
+                  ~f:(fun (p1,p2,nta) ->
+                      let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
+                      let i2 = CountedPermutation.apply_inverse_exn perm1 p1 in
+                      let ns1 =
+                        List.nth_exn
+                          nsl1
+                          i1
+                      in
+                      let ns2 =
+                        List.nth_exn
+                          nsl2
+                          i2
+                      in
+                      (i1,i2,fst (to_nonempty_and_cost nta ns1 ns2)))
+                  (MappingDict.all_alignments md)
+              in
+              Plus (pl1,pl2,all_aligns,cl1,cl2)
+          | (Times(tl1,tl2,als,pl1,pl2)
+            ,Times(tnl1,nsl1)
+            ,Times(tnl2,nsl2)) ->
+            let transform_projection_list
+                (perm:CountedPermutation.t)
+                (plist:position list)
+              : int list =
               List.map
-                ~f:(fun (p1,p2,nta) ->
-                    let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
-                    let i2 = CountedPermutation.apply_inverse_exn perm1 p1 in
-                    let ns1 =
-                      List.nth_exn
-                        nsl1
-                        i1
-                    in
-                    let ns2 =
-                      List.nth_exn
-                        nsl2
-                        i2
-                    in
-                    (i1,i2,to_nonempty nta ns1 ns2))
-                (MappingDict.all_alignments md)
+                ~f:(CountedPermutation.apply_inverse_exn perm)
+                plist
             in
-            Plus (pl1,pl2,all_aligns,cl1,cl2)
-        | (Times(tl1,tl2,als,pl1,pl2)
-          ,Times(tnl1,nsl1)
-          ,Times(tnl2,nsl2)) ->
-          let transform_projection_list
-              (perm:CountedPermutation.t)
-              (plist:position list)
-            : int list =
-            List.map
-              ~f:(CountedPermutation.apply_inverse_exn perm)
-              plist
-          in
-          let tl1' =
-            NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
-              tnl1
-          in
-          let tl2' =
-            NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
-              tnl2
-          in
-          let perm1 =
-            NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
-              tnl1
-          in
-          let perm2 =
-            NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
-              tnl2
-          in
-          if tl1 <> tl1' || tl2 <> tl2' then
-            failwith "bad application of normalization script"
-          else
-            let projs1 = transform_projection_list perm1 pl1 in
-            let projs2 = transform_projection_list perm2 pl2 in
-            let aligns =
-              List.map
-                ~f:(fun (p1,p2,al) ->
-                    let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
-                    let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
-                    let ns1 =
-                      List.nth_exn
-                        nsl1
-                        i1
-                    in
-                    let ns2 =
-                      List.nth_exn
-                        nsl2
-                        i2
-                    in
-                    (i1,i2,to_nonempty al ns1 ns2))
-                als
+            let tl1' =
+              NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
+                tnl1
             in
-            let ordered_aligns =
-              List.sort
-                ~cmp:(fun (p1,_,_) (p2,_,_) -> Int.compare p1 p2)
-                aligns
+            let tl2' =
+              NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_label
+                tnl2
             in
-            let fsts_and_pos =
-              List.mapi
-                ~f:(fun i (p1,_,_) -> (p1,i))
-                ordered_aligns
+            let perm1 =
+              NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
+                tnl1
             in
-            let snds_and_pos =
-              List.mapi
-                ~f:(fun i p2 -> (p2,i))
-                (List.sort
-                   ~cmp:Int.compare
-                   (List.map ~f:snd_trip aligns))
+            let perm2 =
+              NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
+                tnl2
             in
-            let fst_map = IntIntDict.from_kvp_list fsts_and_pos in
-            let snd_map = IntIntDict.from_kvp_list snds_and_pos in
-            let perm =
-              Permutation.create_from_pairs
-                (List.map
-                   ~f:(fun (p1,p2) ->
-                       (IntIntDict.lookup_exn fst_map p1
-                       ,IntIntDict.lookup_exn snd_map p2))
-                   (List.map ~f:(fun (p1,p2,_) -> (p1,p2)) ordered_aligns))
-            in
-            let alignments =
-              List.map
-                ~f:trd_trip
-                ordered_aligns
-            in
-            Times (tl1,tl2,aligns,projs1,projs2)
-        | (Star (sl1,sl2,ns'),Star (sl1',ns1'), Star (sl2',ns2')) ->
-          if (sl1 <> sl1') || (sl2 <> sl2') then
-            failwith "bad application of normalization script"
-          else
-            Star (sl1,sl2,to_nonempty ns' ns1' ns2')
-        | (Base ba,Base bl,Base bl') ->
-          Base ba
-        | _ -> failwith "bad application of normalization script"
-      end
+            if tl1 <> tl1' || tl2 <> tl2' then
+              failwith "bad application of normalization script"
+            else
+              let projs1 = transform_projection_list perm1 pl1 in
+              let projs2 = transform_projection_list perm2 pl2 in
+              let aligns =
+                List.map
+                  ~f:(fun (p1,p2,al) ->
+                      let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
+                      let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
+                      let ns1 =
+                        List.nth_exn
+                          nsl1
+                          i1
+                      in
+                      let ns2 =
+                        List.nth_exn
+                          nsl2
+                          i2
+                      in
+                      (i1,i2,fst (to_nonempty_and_cost al ns1 ns2)))
+                  als
+              in
+              Times (tl1,tl2,aligns,projs1,projs2)
+          | (Star (sl1,sl2,ns'),Star (sl1',ns1'), Star (sl2',ns2')) ->
+            if (sl1 <> sl1') || (sl2 <> sl2') then
+              failwith "bad application of normalization script"
+            else
+              Star (sl1,sl2,fst (to_nonempty_and_cost ns' ns1' ns2'))
+          | (Base ba,Base bl,Base bl') ->
+            Base ba
+          | _ -> failwith "bad application of normalization script"
+        end
+      in
+      (al,cost)
   end
 
   type t =
@@ -1110,14 +1092,14 @@ struct
 
   module Tree = PlusTimesStarTreeOf(PD)(TD)(SD)(BD)
 
-  let get_minimal_alignment
+  let get_minimal_alignment_and_cost
       (t1:Tree.t)
       (t2:Tree.t)
-    : t option =
+    : t option * float =
     let (normalized_t1,script1) = NormalizedTree.from_tree t1 in
     let (normalized_t2,script2) = NormalizedTree.from_tree t2 in
     begin match (normalized_t1,normalized_t2) with
-      | (NormalizedTree.Empty,NormalizedTree.Empty) -> Some Empty
+      | (NormalizedTree.Empty,NormalizedTree.Empty) -> (Some Empty,0.)
       | (NormalizedTree.Nonempty nt1,NormalizedTree.Nonempty nt2) ->
         let (script1,script2) =
           begin match (script1,script2) with
@@ -1130,22 +1112,23 @@ struct
             nt1
             nt2
         in
-        Option.map
-          ~f:(fun nna ->
-              let na =
-                NonemptyNormalizedPlusStarTreeAlignment.to_nonempty
-                  nna
-                  script1
-                  script2
-              in
-              NonemptyTree na)
-          nonempty_normalized_alignment
-      | _ -> None
+        begin match nonempty_normalized_alignment with
+          | Some nna ->
+            let (na,c) =
+              NonemptyNormalizedPlusStarTreeAlignment.to_nonempty_and_cost
+                nna
+                script1
+                script2
+            in
+            (Some (NonemptyTree na),c)
+          | None -> (None,1.)
+        end
+      | _ -> (None,1.)
     end
 
   let get_alignment_distance
       (t1:Tree.t)
       (t2:Tree.t)
     : float =
-    cost (get_minimal_alignment t1 t2)
+    snd (get_minimal_alignment_and_cost t1 t2)
 end

@@ -4,30 +4,67 @@ open Lang
 
 (**** Exampled Regex {{{ *****)
 
+type 'a example_data =
+  {
+    create_data : 'a ;
+    put_data : 'a ;
+    output_data : 'a ;
+  }
+[@@deriving ord, show, hash, make]
+
+type parsing_example_data = (int list list) example_data
+[@@deriving ord, show, hash]
+
+type example_string_data = (string list) example_data
+[@@deriving ord, show, hash]
+
+let empty_parsing_example_data =
+  make_example_data
+    ~create_data:[]
+    ~put_data:[]
+    ~output_data:[]
+
+let empty_string_example_data =
+  make_example_data
+    ~create_data:[]
+    ~put_data:[]
+    ~output_data:[]
+
 type exampled_regex =
   | ERegExEmpty
-  | ERegExBase of string * (int list list)
-  | ERegExConcat of exampled_regex * exampled_regex * (int list list)
-  | ERegExOr of exampled_regex  * exampled_regex * (int list list)
-  | ERegExStar of exampled_regex * (int list list)
-  | ERegExClosed of Regex.t * string list * (int list list)
+  | ERegExBase of string * (int list list) example_data
+  | ERegExConcat of exampled_regex * exampled_regex * (int list list) example_data
+  | ERegExOr of exampled_regex  * exampled_regex * (int list list) example_data
+  | ERegExStar of exampled_regex * (int list list) example_data
+  | ERegExClosed of Regex.t * example_string_data * (int list list) example_data
 
-let extract_iterations_consumed (er:exampled_regex) : int list list =
+let extract_create_iterations_consumed (er:exampled_regex) : int list list =
   begin match er with
     | ERegExEmpty -> []
-    | ERegExBase (_,ill) -> ill
-    | ERegExConcat (_,_,ill) -> ill
-    | ERegExOr (_,_,ill) -> ill
-    | ERegExStar (_,ill) -> ill
-    | ERegExClosed (_,_,ill) -> ill
+    | ERegExBase (_,pd) -> pd.create_data
+    | ERegExConcat (_,_,pd) -> pd.create_data
+    | ERegExOr (_,_,pd) -> pd.create_data
+    | ERegExStar (_,pd) -> pd.create_data
+    | ERegExClosed (_,_,pd) -> pd.create_data
   end
 
-let took_regex (er:exampled_regex)
+let extract_output_iterations_consumed (er:exampled_regex) : int list list =
+  begin match er with
+    | ERegExEmpty -> []
+    | ERegExBase (_,pd) -> pd.output_data
+    | ERegExConcat (_,_,pd) -> pd.output_data
+    | ERegExOr (_,_,pd) -> pd.output_data
+    | ERegExStar (_,pd) -> pd.output_data
+    | ERegExClosed (_,_,pd) -> pd.output_data
+  end
+
+(*let took_regex
+    (er:exampled_regex)
     (iteration:int list) : bool =
   let ill = extract_iterations_consumed er in
-  List.mem ~equal:(=) ill iteration
+  List.mem ~equal:(=) ill iteration*)
 
-let rec extract_string (er:exampled_regex) (iteration:int list)
+(*let rec extract_string (er:exampled_regex) (iteration:int list)
   : string =
   begin match er with
     | ERegExEmpty -> failwith "no string"
@@ -59,19 +96,9 @@ let rec extract_string (er:exampled_regex) (iteration:int list)
         | Some (i,_) ->
             List.nth_exn sl i
         end
-  end
+  end*)
 
-let extract_example_list (er:exampled_regex) : int list list =
-  begin match er with
-  | ERegExEmpty -> []
-  | ERegExBase (_,ill) -> ill
-  | ERegExConcat (_,_,ill) -> ill
-  | ERegExOr (_,_,ill) -> ill
-  | ERegExStar (_,ill) -> ill
-  | ERegExClosed (_,_,ill) -> ill
-  end
-
-let rec exampled_regex_to_string (r:exampled_regex) : string =
+(*let rec exampled_regex_to_string (r:exampled_regex) : string =
   begin match r with
   | ERegExBase (s,ill) -> paren (s ^ string_of_int_list_list ill)
   | ERegExConcat (r1,r2,ill) ->
@@ -92,7 +119,7 @@ let rec exampled_regex_to_string (r:exampled_regex) : string =
         ~sep:";"
         ss) ^ string_of_int_list_list ill))
   | ERegExEmpty -> "{}"
-  end
+  end*)
 
 
 (***** }}} *****)

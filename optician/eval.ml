@@ -5,16 +5,16 @@ open Normalized_lang
 let rec to_empty_exampled_regex (r:Regex.t) : exampled_regex =
   begin match r with
   | Regex.RegExEmpty -> ERegExEmpty
-  | Regex.RegExBase s -> ERegExBase (s,[])
+  | Regex.RegExBase s -> ERegExBase (s,empty_parsing_example_data)
   | Regex.RegExConcat (r1,r2) ->
-      ERegExConcat (to_empty_exampled_regex r1,to_empty_exampled_regex r2,[])
+      ERegExConcat (to_empty_exampled_regex r1,to_empty_exampled_regex r2,empty_parsing_example_data)
   | Regex.RegExOr (r1,r2) ->
       ERegExOr
         ((to_empty_exampled_regex r1),
          (to_empty_exampled_regex r2),
-         [])
-  | Regex.RegExStar r' -> ERegExStar (to_empty_exampled_regex r',[])
-  | Regex.RegExClosed r' -> ERegExClosed (r',[],[])
+         empty_parsing_example_data)
+  | Regex.RegExStar r' -> ERegExStar (to_empty_exampled_regex r',empty_parsing_example_data)
+  | Regex.RegExClosed r' -> ERegExClosed (r',empty_string_example_data,empty_parsing_example_data)
   end
 
 type data = string * exampled_regex *

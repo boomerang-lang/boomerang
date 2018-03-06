@@ -439,12 +439,12 @@ struct
       (l:t)
       (m:t)
     : bool =
-    begin match (l,m) with
-      | (Disconnect (r1,r2,s1,s2),Disconnect (t1,t2,u1,u2)) ->
+    begin match (l,l) with
+      | (Disconnect (r1,r2,f1,f2),Disconnect (t1,t2,g1,g2)) ->
         is_equal (Regex.compare r1 t1)
         && is_equal (Regex.compare r2 t2)
-        && is_equal (String.compare s1 u1)
-        && is_equal (String.compare s2 u2)
+        && (phys_equal f1 g1)
+        && (phys_equal f2 g2)
       | (Concat (l1,l2),Concat (m1,m2)) ->
         is_eq l1 m1
         && is_eq l2 m2
@@ -474,7 +474,7 @@ struct
                 ~f:(uncurry is_eq)
                 lms
           end)
-      | _ -> false
+      | _ -> print_endline "hi"; false
     end
 
   let compare
@@ -504,15 +504,11 @@ struct
       | _ -> None
     end
 
-  let make_or (l1:t) (l2:t) : t =
+  let make_plus (l1:t) (l2:t) : t =
     Union (l1,l2)
-
-  let make_plus : t -> t -> t = make_or
 
   let make_times (l1:t) (l2:t) : t =
     Concat (l1,l2)
-
-  let make_concat : t -> t -> t = make_times
 
   let make_star (l:t) : t =
     Iterate l
@@ -527,22 +523,6 @@ struct
       (s2:string)
     : t =
     Disconnect (r1,r2,s1,s2)
-
-  let make_compose
-      (l1:t)
-      (l2:t)
-    : t =
-    Compose (l1,l2)
-
-  let make_const
-      (s1:string)
-      (s2:string)
-    : t =
-    make_disconnect
-      (Regex.make_base s1)
-      (Regex.make_base s2)
-      s1
-      s2
 
   let make_permute
       (p:Permutation.t)

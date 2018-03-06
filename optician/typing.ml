@@ -39,15 +39,15 @@ let rec type_lens
       let (r1s,r2s) = List.unzip rdl in
       let r1 =
         fold_on_head_with_default
-          (fun r1 r2 -> Regex.RegExConcat (r1,r2))
-          (Regex.RegExBase "")
+          ~f:(fun r1 r2 -> Regex.RegExConcat (r1,r2))
+          ~default:(Regex.RegExBase "")
           r1s
       in
       let r2s_permed = Permutation.apply_to_list_exn p r2s in
       let r2 =
         fold_on_head_with_default
-          (fun r1 r2 -> Regex.RegExConcat (r1,r2))
-          (Regex.RegExBase "")
+          ~f:(fun r1 r2 -> Regex.RegExConcat (r1,r2))
+          ~default:(Regex.RegExBase "")
           r2s_permed
       in
       (r1,r2)

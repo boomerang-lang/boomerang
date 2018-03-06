@@ -12,6 +12,7 @@ open Expand
 open Language_equivalences
 
 module PQ = PriorityQueueOf(QueueElement)
+module SPQ = PriorityQueueOf(SymmetricQueueElement)
 
 module type LENS_SYNTHESIZER =
 sig
@@ -117,7 +118,7 @@ struct
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:examples)
-    : StarSemiringTreeRep.Alignment.t =
+    : (Lens.t * float) option =
     let (lexs,rexs) = List.unzip exs in
     let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
     let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
@@ -131,14 +132,17 @@ struct
           StarSemiringTreeRep.exampled_dnf_regex_to_tree
             exampled_r2
         in
-        print_endline (StarSemiringTreeRep.Tree.show exampled_r1_tree);
-        print_endline (StarSemiringTreeRep.Tree.show exampled_r2_tree);
-        let alignment_opt =
-          StarSemiringTreeRep.Alignment.get_minimal_alignment
+        let (alignment_opt,cost) =
+          StarSemiringTreeRep.Alignment.get_minimal_alignment_and_cost
             exampled_r1_tree
             exampled_r2_tree
         in
-        Option.value_exn alignment_opt
+        Option.map
+          ~f:(fun al ->
+              (Option.value_exn
+                 (StarSemiringTreeRep.alignment_to_lens al))
+            ,cost)
+          alignment_opt
       | _ -> failwith "ah"
     end
 
@@ -247,10 +251,15 @@ struct
            ])
 
 
-  let gen_dnf_lens (lc:LensContext.t) (r1:Regex.t) (r2:Regex.t)
+  let gen_dnf_lens
+      (lc:LensContext.t)
+      (r1:Regex.t)
+      (r2:Regex.t)
       (exs:examples)
     : dnf_lens option =
-    Option.map ~f:(fun x -> x.l) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
+    Option.map
+      ~f:(fun x -> x.l)
+      (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let expansions_performed_for_gen
       (lc:LensContext.t)
@@ -283,6 +292,64 @@ struct
       (exs:examples)
     : int option =
     Option.map ~f:(fun x -> x.expansions_forced) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
+
+  let gen_symmetric_lens
+      (lc:LensContext.t)
+      (r1:Regex.t)
+      (r2:Regex.t)
+      (exs:examples)
+    : Lens.t option =
+    let rec gen_symmetric_lens_queuing
+        (pq:SPQ.t)
+        (best:Lens.t option)
+        (best_cost:float)
+      : Lens.t option =
+      begin match SPQ.pop pq with
+        | Some (qe,f,pq) ->
+          let r1 = (SymmetricQueueElement.get_r1 qe) in
+          let r2 = (SymmetricQueueElement.get_r2 qe) in
+          print_endline
+            (string_of_list
+               Int.to_string
+               (SymmetricQueueElement.get_expansions_choices qe));
+          print_endline (Float.to_string f);
+          print_endline (Float.to_string best_cost);
+          print_endline "\n";
+          if f >=. best_cost then
+            best
+          else
+            let lco =
+              kinda_rigid_synth
+                lc
+                r1
+                r2
+                exs
+            in
+            let (best,best_cost) =
+              begin match lco with
+                | None -> (best,best_cost)
+                | Some (l,c) ->
+                  let cost = c +. f in
+                  if cost <=. best_cost then
+                    (Some l,cost)
+                  else
+                    (best,best_cost)
+              end
+            in
+            let new_elements = Symmetric_expand.expand lc qe in
+            let pq = SPQ.push_all pq new_elements in
+            gen_symmetric_lens_queuing
+              pq
+              best
+              best_cost
+        | None -> best
+      end
+    in
+    gen_symmetric_lens_queuing
+      (SPQ.singleton
+         (SymmetricQueueElement.init r1 r2))
+      None
+      Float.max_finite_value
 
   let gen_lens
       (lc:LensContext.t)
@@ -341,7 +408,7 @@ let expansions_inferred_for_gen = DNFSynth.expansions_inferred_for_gen
 let expansions_forced_for_gen = DNFSynth.expansions_forced_for_gen
 let num_possible_choices = DNFSynth.num_possible_choices
 
-let gen_lens
+let gen_symmetric_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
@@ -357,7 +424,7 @@ let gen_lens
   let r2 = iteratively_deepen r2 in
   if !verbose then
     print_endline "Synthesis Start";
-  let lens_option = DNFSynth.gen_lens lc r1 r2 exs in
+  let lens_option = DNFSynth.gen_symmetric_lens lc r1 r2 exs in
   if !verbose then
     print_endline "Synthesis End";
   if !simplify_generated_lens then
@@ -366,4 +433,45 @@ let gen_lens
       lens_option
   else
     lens_option
-        
+
+let gen_lens
+    (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
+    (r1:Regex.t)
+    (r2:Regex.t)
+    (exs:examples)
+  : Lens.t option =
+  if !gen_symmetric then
+    let lo =
+      gen_symmetric_lens
+        existing_lenses
+        r1
+        r2
+        exs
+    in
+    if !simplify_generated_lens then
+      Option.map
+        ~f:(simplify_lens)
+        lo
+    else
+      lo
+  else
+    let existing_lenses =
+      List.map
+        ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1, iteratively_deepen r2))
+        existing_lenses
+    in
+    let lc = LensContext.insert_list LensContext.empty existing_lenses in
+    let r1 = iteratively_deepen r1 in
+    let r2 = iteratively_deepen r2 in
+    if !verbose then
+      print_endline "Synthesis Start";
+    let lens_option = DNFSynth.gen_lens lc r1 r2 exs in
+    if !verbose then
+      print_endline "Synthesis End";
+    if !simplify_generated_lens then
+      Option.map
+        ~f:(simplify_lens)
+        lens_option
+    else
+      lens_option
+
