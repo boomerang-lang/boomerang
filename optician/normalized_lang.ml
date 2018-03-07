@@ -6,11 +6,36 @@ open Lang
 
 type 'a example_data =
   {
-    create_data : 'a ;
-    put_data : 'a ;
+    arg1_data : 'a ;
+    arg2_data : 'a ;
     output_data : 'a ;
   }
 [@@deriving ord, show, hash, make]
+
+let map_example_data
+    (f:'a -> 'b)
+    (ed:'a example_data)
+  : 'b example_data =
+  make_example_data
+    ~arg1_data:(f ed.arg1_data)
+    ~arg2_data:(f ed.arg2_data)
+    ~output_data:(f ed.output_data)
+
+let unzip_example_data
+    (ed:('a * 'b) example_data)
+  : 'a example_data * 'b example_data =
+  (map_example_data fst ed
+  ,map_example_data snd ed)
+
+let merge_example_data
+    (f:'a -> 'b -> 'c)
+    (ed1:'a example_data)
+    (ed2:'b example_data)
+  : 'c example_data =
+  make_example_data
+    ~arg1_data:(f ed1.arg1_data ed2.arg1_data)
+    ~arg2_data:(f ed1.arg2_data ed2.arg2_data)
+    ~output_data:(f ed1.output_data ed2.output_data)
 
 type parsing_example_data = (int list list) example_data
 [@@deriving ord, show, hash]
@@ -20,14 +45,14 @@ type example_string_data = (string list) example_data
 
 let empty_parsing_example_data =
   make_example_data
-    ~create_data:[]
-    ~put_data:[]
+    ~arg1_data:[]
+    ~arg2_data:[]
     ~output_data:[]
 
 let empty_string_example_data =
   make_example_data
-    ~create_data:[]
-    ~put_data:[]
+    ~arg1_data:[]
+    ~arg2_data:[]
     ~output_data:[]
 
 type exampled_regex =
@@ -38,65 +63,81 @@ type exampled_regex =
   | ERegExStar of exampled_regex * (int list list) example_data
   | ERegExClosed of Regex.t * example_string_data * (int list list) example_data
 
-let extract_create_iterations_consumed (er:exampled_regex) : int list list =
+let extract_example_data (er:exampled_regex) : parsing_example_data =
   begin match er with
-    | ERegExEmpty -> []
-    | ERegExBase (_,pd) -> pd.create_data
-    | ERegExConcat (_,_,pd) -> pd.create_data
-    | ERegExOr (_,_,pd) -> pd.create_data
-    | ERegExStar (_,pd) -> pd.create_data
-    | ERegExClosed (_,_,pd) -> pd.create_data
+    | ERegExEmpty -> empty_parsing_example_data
+    | ERegExBase (_,pd) -> pd
+    | ERegExConcat (_,_,pd) -> pd
+    | ERegExOr (_,_,pd) -> pd
+    | ERegExStar (_,pd) -> pd
+    | ERegExClosed (_,_,pd) -> pd
   end
 
-let extract_output_iterations_consumed (er:exampled_regex) : int list list =
-  begin match er with
-    | ERegExEmpty -> []
-    | ERegExBase (_,pd) -> pd.output_data
-    | ERegExConcat (_,_,pd) -> pd.output_data
-    | ERegExOr (_,_,pd) -> pd.output_data
-    | ERegExStar (_,pd) -> pd.output_data
-    | ERegExClosed (_,_,pd) -> pd.output_data
+type run_mode = Arg1 | Arg2 | Output
+
+let extract_iterations_consumed
+    (m:run_mode)
+    (er:exampled_regex)
+  : int list list =
+  begin match m with
+    | Arg1 -> (extract_example_data er).arg1_data
+    | Arg2 -> (extract_example_data er).arg2_data
+    | Output -> (extract_example_data er).output_data
   end
 
-(*let took_regex
+let took_regex
+    (m:run_mode)
     (er:exampled_regex)
     (iteration:int list) : bool =
-  let ill = extract_iterations_consumed er in
-  List.mem ~equal:(=) ill iteration*)
+  let ill = extract_iterations_consumed m er in
+  List.mem ~equal:(=) ill iteration
 
-(*let rec extract_string (er:exampled_regex) (iteration:int list)
+let extract_data
+    (m:run_mode)
+    (d:'a example_data)
+  : 'a =
+  begin match m with
+    | Arg1 -> d.arg1_data
+    | Arg2 -> d.arg2_data
+    | Output -> d.output_data
+  end
+
+let rec extract_string
+    (m:run_mode)
+    (er:exampled_regex)
+    (iteration:int list)
   : string =
   begin match er with
     | ERegExEmpty -> failwith "no string"
     | ERegExBase (s,_) -> s
     | ERegExConcat (er1,er2,_) ->
-      (extract_string er1 iteration) ^
-      (extract_string er2 iteration)
+      (extract_string m er1 iteration) ^
+      (extract_string m er2 iteration)
     | ERegExOr (er1,er2,_) ->
-      if took_regex er1 iteration then
-        extract_string er1 iteration
+      if took_regex m er1 iteration then
+        extract_string m er1 iteration
       else
-        extract_string er2 iteration
+        extract_string m er2 iteration
     | ERegExStar (er',_) ->
         let valid_iterations =
           List.rev
             (List.filter
               ~f:(fun it -> List.tl_exn it = iteration)
-              (extract_iterations_consumed er')) in
+              (extract_iterations_consumed m er')) in
         String.concat
           (List.map
-            ~f:(extract_string er')
+            ~f:(extract_string m er')
             valid_iterations)
     | ERegExClosed (_,sl,ill) ->
-        let dat_opt = List.findi
+      let dat_opt = List.findi
           ~f:(fun _ il -> il = iteration)
-          ill in
-        begin match dat_opt with
+          (extract_data m ill) in
+      begin match dat_opt with
         | None -> failwith "im horrible"
         | Some (i,_) ->
-            List.nth_exn sl i
+            List.nth_exn (extract_data m sl) i
         end
-  end*)
+  end
 
 (*let rec exampled_regex_to_string (r:exampled_regex) : string =
   begin match r with
@@ -131,14 +172,14 @@ type exampled_atom =
   | EAClosed of Regex.t *
                 Regex.t *
                 Lens.t *
-                string list *
-                int list list *
-                string list
-  | EAStar of exampled_dnf_regex * int list list * Regex.t
+                (string list) example_data *
+                (int list list) example_data *
+                (string list) example_data
+  | EAStar of exampled_dnf_regex * (int list list) example_data * Regex.t
 
-and exampled_clause = (exampled_atom) list * string list * (int list list)
+and exampled_clause = (exampled_atom) list * string list * (int list list) example_data
 
-and exampled_dnf_regex = exampled_clause list * int list list
+and exampled_dnf_regex = exampled_clause list * int list list example_data
 
 let get_atom_regex (ea:exampled_atom) : Regex.t =
   begin match ea with
@@ -147,7 +188,7 @@ let get_atom_regex (ea:exampled_atom) : Regex.t =
     | EAStar (_,_,r) -> r
   end
 
-let rec exampled_dnf_regex_to_string ((r,ill):exampled_dnf_regex) : string =
+(*let rec exampled_dnf_regex_to_string ((r,ill):exampled_dnf_regex) : string =
   paren ((String.concat
   ~sep:" + "
   (List.map ~f:exampled_clause_to_string r)) ^ "," ^ (string_of_int_list_list ill))
@@ -182,20 +223,20 @@ and exampled_atom_to_string (a:exampled_atom) : string =
         sl) ^ "," ^ string_of_int_list_list ill
       )
   | EAStar (r,ill,_) -> (paren ((exampled_dnf_regex_to_string r) ^ (string_of_int_list_list ill))) ^ "*"
-  end
+  end*)
 
 (***** }}} *****)
 
 type ordered_exampled_atom =
-  | OEAClosed of Regex.t * Regex.t * Lens.t * string list
+  | OEAClosed of Regex.t * Regex.t * Lens.t * string list example_data
   | OEAStar of ordered_exampled_dnf_regex
 
 and ordered_exampled_clause = ((ordered_exampled_atom * int) list) list * string
-list * (int list list)
+list * (int list list) example_data
 
 and ordered_exampled_dnf_regex = (ordered_exampled_clause * int) list list
 
-let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
+(*let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
   comparison =
     begin match (a1,a2) with
       | (EAClosed (s1,_,_,el1,_,_), EAClosed (s2,_,_,el2,_,_)) ->
@@ -227,7 +268,7 @@ and compare_exampled_dnf_regexs ((r1,_):exampled_dnf_regex) ((r2,_):exampled_dnf
   ordered_partition_order
     compare_exampled_clauses
       r1
-      r2
+      r2*)
 
 let rec compare_ordered_exampled_atoms (a1:ordered_exampled_atom)
                                        (a2:ordered_exampled_atom)
@@ -236,8 +277,7 @@ let rec compare_ordered_exampled_atoms (a1:ordered_exampled_atom)
       | (OEAClosed (s1,_,_,el1), OEAClosed (s2,_,_,el2)) ->
         let cmp = Regex.compare s1 s2 in
         if is_equal cmp then
-          compare_list
-            ~cmp:(String.compare)
+          compare_example_string_data
             el1
             el2
         else
@@ -258,8 +298,7 @@ and compare_ordered_exampled_clauses
       atoms_partitions2
   in
   if is_equal cmp then
-    compare_list
-      ~cmp:(compare_list ~cmp:Int.compare)
+    compare_parsing_example_data
       ints1
       ints2
   else
@@ -284,7 +323,12 @@ and to_ordered_exampled_clause ((atoms,strings,exnums):exampled_clause) : ordere
     sort_and_partition_with_indices
       compare_ordered_exampled_atoms
       ordered_atoms in
-  (ordered_ordered_atoms,strings,(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums))
+  (ordered_ordered_atoms
+  ,strings
+  ,make_example_data
+      ~arg1_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.arg1_data)
+      ~arg2_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.arg2_data)
+      ~output_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.output_data))
 
 and to_ordered_exampled_dnf_regex ((r,_):exampled_dnf_regex)
         : ordered_exampled_dnf_regex =

@@ -334,67 +334,72 @@ module Permutation = struct
          ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
          (IntIntDict.as_kvp_list perm.reverse))
 
-  let rec to_swap_concat_compose_tree (l:int list) : swap_concat_compose_tree =
-    let stupidconcat (l:int list) : swap_concat_compose_tree =
-      let (_,t) = split_by_first_exn l in
-      List.fold_left
-        ~f:(fun acc _ ->
-            SCCTConcat (acc,SCCTLeaf))
-        ~init:SCCTLeaf
-        t
-    in
-    if List.length l = 0 then
-      failwith "bad input"
-    else if List.length l = 1 then
-      SCCTLeaf
-    else
-      let valid_split =
+  let to_swap_concat_compose_tree
+      (p:t)
+    : swap_concat_compose_tree =
+    let rec to_swap_concat_compose_tree_internal (l:int list) : swap_concat_compose_tree =
+      let stupidconcat (l:int list) : swap_concat_compose_tree =
+        let (_,t) = split_by_first_exn l in
         List.fold_left
-          ~f:(fun acc i ->
-              begin match acc with
-                | None ->
-                  let (l1,l2) = split_at_index_exn l i in
-                  if pairwise_maintain_invariant (<) l1 l2 then
-                    Some (i,true)
-                  else if pairwise_maintain_invariant (>) l1 l2 then
-                    Some (i,false)
-                  else
-                    None
-                | _ -> acc
-              end)
-          ~init:None
-          (range 1 (List.length l)) in
-      begin match valid_split with
-        | None ->
-          let (_,i) =
-            List.foldi
-              ~f:(fun i' (acc,i) x ->
-                  if acc > x then
-                    (acc,i)
-                  else
-                    (x,i'))
-              ~init:(-1,-1)
-              l in
-          let (l1,l2) = split_at_index_exn l i in
-          let (h,t) = split_by_first_exn l2 in
-          SCCTCompose
-            (to_swap_concat_compose_tree (l1@t@[h])
-            ,SCCTConcat
-                (stupidconcat l1
-                ,SCCTSwap
-                    (SCCTLeaf
-                    ,stupidconcat t)))
-        | Some (i,b) ->
-          let (l1,l2) = split_at_index_exn l i in
-          if b then
-            SCCTConcat
-              (to_swap_concat_compose_tree l1
-              ,to_swap_concat_compose_tree l2)
-          else
-            SCCTSwap
-              (to_swap_concat_compose_tree l2
-              ,to_swap_concat_compose_tree l1)
-      end
+          ~f:(fun acc _ ->
+              SCCTConcat (acc,SCCTLeaf))
+          ~init:SCCTLeaf
+          t
+      in
+      if List.length l = 0 then
+        failwith "bad input"
+      else if List.length l = 1 then
+        SCCTLeaf
+      else
+        let valid_split =
+          List.fold_left
+            ~f:(fun acc i ->
+                begin match acc with
+                  | None ->
+                    let (l1,l2) = split_at_index_exn l i in
+                    if pairwise_maintain_invariant (<) l1 l2 then
+                      Some (i,true)
+                    else if pairwise_maintain_invariant (>) l1 l2 then
+                      Some (i,false)
+                    else
+                      None
+                  | _ -> acc
+                end)
+            ~init:None
+            (range 1 (List.length l)) in
+        begin match valid_split with
+          | None ->
+            let (_,i) =
+              List.foldi
+                ~f:(fun i' (acc,i) x ->
+                    if acc > x then
+                      (acc,i)
+                    else
+                      (x,i'))
+                ~init:(-1,-1)
+                l in
+            let (l1,l2) = split_at_index_exn l i in
+            let (h,t) = split_by_first_exn l2 in
+            SCCTCompose
+              (to_swap_concat_compose_tree_internal (l1@t@[h])
+              ,SCCTConcat
+                  (stupidconcat l1
+                  ,SCCTSwap
+                      (SCCTLeaf
+                      ,stupidconcat t)))
+          | Some (i,b) ->
+            let (l1,l2) = split_at_index_exn l i in
+            if b then
+              SCCTConcat
+                (to_swap_concat_compose_tree_internal l1
+                ,to_swap_concat_compose_tree_internal l2)
+            else
+              SCCTSwap
+                (to_swap_concat_compose_tree_internal l2
+                ,to_swap_concat_compose_tree_internal l1)
+        end
+    in
+    to_swap_concat_compose_tree_internal (as_int_list p)
 end
 
 

@@ -20,7 +20,7 @@ sig
     LensContext.t ->
     Regex.t ->
     Regex.t ->
-    examples ->
+    create_examples ->
     Lens.t option
 end
 
@@ -117,11 +117,71 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (creater_exs:create_examples)
+      (createl_exs:create_examples)
+      (putr_exs:put_examples)
+      (putl_exs:put_examples)
     : (Lens.t * float) option =
-    let (lexs,rexs) = List.unzip exs in
-    let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
-    let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
+    let (i,creater_exs) =
+      List.fold_left
+        ~f:(fun (i,exs) (lex,rex) ->
+            (i+1
+            ,((i,lex),(i,rex))::exs))
+        ~init:(0,[])
+        creater_exs
+    in
+    let (i,createl_exs) =
+      List.fold_left
+        ~f:(fun (i,exs) (rex,lex) ->
+            (i+1
+            ,((i,rex),(i,lex))::exs))
+        ~init:(i,[])
+        createl_exs
+    in
+    let (i,putr_exs) =
+      List.fold_left
+        ~f:(fun (i,exs) (lex,rex,rex') ->
+            (i+1
+            ,((i,lex),(i,rex),(i,rex'))::exs))
+        ~init:(i,[])
+        putr_exs
+    in
+    let (_,putl_exs) =
+      List.fold_left
+        ~f:(fun (i,exs) (rex,lex,lex') ->
+            (i+1
+            ,((i,rex),(i,lex),(i,lex'))::exs))
+        ~init:(i,[])
+        putl_exs
+    in
+    let (lcreater,rcreater) = List.unzip creater_exs in
+    let (rcreatel,lcreatel) = List.unzip createl_exs in
+    let (lputr,mputr,rputr) = List.unzip3 putr_exs in
+    let (rputl,mputl,lputl) = List.unzip3 putl_exs in
+    let left_example_data =
+      make_example_data
+        ~arg1_data:(lcreater@lputr)
+        ~arg2_data:(mputl)
+        ~output_data:(lcreatel@lputl)
+    in
+    let right_example_data =
+      make_example_data
+        ~arg1_data:(rcreatel@rputl)
+        ~arg2_data:(mputr)
+        ~output_data:(rcreater@rputr)
+    in
+    let exampled_r1_opt =
+      regex_to_exampled_dnf_regex
+        lc
+        r1
+        left_example_data
+    in
+    let exampled_r2_opt =
+      regex_to_exampled_dnf_regex
+        lc
+        r2
+        right_example_data
+    in
     begin match (exampled_r1_opt,exampled_r2_opt) with
       | (Some exampled_r1, Some exampled_r2) ->
         let exampled_r1_tree =
@@ -149,7 +209,7 @@ struct
   let rigid_synth
       (lc:LensContext.t)
       (qe:QueueElement.t)
-      (exs:examples)
+      (exs:create_examples)
       (count:int)
     : synthesis_info option =
     let r1 = QueueElement.get_r1 qe in
@@ -158,6 +218,18 @@ struct
       None
     else
       let (lexs,rexs) = List.unzip exs in
+      let lexs =
+        make_example_data
+          ~arg1_data:(List.mapi ~f:(fun i lex -> (i,lex)) lexs)
+          ~arg2_data:[]
+          ~output_data:[]
+      in
+      let rexs =
+        make_example_data
+          ~arg1_data:(List.mapi ~f:(fun i rex -> (i,rex)) rexs)
+          ~arg2_data:[]
+          ~output_data:[]
+      in
       let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
       let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
       begin match (exampled_r1_opt,exampled_r2_opt) with
@@ -184,7 +256,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : synthesis_info option =
     let count = ref 0 in
     let rec gen_dnf_lens_zipper_queueing
@@ -255,7 +327,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : dnf_lens option =
     Option.map
       ~f:(fun x -> x.l)
@@ -265,7 +337,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : int option =
     Option.map ~f:(fun x -> x.expansions_performed) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
@@ -273,7 +345,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : int option =
     Option.map ~f:(fun x -> x.specs_visited) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
@@ -281,7 +353,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : int option =
     Option.map ~f:(fun x -> x.expansions_inferred) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
@@ -289,7 +361,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : int option =
     Option.map ~f:(fun x -> x.expansions_forced) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
@@ -297,7 +369,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : Lens.t option =
     let rec gen_symmetric_lens_queuing
         (pq:SPQ.t)
@@ -324,6 +396,9 @@ struct
                 r1
                 r2
                 exs
+                []
+                []
+                []
             in
             let (best,best_cost) =
               begin match lco with
@@ -355,7 +430,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : Lens.t option =
       let dnf_lens_option = gen_dnf_lens lc r1 r2 exs in
       Option.map
@@ -366,7 +441,7 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:examples)
+      (exs:create_examples)
     : float option =
     let rec get_possibible_lenses_oedr
         (oedr:ordered_exampled_dnf_regex)
@@ -412,7 +487,7 @@ let gen_symmetric_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
-    (exs:examples)
+    (exs:create_examples)
   : Lens.t option =
   let existing_lenses =
     List.map
@@ -438,7 +513,7 @@ let gen_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
-    (exs:examples)
+    (exs:create_examples)
   : Lens.t option =
   if !gen_symmetric then
     let lo =

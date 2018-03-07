@@ -1,8 +1,6 @@
 open Stdlib
 open Star_semiring_tree
 
-module type DefaultInfo = Data
-
 module type BaseAlignment =
 sig
   type t
@@ -17,7 +15,6 @@ end
 module type BaseData =
 sig
   type t
-  module Default : DefaultInfo
   module Alignment : BaseAlignment
   val show : t shower
   val pp : t pper
@@ -30,40 +27,34 @@ end
 module type PlusData =
 sig
   type t
-  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
-  val combine_defaults : Default.t list -> Default.t
 end
 
 module type TimesData =
 sig
   type t
-  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
-  val combine_defaults : Default.t list -> Default.t
 end
 
 module type StarData =
 sig
   type t
-  module Default : DefaultInfo
   val show : t shower
   val pp : t pper
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
-  val combine_defaults : Default.t -> Default.t
 end
 
 module Position = PairOf(IntModule)(IntModule)
@@ -86,13 +77,11 @@ end
 
 module PlusTimesStarTreeAlignmentOf
     (PD : PlusData)
-    (TD : TimesData with module Default = PD.Default)
-    (SD : StarData with module Default = PD.Default)
-    (BD : BaseData with module Default = PD.Default) =
+    (TD : TimesData)
+    (SD : StarData)
+    (BD : BaseData) =
 struct
   module NormalizedTree = NormalizedPlusTimesStarTreeOf(PD)(TD)(SD)(BD)
-  module Default = SD.Default
-
   module Nonempty =
   struct
     type t =

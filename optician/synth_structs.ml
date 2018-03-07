@@ -193,65 +193,51 @@ end
 
 module StarSemiringTreeRep =
 struct
-  module DefaultModule =
-  struct
-    type t = string
-    [@@deriving ord, show, hash]
-
-    let concat_merge_defaults
-        (ss:t list)
-      : t =
-      String.concat ss
-
-    let or_merge_defaults
-        (ss:t list)
-      : t =
-      List.hd_exn ss
-  end
-
   module PD =
   struct
-    module Default = DefaultModule
-
     type t =
       {
-        create_parsings : int list list ;
-        put_parsings    : int list list ;
-        output_parsings : int list list ;
+        parsings : int list list example_data ;
       }
     [@@deriving ord, show, hash, make]
 
-    let make
-        ~create_parsings:(create_parsings:int list list)
-        ~put_parsings:(put_parsings:int list list)
-        ~output_parsings:(output_parsings:int list list)
-      : t =
-      make
-        ~create_parsings:create_parsings
-        ~put_parsings:put_parsings
-        ~output_parsings:output_parsings
-        ()
-
-    let are_compatible = is_equal %% compare
-
-    let combine_defaults : Default.t list -> Default.t =
-      DefaultModule.or_merge_defaults
+    let are_compatible
+        (v1:t)
+        (v2:t)
+      : bool =
+      let r_arg1_parsings = v1.parsings.arg1_data in
+      let r_result_parsings = v2.parsings.output_data in
+      let l_arg1_parsings = v2.parsings.arg1_data in
+      let l_result_parsings = v1.parsings.output_data in
+      let is_compat_r =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             r_arg1_parsings
+             r_result_parsings)
+      in
+      let is_compat_l =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             l_arg1_parsings
+             l_result_parsings)
+      in
+      is_compat_r && is_compat_l
   end
 
   module TD =
   struct
-    module Default = DefaultModule
-
     type t =
       {
-        parsings : int list list ;
+        parsings : int list list example_data ;
         strings  : string list   ;
         atoms    : Regex.t list  ;
       }
     [@@deriving ord, show, hash]
 
     let make
-        (parsings:int list list)
+        (parsings:int list list example_data)
         (strings:string list)
         (atoms:Regex.t list)
       : t =
@@ -261,15 +247,12 @@ struct
         atoms    = atoms    ;
       }
 
-    let are_compatible
+    (*let are_compatible
         (v1:t)
         (v2:t)
       : bool =
       is_equal
-        (compare_list
-           ~cmp:(compare_list ~cmp:Int.compare)
-           v1.parsings
-           v2.parsings)
+        (compare_parsing_example_data v1.parsings v2.parsings)*)
 
     let get_strings
         (v:t)
@@ -281,43 +264,78 @@ struct
       : Regex.t list =
       v.atoms
 
-    let combine_defaults : Default.t list -> Default.t =
-      DefaultModule.concat_merge_defaults
+    let are_compatible
+        (v1:t)
+        (v2:t)
+      : bool =
+      let r_arg1_parsings = v1.parsings.arg1_data in
+      let r_result_parsings = v2.parsings.output_data in
+      let l_arg1_parsings = v2.parsings.arg1_data in
+      let l_result_parsings = v1.parsings.output_data in
+      let is_compat_r =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             r_arg1_parsings
+             r_result_parsings)
+      in
+      let is_compat_l =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             l_arg1_parsings
+             l_result_parsings)
+      in
+      is_compat_r && is_compat_l
   end
 
   module SD =
   struct
-    module Default = DefaultModule
+    type t =
+      {
+        parsings : int list list example_data ;
+      }
+    [@@deriving ord, show, hash, make]
 
-    type t = Parsings of int list list
-    [@@deriving ord, show, hash]
-
-    let make
-        (ill:int list list)
-      : t =
-      Parsings ill
-
-    let are_compatible = is_equal %% compare
-
-    let combine_defaults : Default.t -> Default.t = fun _ -> ""
+    let are_compatible
+        (v1:t)
+        (v2:t)
+      : bool =
+      let r_arg1_parsings = v1.parsings.arg1_data in
+      let r_result_parsings = v2.parsings.output_data in
+      let l_arg1_parsings = v2.parsings.arg1_data in
+      let l_result_parsings = v1.parsings.output_data in
+      let is_compat_r =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             r_arg1_parsings
+             r_result_parsings)
+      in
+      let is_compat_l =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             l_arg1_parsings
+             l_result_parsings)
+      in
+      is_compat_r && is_compat_l
   end
 
   module BD =
   struct
-    module Default = DefaultModule
-
     type t =
       {
-        parsings : int list list ;
-        strings  : string list   ;
-        regex    : Regex.t       ;
+        parsings : int list list example_data ;
+        strings  : string list example_data   ;
+        regex    : Regex.t                    ;
       }
     [@@deriving ord, show, hash]
 
     let make
         (r:Regex.t)
-        (ill:int list list)
-        (ss:string list)
+        (ill:int list list example_data)
+        (ss:string list example_data)
       : t =
       {
         parsings = ill ;
@@ -335,7 +353,42 @@ struct
         (v1:t)
         (v2:t)
       : Lens.t option =
-      if is_equal (compare v1 v2) then
+      (*TODO contextual lenses*)
+      let creater_args_parsings = v1.parsings.arg1_data in
+      let creater_results_parsings = v2.parsings.output_data in
+      let createl_args_parsings = v2.parsings.arg1_data in
+      let createl_results_parsings = v1.parsings.output_data in
+      let creater_args_strings = v1.strings.arg1_data in
+      let creater_results_strings = v2.strings.output_data in
+      let createl_args_strings = v2.strings.arg1_data in
+      let createl_results_strings = v1.strings.output_data in
+      let is_eq_creater =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             creater_args_parsings
+             creater_results_parsings)
+        &&
+        is_equal
+          (compare_list
+             ~cmp:(String.compare)
+             creater_args_strings
+             creater_results_strings)
+      in
+      let is_eq_createl =
+        is_equal
+          (compare_list
+             ~cmp:(compare_list ~cmp:Int.compare)
+             createl_args_parsings
+             createl_results_parsings)
+        &&
+        is_equal
+          (compare_list
+             ~cmp:(String.compare)
+             createl_args_strings
+             createl_results_strings)
+      in
+      if is_eq_creater && is_eq_createl then
         Some (Lens.make_ident v1.regex)
       else
         None

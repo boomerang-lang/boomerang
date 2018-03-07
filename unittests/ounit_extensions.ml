@@ -4,6 +4,7 @@ open Optician
 open Star_semiring_tree
 open Star_semiring_tree_alignment
 open Synth_structs
+open Lang
 
 module BaseIntModule =
 struct
@@ -59,11 +60,17 @@ module IntPTSTAlignment =
     (BaseIntModule)
 
 module IntPTSTAlignmentOption = OptionOf(IntPTSTAlignment)
+module AlignmentOptionCost = PairOf(IntPTSTAlignmentOption)(FloatModule)
 
 let assert_alignment_option_equal =
   assert_equal
     ~printer:(IntPTSTAlignmentOption.show)
     ~cmp:(IntPTSTAlignmentOption.compare)
+
+let assert_alignment_option_cost_equal =
+  assert_equal
+    ~printer:(AlignmentOptionCost.show)
+    ~cmp:(AlignmentOptionCost.compare)
 
 let assert_rxtree_equal =
   assert_equal
@@ -74,3 +81,40 @@ let assert_alignment_equal =
   assert_equal
     ~printer:StarSemiringTreeRep.Alignment.show
     ~cmp:StarSemiringTreeRep.Alignment.compare
+
+let assert_lens_equal =
+  assert_equal
+    ~printer:Lens.show
+    ~cmp:(fun l1 l2 -> if Lens.is_eq l1 l2 then 0 else 1)
+
+module LensOption = OptionOf(Lens)
+
+let assert_lens_option_equal =
+  assert_equal
+    ~printer:LensOption.show
+    ~cmp:(fun l1o l2o ->
+        begin match (l1o,l2o) with
+          | (None,None) -> 0
+          | (Some l1, Some l2) ->
+            if Lens.is_eq l1 l2 then
+              0
+            else
+              1
+          | _ -> 1
+        end)
+
+module LensFloatOption = OptionOf(PairOf(Lens)(FloatModule))
+
+let assert_lens_float_option_equal =
+  assert_equal
+    ~printer:LensFloatOption.show
+    ~cmp:(fun l1o l2o ->
+        begin match (l1o,l2o) with
+          | (None,None) -> 0
+          | (Some (l1,f1), Some (l2,f2)) ->
+            if Lens.is_eq l1 l2 then
+              Float.compare f1 f2
+            else
+              1
+          | _ -> 1
+        end)

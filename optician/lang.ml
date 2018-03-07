@@ -726,7 +726,8 @@ let lens_star_semiring = (module Lens : StarSemiring.Sig with type t = Lens.t)
 
 (**** Language {{{ *****)
 
-type examples = (string * string) list
+type create_examples = (string * string) list
+type put_examples = (string * string * string) list
 
 type specification = (Id.t * Regex.t * Regex.t * (string * string) list)
 
@@ -735,7 +736,7 @@ type declaration =
   | DeclTestString of (Regex.t * string)
   | DeclSynthesizeLens of specification
   | DeclLensCreation of Id.t * Regex.t * Regex.t * Lens.t
-  | DeclTestLens of Id.t * examples
+  | DeclTestLens of Id.t * create_examples
 
 type program = declaration list
 

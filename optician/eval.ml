@@ -17,7 +17,7 @@ let rec to_empty_exampled_regex (r:Regex.t) : exampled_regex =
   | Regex.RegExClosed r' -> ERegExClosed (r',empty_string_example_data,empty_parsing_example_data)
   end
 
-type data = string * exampled_regex *
+type data = run_mode * string * exampled_regex *
             (string -> exampled_regex -> exampled_regex) list
             * int list * string option
 
@@ -25,51 +25,65 @@ type state =
   | State of (data -> ((state ref * data) list))
   | QAccept
 
+let add_data
+    (m:run_mode)
+    (ed:('a list) example_data)
+    (p:'a)
+  : ('a list) example_data =
+  begin match m with
+    | Arg1 -> {ed with arg1_data = p::ed.arg1_data }
+    | Arg2 -> {ed with arg2_data = p::ed.arg2_data }
+    | Output -> {ed with output_data = p::ed.output_data }
+  end
+
 type dfa = (state ref) * (state ref)
 
-let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
+let rec regex_to_dfa
+    (r:Regex.t)
+    (inside_var:bool)
+  : dfa =
   begin match r with
   | Regex.RegExEmpty ->
       let final = ref QAccept in
       (ref (State (fun _ -> [])), final)
   | Regex.RegExBase s ->
       let final = ref QAccept in
-      (ref (State (fun (str,er,recombiners,is,so) ->
+      (ref (State (fun (m,str,er,recombiners,is,so) ->
         begin match String.chop_prefix ~prefix:s str with
         | None -> []
         | Some str' ->
             if not inside_var then
               begin match er with
-              | ERegExBase (b,il) -> [(final,(str',ERegExBase (b,is::il),recombiners,is,so))]
+              | ERegExBase (b,il) -> [(final,(m,str',ERegExBase (b,add_data m il is),recombiners,is,so))]
               | _ -> failwith "bad";
               end
             else
-              [(final,(str',er,recombiners,is,so))]
+              [(final,(m,str',er,recombiners,is,so))]
         end)), final)
   | Regex.RegExConcat (r1,r2) ->
       let (r1_start_ref,r1_end_ref) = regex_to_dfa r1 inside_var in
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
-      let new_start_fun = (fun (s,er,rc,is,so) ->
+      let new_start_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
           begin match er with
           | ERegExConcat (er1,er2,_) ->
             let rc_swapsecond = (fun _ _ -> er2) in
-            [r1_start_ref, (s,er1,rc_swapsecond::rc,is,so)]
+            [r1_start_ref, (m,s,er1,rc_swapsecond::rc,is,so)]
           | _ -> failwith "i am a bad programmer"
           end
         else
-          [r1_start_ref, (s,er,rc,is,so)]) in
+          [r1_start_ref, (m,s,er,rc,is,so)]) in
       let new_start = State new_start_fun in
-      let new_middle_fun = (fun (s,er,rc,is,so) ->
+      let new_middle_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
           begin match rc with
           | h::t -> let rc_rememberfirst = (fun _ er' -> ERegExConcat (er,er',
-          extract_example_list er')) in
-            [r2_start_ref, (s,h s er,rc_rememberfirst::t,is,so)]
+          extract_example_data er')) in
+            [r2_start_ref, (m,s,h s er,rc_rememberfirst::t,is,so)]
           | [] -> failwith "stupid bad"
           end
         else
-          [r2_start_ref, (s,er,rc,is,so)])
+          [r2_start_ref, (m,s,er,rc,is,so)])
       in
       let middle_state = State new_middle_fun in
       r1_end_ref := middle_state;
@@ -77,9 +91,9 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
       let new_r2_end =
         if not inside_var then
           State
-            (fun (s,er,rc,is,so) ->
+            (fun (m,s,er,rc,is,so) ->
               begin match rc with
-              | h::t -> [(new_end_ref,(s,h s er, t, is,so))]
+              | h::t -> [(new_end_ref,(m,s,h s er, t, is,so))]
               | _ -> failwith "bad coder"
               end)
         else
@@ -90,32 +104,32 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
   | Regex.RegExOr (r1,r2) ->
       let (r1_start_ref,r1_end_ref) = regex_to_dfa r1 inside_var in
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
-      let new_start_fun = (fun (s,er,rc,is,so) ->
+      let new_start_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
           begin match er with
           | ERegExOr (er1,er2,il) ->
               let rc_left = 
                 (fun _ er1' ->
-                  ERegExOr (er1',er2,is::il)) in
+                  ERegExOr (er1',er2,add_data m il is)) in
               let rc_right =
                 (fun _ er2' ->
-                  ERegExOr (er1,er2',is::il)) in
-              [(r1_start_ref, (s,er1,rc_left::rc,is,so))
-              ;(r2_start_ref, (s,er2,rc_right::rc,is,so))]
+                  ERegExOr (er1,er2',add_data m il is)) in
+              [(r1_start_ref, (m,s,er1,rc_left::rc,is,so))
+              ;(r2_start_ref, (m,s,er2,rc_right::rc,is,so))]
           | _ -> failwith "bad programming error" 
           end
         else
-          [(r1_start_ref, (s,er,rc,is,so))
-          ;(r2_start_ref, (s,er,rc,is,so))]
+          [(r1_start_ref, (m,s,er,rc,is,so))
+          ;(r2_start_ref, (m,s,er,rc,is,so))]
         ) in
       let new_start = State (new_start_fun) in
       let new_end_ref = ref QAccept in
       let new_inner_end =
         if not inside_var then
           State
-            (fun (s,er,rc,is,so) ->
+            (fun (m,s,er,rc,is,so) ->
               begin match rc with
-              | h::t -> [(new_end_ref,(s,h s er, t, is,so))]
+              | h::t -> [(new_end_ref,(m,s,h s er, t, is,so))]
               | _ -> failwith "bad coder1"
               end)
         else
@@ -129,10 +143,10 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
       let new_end_ref = ref QAccept in
       let new_inner_end_fun =
         if not inside_var then
-          (fun (s,er,rc,is,so) ->
+          (fun (m,s,er,rc,is,so) ->
             begin match (is,rc) with
-            | (i::it,h::t) -> (inner_start_ref, (s,er,rc,(i+1)::it,so))::
-              [(new_end_ref,(s,h s er,t,it,so))]
+            | (i::it,h::t) -> (inner_start_ref, (m,s,er,rc,(i+1)::it,so))::
+              [(new_end_ref,(m,s,h s er,t,it,so))]
             | _ -> failwith "bad coder2"
             end)
         else
@@ -141,13 +155,13 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
       inner_end_ref := State new_inner_end_fun;
       let new_start_fun = 
         if not inside_var then
-          (fun (s,er,rc,is,so) ->
+          (fun (m,s,er,rc,is,so) ->
             begin match er with
             | ERegExStar (er',il) ->
               let rc_add_star =
                 (fun _ er'' ->
-                  ERegExStar (er'',is::il)) in
-                [(inner_end_ref,(s,er',rc_add_star::rc,-1::is,so))]
+                  ERegExStar (er'',add_data m il is)) in
+                [(inner_end_ref,(m,s,er',rc_add_star::rc,-1::is,so))]
             | _ -> failwith "error between keyboard and chair"
             end)
         else
@@ -160,12 +174,12 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
       let new_end_ref = ref QAccept in
       let new_start_fun =
         if not inside_var then
-          (fun ((s,er,rc,is,_):data) ->
-            [(inner_start_ref,(s,er,
+          (fun ((m,s,er,rc,is,_):data) ->
+            [(inner_start_ref,(m,s,er,
               (fun s' er' ->
                 begin match er' with
                 | ERegExClosed (r',l,il) -> ERegExClosed
-                    (r',(String.chop_suffix_exn ~suffix:s' s)::l,is::il)
+                    (r',add_data m l (String.chop_suffix_exn ~suffix:s' s),add_data m il is)
                 | _ -> failwith "programmer < dumpster"
                 end)::rc,is,Some s))]
           )
@@ -174,27 +188,27 @@ let rec regex_to_dfa (r:Regex.t) (inside_var:bool) : dfa =
       in
       let new_start_state = State new_start_fun in
       let new_inner_end_fun =
-        (fun (s,er,rc,is,so) ->
+        (fun (m,s,er,rc,is,so) ->
           if not inside_var then
             begin match rc with
             | [] -> failwith "bad coding2"
-            | h::t -> [(new_end_ref,(s,h s er,t,is,so))]
+            | h::t -> [(new_end_ref,(m,s,h s er,t,is,so))]
             end
           else
-            [(new_end_ref,(s,er,rc,is,so))]) in
+            [(new_end_ref,(m,s,er,rc,is,so))]) in
       inner_end_ref := (State new_inner_end_fun);
       (ref new_start_state,new_end_ref)
   end
 
-let rec eval_dfa (st:state) ((s,er,recombiners,is,so):data) :
+let rec eval_dfa (st:state) ((m,s,er,recombiners,is,so):data) :
   exampled_regex option =
   begin match st with
   | State (f) ->
-        let state_string_list = f (s,er,recombiners,is,so) in
+        let state_string_list = f (m,s,er,recombiners,is,so) in
         List.fold_left
-        ~f:(fun acc (st',(s',er',rc,is,so)) ->
+        ~f:(fun acc (st',(m,s',er',rc,is,so)) ->
           begin match acc with
-          | None ->  eval_dfa (!st') (s',er',rc,is,so)
+          | None ->  eval_dfa (!st') (m,s',er',rc,is,so)
           | _ -> acc
           end)
         ~init:None
@@ -212,17 +226,25 @@ let fast_eval (r:Regex.t) (s:string) : bool =
     (Option.is_empty
        (eval_dfa
           !dfa_start
-          (s,(to_empty_exampled_regex r),[],[0],None)))
+          (Arg1,s,(to_empty_exampled_regex r),[],[0],None)))
 
-let regex_to_exampled_regex (r:Regex.t) (es:string list)
-                                 : exampled_regex option =
+let regex_to_exampled_regex
+    (r:Regex.t)
+    (s_ex_data:(int * string) list example_data)
+  : exampled_regex option =
   let (dfa_start,_) = regex_to_dfa r false in
   let start_state = !dfa_start in
-  List.foldi
-  ~f:(fun i er e ->
-    begin match er with
-    | None -> None
-    | Some er' -> eval_dfa start_state (e,er',[],[i],None)
-    end)
-  ~init:(Some (to_empty_exampled_regex r))
-  es
+  List.fold_left
+    ~f:(fun er (m,es) ->
+        List.fold_left
+          ~f:(fun er (i,e) ->
+              begin match er with
+                | None -> None
+                | Some er' -> eval_dfa start_state (m,e,er',[],[i],None)
+              end)
+          ~init:er
+          es)
+    ~init:(Some (to_empty_exampled_regex r))
+    [(Arg1,s_ex_data.arg1_data)
+    ;(Arg2,s_ex_data.arg2_data)
+    ;(Output,s_ex_data.output_data)]

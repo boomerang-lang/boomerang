@@ -685,6 +685,27 @@ struct
     fold
       (fun _ _ acc -> acc+1)
       0
+
+  let rec first
+      ~f:(f:key -> value -> bool)
+    : t -> (key * value) option =
+    fold
+      (fun k v fo ->
+         begin match fo with
+           | None ->
+             if f k v then
+               Some (k,v)
+             else
+               None
+           | Some _ -> fo
+         end)
+      None
+
+  let rec first_exn
+      ~f:(f:key -> value -> bool)
+      (d:t)
+    : (key * value) =
+    Option.value_exn (first ~f:f d)
 end
 
 

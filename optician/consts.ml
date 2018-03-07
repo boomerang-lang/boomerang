@@ -17,6 +17,6 @@ let generate_io_count : int ref = ref 0
 
 let verbose : bool ref = ref false
 
-let gen_symmetric : bool ref = ref true
+let gen_symmetric : bool ref = ref false
 
 let simplify_generated_lens : bool ref = ref true

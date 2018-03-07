@@ -13,7 +13,7 @@ let rec lens_putl_internal
     | (Lens.Disconnect (r1,r2,s1,s2), ERegExBase (s2',_)) ->
       s1
     | (Lens.Closed (_,l'), _) ->
-      let relevant_string = extract_string er iteration in
+      let relevant_string = extract_string Arg1 er iteration in
       Lens.get_left_create_closed l' relevant_string
     | (Lens.Concat (l1,l2), ERegExConcat (er1,er2,_)) ->
         (lens_putl_internal l1 er1 iteration) ^
@@ -22,16 +22,20 @@ let rec lens_putl_internal
         (lens_putl_internal l1 er2 iteration) ^
         (lens_putl_internal l2 er1 iteration)
     | (Lens.Union (l1,l2), ERegExOr (er1,er2,_)) ->
-        if took_regex er1 iteration then
+        if took_regex Arg1 er1 iteration then
           lens_putl_internal l1 er1 iteration
         else
           lens_putl_internal l2 er2 iteration
     | (Lens.Compose (l1,l2),_) ->
       let intermediary_string = lens_putl_internal l1 er iteration in
       let (_,intermediary_regex) = type_lens l2 in
-      let intermediary_er_o = regex_to_exampled_regex
+      let intermediary_er_o =
+        regex_to_exampled_regex
           intermediary_regex
-          [intermediary_string]
+          (make_example_data
+             ~arg1_data:[(0,intermediary_string)]
+             ~arg2_data:[]
+             ~output_data:[])
       in
       begin match intermediary_er_o with
         | None -> failwith "bad input to lens"
@@ -42,13 +46,13 @@ let rec lens_putl_internal
           List.rev
             (List.filter
               ~f:(fun it -> List.tl_exn it = iteration)
-              (extract_iterations_consumed er')) in
+              (extract_iterations_consumed Arg1 er')) in
         String.concat
           (List.map
             ~f:(lens_putl_internal l' er')
             valid_iterations)
     | (Lens.Identity _, _) ->
-      extract_string er iteration
+      extract_string Arg1 er iteration
     | (Lens.Inverse l', _) ->
       lens_putr_internal l' er iteration
     | (Lens.Permute (p,ls), _) ->
@@ -64,7 +68,7 @@ let rec lens_putl_internal
           begin match er with
             | ERegExConcat(er1,er2,_) ->
               er2::(extract_reversed_concat_list er1 (n-1))
-            | _ -> failwith ("bad typecheck disagreeing types1" ^ (exampled_regex_to_string er) ^ Lens.show l)
+            | _ -> failwith ("bad typecheck disagreeing types1" ^ Lens.show l)
           end
       in
       let concat_list =
@@ -82,7 +86,7 @@ let rec lens_putl_internal
             s ^ (lens_putl_internal l er iteration))
         ~init:""
         er_l_list
-    | _ -> failwith ("bad typecheck disagreeing types2" ^ (exampled_regex_to_string er) ^ Lens.show l)
+    | _ -> failwith ("bad typecheck disagreeing types2" ^ Lens.show l)
   end
 
 and lens_putr_internal
@@ -94,7 +98,7 @@ and lens_putr_internal
     | (Lens.Disconnect (r1,r2,s1,s2), ERegExBase (s2',_)) ->
       s2
     | (Lens.Closed (_,l'), _) ->
-      let relevant_string = extract_string er iteration in
+      let relevant_string = extract_string Arg1 er iteration in
       Lens.get_right_create_closed l' relevant_string
     | (Lens.Concat (l1,l2), ERegExConcat (er1,er2,_)) ->
         (lens_putr_internal l1 er1 iteration) ^
@@ -103,7 +107,7 @@ and lens_putr_internal
         (lens_putr_internal l2 er2 iteration) ^
         (lens_putr_internal l1 er1 iteration)
     | (Lens.Union (l1,l2), ERegExOr (er1,er2,_)) ->
-        if took_regex er1 iteration then
+        if took_regex Arg1 er1 iteration then
           lens_putr_internal l1 er1 iteration
         else
           lens_putr_internal l2 er2 iteration
@@ -112,7 +116,10 @@ and lens_putr_internal
       let (intermediary_regex,_) = type_lens l1 in
       let intermediary_er_o = regex_to_exampled_regex
           intermediary_regex
-          [intermediary_string]
+          (make_example_data
+             ~arg1_data:[(0,intermediary_string)]
+             ~arg2_data:[]
+             ~output_data:[])
       in
       begin match intermediary_er_o with
         | None -> failwith "bad input to lens"
@@ -123,13 +130,13 @@ and lens_putr_internal
           List.rev
             (List.filter
               ~f:(fun it -> List.tl_exn it = iteration)
-              (extract_iterations_consumed er')) in
+              (extract_iterations_consumed Arg1 er')) in
         String.concat
           (List.map
             ~f:(lens_putr_internal l' er')
             valid_iterations)
     | (Lens.Identity _, _) ->
-      extract_string er iteration
+      extract_string Arg1 er iteration
     | (Lens.Inverse l', _) ->
       lens_putl_internal l' er iteration
     | (Lens.Permute (p,ls), _) ->
@@ -145,7 +152,7 @@ and lens_putr_internal
           begin match er with
             | ERegExConcat(er1,er2,_) ->
               er2::(extract_reversed_concat_list er1 (n-1))
-            | _ -> failwith ("bad typecheck disagreeing types3" ^ (exampled_regex_to_string er) ^ Lens.show l)
+            | _ -> failwith ("bad typecheck disagreeing types3" ^ Lens.show l)
           end
       in
       let concat_list =
@@ -163,7 +170,7 @@ and lens_putr_internal
             s ^ (lens_putl_internal l er iteration))
         ~init:""
         permed_er_l_list
-    | _ -> failwith ("bad typecheck disagreeing types4" ^ (exampled_regex_to_string er) ^ Lens.show l)
+    | _ -> failwith ("bad typecheck disagreeing types4" ^ Lens.show l)
   end
 
 let lens_putr
@@ -171,7 +178,12 @@ let lens_putr
     (s:string)
   : string =
   let (sr,_) = type_lens l in
-  let exampled_sr_o = regex_to_exampled_regex sr [s] in
+  let exampled_sr_o = regex_to_exampled_regex sr
+      (make_example_data
+         ~arg1_data:[(0,s)]
+         ~arg2_data:[]
+         ~output_data:[])
+  in
   begin match exampled_sr_o with
     | None -> failwith ("bad input to lens~: " ^ s ^ " " ^ (Regex.show sr))
     | Some exampled_sr -> lens_putr_internal l exampled_sr [0]
@@ -182,7 +194,13 @@ let lens_putl
     (s:string)
   : string =
   let (_,tr) = type_lens l in
-  let exampled_sr_o = regex_to_exampled_regex tr [s] in
+  let exampled_sr_o = regex_to_exampled_regex
+      tr
+      (make_example_data
+         ~arg1_data:[(0,s)]
+         ~arg2_data:[]
+         ~output_data:[])
+  in
   begin match exampled_sr_o with
     | None -> failwith ("bad input to lens: " ^ s)
     | Some exampled_sr -> lens_putl_internal l exampled_sr [0]
