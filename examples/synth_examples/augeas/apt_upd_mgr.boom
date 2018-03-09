@@ -212,4 +212,4 @@ test matches_cex
 
 let apt_update_manager
   : (lens in APT_UPDATE_CONF <=> APT_UPDATE_DICT) =
-  synth APT_UPDATE_CONF <=> APT_UPDATE_DICT using {("# comment\n[DEFAULT]\nURI = http://changelogs.ubuntu.com/meta-release\n\n","{\"#comment\"=\"comment\"}{\"DEFAULT\"={\"URI\"=\"http://changelogs.ubuntu.com/meta-release\"}}{}")} 
+  synth APT_UPDATE_CONF <=> APT_UPDATE_DICT using {createrex ("# comment\n[DEFAULT]\nURI = http://changelogs.ubuntu.com/meta-release\n\n","{\"#comment\"=\"comment\"}{\"DEFAULT\"={\"URI\"=\"http://changelogs.ubuntu.com/meta-release\"}}{}")} 

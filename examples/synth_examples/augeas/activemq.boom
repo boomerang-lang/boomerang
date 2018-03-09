@@ -193,4 +193,4 @@ test matches_cex
 
 let map_activemq
   : (lens in ACTIVEMQ_DICT <=> ACTIVEMQ_CONFIG) =
-  synth ACTIVEMQ_DICT <=> ACTIVEMQ_CONFIG using {("{ }\n{ \"ACTIVEMQ_HOME\" = \"/usr/share/activemq\" }\n{ \"ACTIVEMQ_BASE\" = \"${ACTIVEMQ_HOME}\" }","ACTIVEMQ_HOME=/usr/share/activemq\nACTIVEMQ_BASE=${ACTIVEMQ_HOME}\n")} 
+  synth ACTIVEMQ_DICT <=> ACTIVEMQ_CONFIG using {createrex ("{ }\n{ \"ACTIVEMQ_HOME\" = \"/usr/share/activemq\" }\n{ \"ACTIVEMQ_BASE\" = \"${ACTIVEMQ_HOME}\" }","ACTIVEMQ_HOME=/usr/share/activemq\nACTIVEMQ_BASE=${ACTIVEMQ_HOME}\n")} 

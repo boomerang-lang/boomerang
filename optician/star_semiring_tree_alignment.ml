@@ -22,6 +22,7 @@ sig
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val get_alignment : t -> t -> Alignment.t option
+  val requires_mapping : t -> bool
 end
 
 module type PlusData =
@@ -33,6 +34,7 @@ sig
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val requires_mapping : t -> bool
 end
 
 module type TimesData =
@@ -44,6 +46,7 @@ sig
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val requires_mapping : t -> bool
 end
 
 module type StarData =
@@ -55,6 +58,7 @@ sig
   val hash : t hasher
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
+  val requires_mapping : t -> bool
 end
 
 module Position = PairOf(IntModule)(IntModule)
@@ -82,6 +86,23 @@ module PlusTimesStarTreeAlignmentOf
     (BD : BaseData) =
 struct
   module NormalizedTree = NormalizedPlusTimesStarTreeOf(PD)(TD)(SD)(BD)
+  let rec requires_mapping
+      (nt:NormalizedTree.Nonempty.t)
+    : bool =
+    begin match nt with
+      | Plus (pd,nts) ->
+        PD.requires_mapping pd
+        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+      | Times (td,nts) ->
+        TD.requires_mapping td
+        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+      | Star (sd,(nt,_)) ->
+        SD.requires_mapping sd
+        || requires_mapping nt
+      | Base bd ->
+        BD.requires_mapping bd
+    end
+
   module Nonempty =
   struct
     type t =
@@ -807,24 +828,34 @@ struct
             ~f:(fun pq ->
                 begin match RemainingElementsPQueue.pop pq with
                   | None -> Right None
-                  | Some (([],aligns,d1,d2,_),f,_) ->
-                    let leftover_left =
-                      List.concat_map
-                        ~f:(fun (i1,p,c) ->
-                            List.map
-                              ~f:(fun i2 -> (i1,i2))
-                              (range p c))
-                        (DataTreeProcessedInfoDict.value_list d1)
+                  | Some (([],aligns,d1,d2,_),f,pq) ->
+                    let is_safe =
+                      DataTreeProcessedInfoDict.for_all
+                        ~f:(fun a (_,p,c) ->
+                            p >= c
+                            ||
+                            not (requires_mapping a))
                     in
-                    let leftover_right =
-                      List.concat_map
-                        ~f:(fun (i1,p,c) ->
-                            List.map
-                              ~f:(fun i2 -> (i1,i2))
-                              (range p c))
-                        (DataTreeProcessedInfoDict.value_list d2)
-                    in
-                    Right (Some (aligns,leftover_left,leftover_right))
+                    if (is_safe d1 && is_safe d2) then
+                      let leftover_left =
+                        List.concat_map
+                          ~f:(fun (i1,p,c) ->
+                              List.map
+                                ~f:(fun i2 -> (i1,i2))
+                                (range p c))
+                          (DataTreeProcessedInfoDict.value_list d1)
+                      in
+                      let leftover_right =
+                        List.concat_map
+                          ~f:(fun (i1,p,c) ->
+                              List.map
+                                ~f:(fun i2 -> (i1,i2))
+                                (range p c))
+                          (DataTreeProcessedInfoDict.value_list d2)
+                      in
+                      Right (Some (aligns,leftover_left,leftover_right))
+                    else
+                      Left pq
                   | Some ((t1t2s,aligns,d1,d2,_),f,pq) ->
                     let to_add = remove_all_elements t1t2s in
                     let queue_elements =

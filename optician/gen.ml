@@ -203,7 +203,7 @@ struct
                  (StarSemiringTreeRep.alignment_to_lens al))
             ,cost)
           alignment_opt
-      | _ -> failwith "ah"
+      | _ -> failwith "bad examples"
     end
 
   let rigid_synth
@@ -369,7 +369,10 @@ struct
       (lc:LensContext.t)
       (r1:Regex.t)
       (r2:Regex.t)
-      (exs:create_examples)
+      (creater_exs:create_examples)
+      (createl_exs:create_examples)
+      (putr_exs:put_examples)
+      (putl_exs:put_examples)
     : Lens.t option =
     let rec gen_symmetric_lens_queuing
         (pq:SPQ.t)
@@ -380,13 +383,6 @@ struct
         | Some (qe,f,pq) ->
           let r1 = (SymmetricQueueElement.get_r1 qe) in
           let r2 = (SymmetricQueueElement.get_r2 qe) in
-          print_endline
-            (string_of_list
-               Int.to_string
-               (SymmetricQueueElement.get_expansions_choices qe));
-          print_endline (Float.to_string f);
-          print_endline (Float.to_string best_cost);
-          print_endline "\n";
           if f >=. best_cost then
             best
           else
@@ -395,10 +391,10 @@ struct
                 lc
                 r1
                 r2
-                exs
-                []
-                []
-                []
+                creater_exs
+                createl_exs
+                putr_exs
+                putl_exs
             in
             let (best,best_cost) =
               begin match lco with
@@ -487,7 +483,10 @@ let gen_symmetric_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
-    (exs:create_examples)
+    (creater_exs:create_examples)
+    (createl_exs:create_examples)
+    (putr_exs:put_examples)
+    (putl_exs:put_examples)
   : Lens.t option =
   let existing_lenses =
     List.map
@@ -499,7 +498,16 @@ let gen_symmetric_lens
   let r2 = iteratively_deepen r2 in
   if !verbose then
     print_endline "Synthesis Start";
-  let lens_option = DNFSynth.gen_symmetric_lens lc r1 r2 exs in
+  let lens_option =
+    DNFSynth.gen_symmetric_lens
+      lc
+      r1
+      r2
+      creater_exs
+      createl_exs
+      putr_exs
+      putl_exs
+  in
   if !verbose then
     print_endline "Synthesis End";
   if !simplify_generated_lens then
@@ -513,7 +521,10 @@ let gen_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
-    (exs:create_examples)
+    (creater_exs:create_examples)
+    (createl_exs:create_examples)
+    (putr_exs:put_examples)
+    (putl_exs:put_examples)
   : Lens.t option =
   if !gen_symmetric then
     let lo =
@@ -521,7 +532,10 @@ let gen_lens
         existing_lenses
         r1
         r2
-        exs
+        creater_exs
+        createl_exs
+        putr_exs
+        putl_exs
     in
     if !simplify_generated_lens then
       Option.map
@@ -540,7 +554,7 @@ let gen_lens
     let r2 = iteratively_deepen r2 in
     if !verbose then
       print_endline "Synthesis Start";
-    let lens_option = DNFSynth.gen_lens lc r1 r2 exs in
+    let lens_option = DNFSynth.gen_lens lc r1 r2 creater_exs in
     if !verbose then
       print_endline "Synthesis End";
     if !simplify_generated_lens then

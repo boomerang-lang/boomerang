@@ -83,5 +83,5 @@ test matches_cex
 
 let extract_file
   : (lens in DIRECTORY <=> FILEANDFOLDER) =
-  synth DIRECTORY <=> FILEANDFOLDER using {("Users/amiltner/lens/tests/flashfill/extract-filename.txt/","file: extract-filename.txt\nfolder: Users/amiltner/lens/tests/flashfill/"),
-    ("/","root directory given")} 
+  synth DIRECTORY <=> FILEANDFOLDER using {createrex ("Users/amiltner/lens/tests/flashfill/extract-filename.txt/","file: extract-filename.txt\nfolder: Users/amiltner/lens/tests/flashfill/"),
+    createrex ("/","root directory given")} 

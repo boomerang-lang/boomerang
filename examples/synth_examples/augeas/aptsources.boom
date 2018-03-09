@@ -234,4 +234,4 @@ test matches_cex
 
 let aptsrc
   : (lens in APTSOURCE_CONF <=> APTSOURCE_DICT) =
-  synth APTSOURCE_CONF <=> APTSOURCE_DICT using {("deb [ arch+=amd64 ] tor+http://ftp.us.debian.org/debian sid main contrib\n","{\"type\"=\"deb\"}{\"options\"{\"arch\"=\"amd64\"{\"operation\"=\"+\"}}}{\"uri\"=\"tor+http://ftp.us.debian.org/debian\"}{\"distribution\"=\"sid\"}{\"component\"=\"main\"}{\"component\"=\"contrib\"}")} 
+  synth APTSOURCE_CONF <=> APTSOURCE_DICT using {createrex ("deb [ arch+=amd64 ] tor+http://ftp.us.debian.org/debian sid main contrib\n","{\"type\"=\"deb\"}{\"options\"{\"arch\"=\"amd64\"{\"operation\"=\"+\"}}}{\"uri\"=\"tor+http://ftp.us.debian.org/debian\"}{\"distribution\"=\"sid\"}{\"component\"=\"main\"}{\"component\"=\"contrib\"}")} 

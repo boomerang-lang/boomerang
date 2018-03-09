@@ -107,7 +107,12 @@ and exp =
     | ECSet    of Info.t * bool * (char * char) list 
 
     (* synthesis of lenses *)
-    | ESynth   of Info.t * exp * exp * exp list
+    | ESynth   of Info.t * exp * exp
+                  * ([`CreateREx
+                     | `CreateLEx
+                     | `PutREx
+                     | `PutLEx]
+                     * exp) list
 
     (* booleans with counter examples *)
     (* None ~ true; Some s ~ false with counterexample s *)
@@ -188,7 +193,7 @@ let rec info_of_exp e = match e with
   | EVar     (i,_)       -> i
   | EOver    (i,_,_)     -> i
   | EFun     (i,_,_,_)   -> i
-  | ELet     (i,_,_)     -> i 
+  | ELet     (i,_,_)     -> i
   | ETyFun   (i,_,_)     -> i
   | ETyApp   (i,_,_)     -> i
   | EPair    (i,_,_)     -> i
@@ -196,8 +201,8 @@ let rec info_of_exp e = match e with
   | ECast    (i,_,_,_,_) -> i
   | EUnit    (i)         -> i
   | EBoolean (i,_)       -> i
-  | EInteger (i,_)       -> i    
-  | EChar    (i,_)       -> i 
+  | EInteger (i,_)       -> i
+  | EChar    (i,_)       -> i
   | EString  (i,_)       -> i
   | ECSet    (i,_,_)     -> i
   | ESynth   (i,_,_,_)   -> i
@@ -343,7 +348,7 @@ let mk_compose i e1 e2 =
 let mk_set i e1 e2 = 
   mk_bin_op i (mk_qid_var (Qid.mk_core_t i "set")) e1 e2
 
-let mk_rx i e = 
+let mk_rx i e =
   mk_app i (mk_core_var i "str") e
 
 let mk_synth i e1 e2 exs =

@@ -101,20 +101,34 @@ let FULLTAGS
 
 let bibtex_to_readable_au
   : (lens in BIBTEXAUTHORINFO <=> TAGGEDAUTHORDEFNS) =
-  synth BIBTEXAUTHORINFO <=> TAGGEDAUTHORDEFNS using {("author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron}","au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon")} 
+  synth BIBTEXAUTHORINFO <=> TAGGEDAUTHORDEFNS using
+    { createrex
+      ("author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron}"
+      ,"au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon") }
 
 let bibtext_to_readable_title
   : (lens in BIBTEXTITLE <=> TAGGEDTITLE) =
-  synth BIBTEXTITLE <=> TAGGEDTITLE using {("title={Boomerang Resourceful Lenses For String Data}","ti - Boomerang Resourceful Lenses For String Data")} 
+  synth BIBTEXTITLE <=> TAGGEDTITLE using
+  { createrex
+    ("title={Boomerang Resourceful Lenses For String Data}"
+    ,"ti - Boomerang Resourceful Lenses For String Data")}
 
 let journal_to_readable_journal
   : (lens in BIBTEXJOURNAL <=> TAGGEDJOURNAL) =
-  synth BIBTEXJOURNAL <=> TAGGEDJOURNAL using {("journal={Principals Of Programming Languages}","jo - Principals Of Programming Languages")} 
+  synth BIBTEXJOURNAL <=> TAGGEDJOURNAL using
+  { createrex
+    ("journal={Principals Of Programming Languages}"
+    ,"jo - Principals Of Programming Languages")}
 
 let bibtext_to_tagged_tester
   : (lens in FULLBIBTEX <=> FULLTAGS) =
-  synth FULLBIBTEX <=> FULLTAGS using {("{author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron},title={Boomerang Resourceful Lenses For String Data},journal={Principals Of Programming Languages},}","au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon\nti - Boomerang Resourceful Lenses For String Data\njo - Principals Of Programming Languages"),
-    ("{title={Boomerang Resourceful Lenses For String Data},}","ti - Boomerang Resourceful Lenses For String Data")} 
+  synth FULLBIBTEX <=> FULLTAGS using
+  { createrex
+      ("{author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron},title={Boomerang Resourceful Lenses For String Data},journal={Principals Of Programming Languages},}"
+      ,"au - Nathan Foster\n au - Benjamin Pierce\n au - Aaron Bohannon\nti - Boomerang Resourceful Lenses For String Data\njo - Principals Of Programming Languages"),
+    createrex
+      ("{title={Boomerang Resourceful Lenses For String Data},}"
+      ,"ti - Boomerang Resourceful Lenses For String Data") }
 
 test bibtext_to_tagged_tester.get
   "{author={Foster, Nathan and Pierce, Benjamin and Bohannon, Aaron},}"

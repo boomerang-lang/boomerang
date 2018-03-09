@@ -238,4 +238,4 @@ test matches_cex
 
 let x
   : (lens in KEY_CONF <=> KEY_DICT) =
-  synth KEY_CONF <=> KEY_DICT using {("cert-authority,command=\"t\" ssh-dsa 12345 my comment","{\"key\"=\"12345\"{\"options\"{\"cert-authority\"}{\"command\"=\"t\"}}{\"type\"=\"ssh-dsa\"}{\"comment\"=\"my comment\"}}")} 
+  synth KEY_CONF <=> KEY_DICT using {createrex ("cert-authority,command=\"t\" ssh-dsa 12345 my comment","{\"key\"=\"12345\"{\"options\"{\"cert-authority\"}{\"command\"=\"t\"}}{\"type\"=\"ssh-dsa\"}{\"comment\"=\"my comment\"}}")} 

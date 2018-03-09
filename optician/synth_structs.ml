@@ -224,6 +224,18 @@ struct
              l_result_parsings)
       in
       is_compat_r && is_compat_l
+
+    let requires_mapping
+        (v:t)
+      : bool =
+      not
+        (List.for_all
+           ~f:(fun p ->
+               List.mem
+                 ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
+                 v.parsings.output_data
+                 p)
+           v.parsings.arg2_data)
   end
 
   module TD =
@@ -246,13 +258,6 @@ struct
         strings  = strings  ;
         atoms    = atoms    ;
       }
-
-    (*let are_compatible
-        (v1:t)
-        (v2:t)
-      : bool =
-      is_equal
-        (compare_parsing_example_data v1.parsings v2.parsings)*)
 
     let get_strings
         (v:t)
@@ -287,6 +292,18 @@ struct
              l_result_parsings)
       in
       is_compat_r && is_compat_l
+
+    let requires_mapping
+        (v:t)
+      : bool =
+      not
+        (List.for_all
+           ~f:(fun p ->
+               List.mem
+                 ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
+                 v.parsings.output_data
+                 p)
+           v.parsings.arg2_data)
   end
 
   module SD =
@@ -320,6 +337,18 @@ struct
              l_result_parsings)
       in
       is_compat_r && is_compat_l
+
+    let requires_mapping
+        (v:t)
+      : bool =
+      not
+        (List.for_all
+           ~f:(fun p ->
+               List.mem
+                 ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
+                 v.parsings.output_data
+                 p)
+           v.parsings.arg2_data)
   end
 
   module BD =
@@ -397,6 +426,31 @@ struct
         (_:unit)
       : float =
       0.
+
+    let requires_mapping
+        (v:t)
+      : bool =
+      let arg2_parsings_strings =
+        List.zip_exn
+          v.parsings.arg2_data
+          v.strings.arg2_data
+      in
+      let output_parsings_strings =
+        List.zip_exn
+          v.parsings.output_data
+          v.strings.output_data
+      in
+      not
+        (List.for_all
+           ~f:(fun p ->
+               List.mem
+                 ~equal:(is_equal
+                         %% (pair_compare
+                               (compare_list ~cmp:Int.compare)
+                               String.compare))
+                 output_parsings_strings
+                 p)
+           arg2_parsings_strings)
   end
 
   module Alignment = PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)

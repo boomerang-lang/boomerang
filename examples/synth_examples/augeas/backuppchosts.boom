@@ -216,4 +216,4 @@ let CONF_DICT
 
 let backuppchosts_map
   : (lens in CONF <=> CONF_DICT) =
-  synth CONF <=> CONF_DICT using {("host        dhcp    user      moreUsers\nhostname1     0     user1     anotheruser,athirduser\nhostname2     1     user2     stillanotheruser\n","{{\"host\"=\"host\"}        {\"dhcp\"=\"dhcp\"}    {\"user\"=\"user\"}      {\"moreusers\"=\"moreUsers\"}}{{\"host\"=\"hostname1\"}     {\"dhcp\"=\"0\"}     {\"user\"=\"user1\"}     {\"moreusers\"=\"anotheruser\"}{\"moreusers\"=\"athirduser\"}}{{\"host\"=\"hostname2\"}     {\"dhcp\"=\"1\"}     {\"user\"=\"user2\"}     {\"moreusers\"=\"stillanotheruser\"}}")} 
+  synth CONF <=> CONF_DICT using {createrex ("host        dhcp    user      moreUsers\nhostname1     0     user1     anotheruser,athirduser\nhostname2     1     user2     stillanotheruser\n","{{\"host\"=\"host\"}        {\"dhcp\"=\"dhcp\"}    {\"user\"=\"user\"}      {\"moreusers\"=\"moreUsers\"}}{{\"host\"=\"hostname1\"}     {\"dhcp\"=\"0\"}     {\"user\"=\"user1\"}     {\"moreusers\"=\"anotheruser\"}{\"moreusers\"=\"athirduser\"}}{{\"host\"=\"hostname2\"}     {\"dhcp\"=\"1\"}     {\"user\"=\"user2\"}     {\"moreusers\"=\"stillanotheruser\"}}")} 

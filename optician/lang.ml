@@ -517,6 +517,12 @@ struct
   let make_star (l:t) : t =
     Iterate l
 
+  let make_swap
+      (r1:t)
+      (r2:t)
+    : t =
+    Swap (r1,r2)
+
   let make_ident (r:Regex.t) : t =
     Identity r
 

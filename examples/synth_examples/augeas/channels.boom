@@ -282,7 +282,7 @@ let THIS_COMMENT : regexp = "; " . STRING
 
 let entry_map
   : (lens in ENTRY_CONF <=> ENTRY_DICT) =
-  synth ENTRY_CONF <=> ENTRY_DICT using {("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0","{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}")} 
+  synth ENTRY_CONF <=> ENTRY_DICT using {createrex ("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0","{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}")} 
 
 let CHANNELS_CONF
   : regexp =
@@ -299,4 +299,4 @@ let CHANNELS_DICT
 
 let channels_map
   : (lens in CHANNELS_CONF <=> CHANNELS_DICT) =
-  synth CHANNELS_CONF <=> CHANNELS_DICT using {("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0\n","{{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}}")} 
+  synth CHANNELS_CONF <=> CHANNELS_DICT using {createrex ("Direct 8 TV;SES ASTRA:12551:VC56M2O0S0:S19.2E:22000:1111=2:1112=fra@3:1116:0:12174:1:1108:0\n","{{\"entry\"=\"Direct 8 TV\"{\"provider\"=\"SES ASTRA\"}{\"frequency\"=\"12551\"}{\"parameter\"=\"VC56M2O0S0\"}{\"signal_source\"=\"S19.2E\"}{\"symbol_rate\"=\"22000\"}{\"tpid\"=\"1116\"}{\"caid\"=\"0\"}{\"sid\"=\"12174\"}{\"nid\"=\"1\"}{\"tid\"=\"1108\"}{\"rid\"=\"0\"}{\"vpid\"=\"1111\"{\"codec\"=\"2\"}}{\"apid\"=\"1112\"{\"lang\"=\"fra\"}{\"codec\"=\"3\"}}}}")} 

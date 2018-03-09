@@ -233,22 +233,22 @@ let CONFIG_STRING : regexp = (CONFIG_COMMENT . "\n")*
 
 let extract_netgroup
   : (lens in ("@" . IDENTIFIER) <=> NETGROUPINFO) =
-  synth ("@" . IDENTIFIER) <=> NETGROUPINFO using {("@domain","{ \"netgroup\" = \"domain\" }")} 
+  synth ("@" . IDENTIFIER) <=> NETGROUPINFO using {createrex ("@domain","{ \"netgroup\" = \"domain\" }")} 
 
 let extract_origin_list
   : (lens in ORIGINLIST <=> ORIGIN_DICT) =
-  synth ORIGINLIST <=> ORIGIN_DICT using {(" cron crond :0","\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" }")} 
+  synth ORIGINLIST <=> ORIGIN_DICT using {createrex (" cron crond :0","\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" }")} 
 
 let extract_userdata
   : (lens in USERNAMEHOSTGROUPCONFIG <=> UNHGCFG_KVP) =
-  synth USERNAMEHOSTGROUPCONFIG <=> UNHGCFG_KVP using {("john","{ \"user\" = \"john\" }"),
-    ("john@domain","{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }"),
-    ("@domain","{ \"netgroup\" = \"domain\" }")} 
+  synth USERNAMEHOSTGROUPCONFIG <=> UNHGCFG_KVP using {createrex ("john","{ \"user\" = \"john\" }"),
+    createrex ("john@domain","{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }"),
+    createrex ("@domain","{ \"netgroup\" = \"domain\" }")} 
 
 let extract_access
   : (lens in FULLCONFIGACCESS <=> CONFIGACCESSDICT) =
-  synth FULLCONFIGACCESS <=> CONFIGACCESSDICT using {("+ : john john@domain @domain : cron crond :0","{ \"access\" = \"+\"\n{ \"user\" = \"john\" }\n{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }\n{ \"netgroup\" = \"domain\" }\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" } }")} 
+  synth FULLCONFIGACCESS <=> CONFIGACCESSDICT using {createrex ("+ : john john@domain @domain : cron crond :0","{ \"access\" = \"+\"\n{ \"user\" = \"john\" }\n{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }\n{ \"netgroup\" = \"domain\" }\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" } }")} 
 
 let extract_config
   : (lens in FULL_ACCESS_CONFIG <=> FULL_ACCESS_DICT) =
-  synth FULL_ACCESS_CONFIG <=> FULL_ACCESS_DICT using {("+ : john john@domain @domain : cron crond :0\n# here is a comment with \"quotes\"\n","{ \"access\" = \"+\"\n{ \"user\" = \"john\" }\n{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }\n{ \"netgroup\" = \"domain\" }\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" } }\n\"#comment\"=\"here is a comment with \\\"quotes\\\"\"\n")} 
+  synth FULL_ACCESS_CONFIG <=> FULL_ACCESS_DICT using {createrex ("+ : john john@domain @domain : cron crond :0\n# here is a comment with \"quotes\"\n","{ \"access\" = \"+\"\n{ \"user\" = \"john\" }\n{ \"user\" = \"john\"\n\t{ \"host\" = \"domain\" } }\n{ \"netgroup\" = \"domain\" }\n{ \"origin\" = \"cron\" }\n{ \"origin\" = \"crond\" }\n{ \"origin\" = \":0\" } }\n\"#comment\"=\"here is a comment with \\\"quotes\\\"\"\n")} 

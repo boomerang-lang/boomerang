@@ -69,4 +69,4 @@ let AMOUNT_EXTRACTED
 
 let extract_amount
   : (lens in THINGANDAMOUNT <=> AMOUNT_EXTRACTED) =
-  synth THINGANDAMOUNT <=> AMOUNT_EXTRACTED using {("hey look we sure have a lot of corn we have 35 OZ","amount: 35 OZ\nworthless text: hey look we sure have a lot of corn we have ")} 
+  synth THINGANDAMOUNT <=> AMOUNT_EXTRACTED using {createrex ("hey look we sure have a lot of corn we have 35 OZ","amount: 35 OZ\nworthless text: hey look we sure have a lot of corn we have ")} 

@@ -61,13 +61,15 @@ let UPPERCASENAME : regexp = UPPERCASE . UPPERCASE*
 
 let capitalize
   : (lens in UPPERCASENAME <=> NAME) =
-  synth UPPERCASENAME <=> NAME using {("DOE","Doe")}
+  synth UPPERCASENAME <=> NAME using {createrex ("DOE","Doe")}
 
 test capitalize.get "JOHN" = "John"
 
 test capitalize.get "DOE" = "Doe"
 
 let remove_last =
-  synth (NAME . " " . NAME) <=> NAME using {("Anders Miltner","Anders")}
+  synth (NAME . " " . NAME) <=> NAME using
+  {
+    putlex (("Anderz","Anders Anders"),"Anders Anderz")}
 
 test remove_last = ?

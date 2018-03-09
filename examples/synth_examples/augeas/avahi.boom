@@ -205,4 +205,4 @@ let AVAHI_DICT : regexp = "{" . ("{ }" | TITLED_KVP_DICT)*  . "}"
 
 let avahi_map
   : (lens in AVAHI <=> AVAHI_DICT) =
-  synth AVAHI <=> AVAHI_DICT using {("\n[server]\nhost-name=web\ndomain=example.com\n\n[wide-area]\nenable-wide-area=yes\n","{{ }{\"server\"{\"host-name\"=\"web\"}{\"domain\"=\"example.com\"}}{ }{\"wide-area\"{\"enable-wide-area\"=\"yes\"}}}")} 
+  synth AVAHI <=> AVAHI_DICT using {createrex ("\n[server]\nhost-name=web\ndomain=example.com\n\n[wide-area]\nenable-wide-area=yes\n","{{ }{\"server\"{\"host-name\"=\"web\"}{\"domain\"=\"example.com\"}}{ }{\"wide-area\"{\"enable-wide-area\"=\"yes\"}}}")} 

@@ -196,4 +196,4 @@ let APPROX_DICT
 
 let afs_cellalias
   : (lens in APPROX_CONF <=> APPROX_DICT) =
-  synth APPROX_CONF <=> APPROX_DICT using {("# comment\n\n$test-ing\ttest val\n","{\"#comment\"=\"comment\"}{}{\"$test-ing\"=\"test val\"}")} 
+  synth APPROX_CONF <=> APPROX_DICT using {createrex ("# comment\n\n$test-ing\ttest val\n","{\"#comment\"=\"comment\"}{}{\"$test-ing\"=\"test val\"}")} 

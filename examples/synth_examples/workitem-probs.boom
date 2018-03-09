@@ -85,7 +85,8 @@ let TYPE_MODERN_FIELD : regexp = "" | TYPE_MODERN . ","
 
 let type_converter
   : (lens in TYPE_LEGACY <=> TYPE_MODERN_FIELD) =
-  synth TYPE_LEGACY <=> TYPE_MODERN_FIELD using {("<Field Id=2>bug</Field>","\"type\"=\"bug\",")} 
+  synth TYPE_LEGACY <=> TYPE_MODERN_FIELD using
+  {createrex ("<Field Id=2>bug</Field>","\"type\"=\"bug\",") }
 
 let ID_LEGACY : regexp = "<Field Id=3>" . NUMERIC_FIELD . "</Field>" 
 
@@ -121,11 +122,11 @@ let WORKITEM_MODERN
 
 let legacy_converter
   : (lens in WORKITEM_LEGACY <=> WORKITEM_MODERN) =
-  synth WORKITEM_LEGACY <=> WORKITEM_MODERN using {("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",}"),
-    ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",}"),
-    ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
-    ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
-    ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"type\"=\"bug\",}"),
-    ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",}"),
-    ("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",}"),
-    ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"type\"=\"bug\",}")} 
+  synth WORKITEM_LEGACY <=> WORKITEM_MODERN using {createrex ("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"type\"=\"bug\",}")} 

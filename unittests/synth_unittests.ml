@@ -896,10 +896,158 @@ let test_kinda_rigid_synth_project_lastname _ =
        []
        [])
 
+let test_kinda_rigid_synth_project_firstname _ =
+  let uppercase = (Regex.from_char_set [(65,90)]) in
+  let lowercases = Regex.make_star (Regex.from_char_set [(97,122)]) in
+  let name =
+    iteratively_deepen
+      (Regex.make_concat
+         uppercase
+         lowercases)
+  in
+  let name_opened = Option.value_exn (Regex.separate_closed name) in
+  let firstlast =
+    Regex.make_concat
+      name
+      (Regex.make_concat
+         (Regex.make_base " ")
+         name)
+  in
+  assert_lens_float_option_equal
+    (Some
+       (Lens.make_concat
+          (Lens.make_const "" "")
+          (Lens.make_swap
+             (Lens.make_concat
+                (Lens.make_ident name_opened)
+                (Lens.make_const "" ""))
+             (Lens.make_concat
+                (Lens.make_disconnect (Regex.make_base "") name "" "A")
+                (Lens.make_const "" " ")))
+       ,1. /. 3.))
+    (Gen.DNFSynth.kinda_rigid_synth
+       LensContext.empty
+       name
+       firstlast
+       [("Miltner","Anders Miltner")]
+       []
+       []
+       [])
+
+let test_kinda_rigid_synth_disconnect _ =
+  let uppercase = (Regex.from_char_set [(65,90)]) in
+  let lowercases = Regex.make_star (Regex.from_char_set [(97,122)]) in
+  let name =
+    iteratively_deepen
+      (Regex.make_concat
+         uppercase
+         lowercases)
+  in
+  assert_lens_float_option_equal
+    (Some
+       (Lens.make_concat
+          (Lens.make_const "" "")
+          (Lens.make_swap
+             (Lens.make_concat
+                (Lens.make_disconnect name (Regex.one) "A" "")
+                (Lens.make_const "" ""))
+             (Lens.make_concat
+                (Lens.make_disconnect (Regex.one) name "" "A")
+                (Lens.make_const "" "")))
+       ,1. /. 3.))
+    (Gen.DNFSynth.kinda_rigid_synth
+       LensContext.empty
+       name
+       name
+       [("Anders","Anders")]
+       []
+       [("Anders","Miltner","Miltner")]
+       [])
+
+let test_kinda_rigid_synth_project_last_from_put _ =
+  let uppercase = (Regex.from_char_set [(65,90)]) in
+  let lowercases = Regex.make_star (Regex.from_char_set [(97,122)]) in
+  let name =
+    iteratively_deepen
+      (Regex.make_concat
+         uppercase
+         lowercases)
+  in
+  let name_opened = Option.value_exn (Regex.separate_closed name) in
+  let firstlast =
+    Regex.make_concat
+      name
+      (Regex.make_concat
+         (Regex.make_base " ")
+         name)
+  in
+  assert_lens_float_option_equal
+    (Some
+       (Lens.make_concat
+          (Lens.make_const "" "")
+          (Lens.make_concat
+             (Lens.make_concat
+                (Lens.make_ident name_opened)
+                (Lens.make_const " " ""))
+             (Lens.make_concat
+                (Lens.make_disconnect name (Regex.make_base "") "A" "")
+                (Lens.make_const "" "")))
+       ,1. /. 3.))
+    (Gen.DNFSynth.kinda_rigid_synth
+       LensContext.empty
+       firstlast
+       name
+       []
+       []
+       []
+       [("Anders","Nnders Anders","Anders Anders")])
+
+let test_kinda_rigid_synth_project_first_from_put _ =
+  let uppercase = (Regex.from_char_set [(65,90)]) in
+  let lowercases = Regex.make_star (Regex.from_char_set [(97,122)]) in
+  let name =
+    iteratively_deepen
+      (Regex.make_concat
+         uppercase
+         lowercases)
+  in
+  let name_opened = Option.value_exn (Regex.separate_closed name) in
+  let firstlast =
+    Regex.make_concat
+      name
+      (Regex.make_concat
+         (Regex.make_base " ")
+         name)
+  in
+  assert_lens_float_option_equal
+    (Some
+       (Lens.make_concat
+          (Lens.make_const "" "")
+          (Lens.make_swap
+             (Lens.make_concat
+                (Lens.make_disconnect name (Regex.make_base "") "A" "")
+                (Lens.make_const " " ""))
+             (Lens.make_concat
+                (Lens.make_ident name_opened)
+                (Lens.make_const "" "")))
+       ,1. /. 3.))
+    (Gen.DNFSynth.kinda_rigid_synth
+       LensContext.empty
+       firstlast
+       name
+       []
+       []
+       []
+       [("Anders","Anders Nnders","Anders Anders")])
+
 let kinda_rigid_synth_suite = "Test kinda_rigid_synth" >:::
-                              [
-                                "test_kinda_rigid_synth_project_lastname" >:: test_kinda_rigid_synth_empty;
+  [
+    "test_kinda_rigid_synth_empty" >:: test_kinda_rigid_synth_empty;
     "test_kinda_rigid_synth_project_lastname" >:: test_kinda_rigid_synth_project_lastname;
+    "test_kinda_rigid_synth_project_firstname" >:: test_kinda_rigid_synth_project_firstname;
+    "test_kinda_rigid_synth_disconnect" >:: test_kinda_rigid_synth_disconnect;
+    "test_kinda_rigid_synth_project_last_from_put" >:: test_kinda_rigid_synth_project_last_from_put;
+    "test_kinda_rigid_synth_project_first_from_put" >:: test_kinda_rigid_synth_project_first_from_put;
   ]
 
 let _ = run_test_tt_main kinda_rigid_synth_suite

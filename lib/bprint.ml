@@ -263,14 +263,22 @@ and format_exp e0 = match e0 with
     format_exp e1;
     msg "@ <=>@ ";
     format_exp e2;
+    (* TODO *)
     begin match exs with
       | [] -> msg "@]"
       | _ ->
         msg "@ using@ [";
         Misc.format_list
           "@ ;@ "
-          format_exp
-           exs;
+          (fun (t,e) ->
+             begin match t with
+               | `PutREx -> msg "putr@ "
+               | `PutLEx -> msg "putl@ "
+               | `CreateREx -> msg "creater@ "
+               | `CreateLEx -> msg "createl@ "
+             end;
+             format_exp e)
+          exs;
         msg "]@]"
     end
   | ECSet (_,pos, ranges) ->

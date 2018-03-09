@@ -100,7 +100,11 @@ let LETTER_ADDRESS_LIST
 
 let csv_to_letter
   : (lens in CSV_ADDRESS_DATABASE <=> LETTER_ADDRESS_LIST) =
-  synth CSV_ADDRESS_DATABASE <=> LETTER_ADDRESS_LIST using {("Doe,John,NP,12345,Porttown,88,Town Road West\nDoe,Jane,CJ,54321,Greentown,610,Direction House\n","John Doe\n88 Town Road West\nPorttown, NP  12345\n\nJane Doe\n610 Direction House\nGreentown, CJ  54321")} 
+  synth CSV_ADDRESS_DATABASE <=> LETTER_ADDRESS_LIST
+  using
+    { createrex
+      ("Doe,John,NP,12345,Porttown,88,Town Road West\nDoe,Jane,CJ,54321,Greentown,610,Direction House\n"
+      ,"John Doe\n88 Town Road West\nPorttown, NP  12345\n\nJane Doe\n610 Direction House\nGreentown, CJ  54321") }
 
 test csv_to_letter.get
   "Doe,John,NP,12345,Porttown,88,Town Road West\nDoe,Jane,CJ,54321,Greentown,610,Direction House\n"

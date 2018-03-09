@@ -170,7 +170,10 @@ let synth
     (env:CEnv.t)
     (r1:Brx.t)
     (r2:Brx.t)
-    (exs:(string * string) list)
+    (creater_exs:create_examples)
+    (createl_exs:create_examples)
+    (putr_exs:put_examples)
+    (putl_exs:put_examples)
   : Blenses.MLens.t =
   let subregexps = (Brx.subregexp_list r1)@(Brx.subregexp_list r2) in
   let (lss,d) = retrieve_existing_lenses subregexps env in
@@ -184,4 +187,7 @@ let synth
           lss
           r1
           r2
-          exs))
+          creater_exs
+          createl_exs
+          putr_exs
+          putl_exs))

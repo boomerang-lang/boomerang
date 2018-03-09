@@ -208,4 +208,5 @@ test matches_cex
 let apt_update_manager
   : (lens in APTCACHERNGSECURITY_CONF <=> APTCACHERNGSECURITY_DICT) =
   synth APTCACHERNGSECURITY_CONF <=> APTCACHERNGSECURITY_DICT using {
+  createrex
     ("# comment\nAdminAuth: mooma:moopa\n\n","{\"#comment\"=\"comment\"}{\"AdminAuth\"{\"mooma\"=\"moopa\"}}{}")} 

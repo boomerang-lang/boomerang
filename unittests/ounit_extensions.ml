@@ -25,12 +25,15 @@ struct
       Some (i2 / i1)
     else
       None
+
+  let requires_mapping v = v mod 100 = 0
 end
 
 module CompatibilityIntModule =
 struct
   include IntModule
   let are_compatible = is_equal %% compare
+  let requires_mapping v = v mod 100 = 0
 end
 
 module IntNormalizedPTST =

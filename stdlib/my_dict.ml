@@ -706,6 +706,22 @@ struct
       (d:t)
     : (key * value) =
     Option.value_exn (first ~f:f d)
+
+  let exists
+      ~f:(f:key -> value -> bool)
+      (d:t)
+    : bool =
+    let first_matching_o =
+      first
+        ~f:f
+        d
+    in
+    Option.is_some first_matching_o
+
+  let for_all
+      ~f:(f:key -> value -> bool)
+    : t -> bool =
+    not % (exists ~f:(not %% f))
 end
 
 

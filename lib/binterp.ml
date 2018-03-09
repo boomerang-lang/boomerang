@@ -364,17 +364,58 @@ and interp_exp wq cev e0 =
   | ESynth(i,e1,e2,exs) ->
     let v1 = interp_exp wq cev e1 in 
     let v2 = interp_exp wq cev e2 in
-    let exs = List.map (interp_exp wq cev) exs in
-    let exs =
-      List.map
-        (fun e ->
-           let (v1,v2) = V.get_p e in
-           (V.get_s v1, V.get_s v2))
+    let exs = List.map (fun (t,e) -> (t,interp_exp wq cev e)) exs in
+    let (creater_exs,createl_exs,putr_exs,putl_exs) =
+      List.fold_left
+        (fun (creater_exs,createl_exs,putr_exs,putl_exs) (t,e) ->
+            begin match t with
+              | `CreateREx ->
+                let (v1,v2) = V.get_p e in
+                let creater_exs =
+                  (V.get_s v1,V.get_s v2)
+                  ::creater_exs
+                in
+                (creater_exs,createl_exs,putr_exs,putl_exs)
+              | `CreateLEx ->
+                let (v1,v2) = V.get_p e in
+                let createl_exs =
+                  (V.get_s v1,V.get_s v2)
+                  ::createl_exs
+                in
+                (creater_exs,createl_exs,putr_exs,putl_exs)
+              | `PutREx ->
+                let (i,o) = V.get_p e in
+                let (i1,i2) = V.get_p i in
+                let putr_exs =
+                  (V.get_s i1,V.get_s i2,V.get_s o)
+                  ::putr_exs
+                in
+                (creater_exs,createl_exs,putr_exs,putl_exs)
+              | `PutLEx ->
+                let (i,o) = V.get_p e in
+                let (i1,i2) = V.get_p i in
+                let putl_exs =
+                  (V.get_s i1,V.get_s i2,V.get_s o)
+                  ::putl_exs
+                in
+                (creater_exs,createl_exs,putr_exs,putl_exs)
+            end)
+        ([],[],[],[])
         exs
     in
     let r1 = V.get_r v1 in
     let r2 = V.get_r v2 in
-    V.mk_l i (Bsynth.synth i cev r1 r2 exs)
+    V.mk_l
+      i
+      (Bsynth.synth
+         i
+         cev
+         r1
+         r2
+         creater_exs
+         createl_exs
+         putr_exs
+         putl_exs)
 
 and interp_binding wq cev b0 = match b0 with
   | Bind(i,p,so,e) -> 
@@ -385,11 +426,11 @@ and interp_binding wq cev b0 = match b0 with
                (string_of_pat p) (V.string_of_t v))
         | Some binds -> 
             Safelist.fold_left 
-              (fun (xsi,cevi) (xi,vi,soi) -> 
-                 let qxi = Qid.t_of_id xi in 
-                 let rsi = match soi with 
-                   | None -> G.Unknown 
-                   | Some s -> G.Sort s in  
+              (fun (xsi,cevi) (xi,vi,soi) ->
+                 let qxi = Qid.t_of_id xi in
+                 let rsi = match soi with
+                   | None -> G.Unknown
+                   | Some s -> G.Sort s in
                  (qxi::xsi,CEnv.update cevi (Qid.t_of_id xi) (rsi,vi)))
               ([],cev) binds in 
       (bcev,Safelist.rev xs_rev)
