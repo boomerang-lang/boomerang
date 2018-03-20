@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Regexcontext
 open Regex_utilities
@@ -170,7 +170,7 @@ let simplify_lens : Lens.t -> Lens.t =
               ~f:(fun l1 -> Lens.Concat (l1,l2))
               (try_insert_into_leftmost_identity l1 r1)
           | Lens.Identity r2 ->
-            Some (Lens.Identity (Regex.RegExConcat (r1,r2)))
+            Some (Lens.Identity (Regex.make_concat r1 r2))
           | _ -> None
         end
       in
@@ -220,7 +220,7 @@ let simplify_lens : Lens.t -> Lens.t =
           | (None, None) -> None
           | (Some r1, None) -> Some r1
           | (None, Some r2) -> Some r2
-          | (Some r1, Some r2) -> Some (Regex.RegExOr (r1,r2))
+          | (Some r1, Some r2) -> Some (Regex.make_or r1 r2)
         end
       in
       let or_lens_options
@@ -263,7 +263,7 @@ let simplify_lens : Lens.t -> Lens.t =
             let l' = merge_ored_beneath l' in
             (Some (Lens.Iterate l'), None)
           | Lens.Identity r ->
-            (None, if r = Regex.RegExEmpty then None else Some r)
+            (None, if r = Regex.empty then None else Some r)
           | Lens.Inverse l' ->
             let l' = merge_ored_beneath l' in
             (Some (Lens.Inverse l'), None)
@@ -280,7 +280,7 @@ let simplify_lens : Lens.t -> Lens.t =
     let distribute_iteration : Lens.t -> Lens.t =
       let distribute_iteration_single_level (l:Lens.t) : Lens.t =
         begin match l with
-          | Lens.Iterate (Lens.Identity r) -> Lens.Identity (Regex.RegExStar r)
+          | Lens.Iterate (Lens.Identity r) -> Lens.Identity (Regex.make_star r)
           | _ -> l
         end
       in
@@ -307,11 +307,15 @@ let simplify_lens : Lens.t -> Lens.t =
   let identify_identity_consts : Lens.t -> Lens.t =
     let identify_identity_consts_current_level (l:Lens.t) : Lens.t =
       begin match l with
-        | Lens.Disconnect(Regex.RegExBase s1,Regex.RegExBase s2,_,_) ->
-          if s1 = s2 then
-            Lens.Identity (Regex.RegExBase s1)
-          else
-            l
+        | Lens.Disconnect(r1,r2,_,_) ->
+          begin match (r1.node,r2.node) with
+            | (Regex.RegExBase s1, Regex.RegExBase s2) ->
+              if s1 = s2 then
+                Lens.Identity (Regex.make_base s1)
+              else
+                l
+            | _ -> l
+          end
         | _ -> l
       end
     in
@@ -321,12 +325,36 @@ let simplify_lens : Lens.t -> Lens.t =
   let remove_identity_identities : Lens.t -> Lens.t =
     let remove_identity_identities_current_level (l:Lens.t) : Lens.t =
       begin match l with
-        | Lens.Concat(Lens.Identity (Regex.RegExBase ""), l) -> l
-        | Lens.Concat(l, Lens.Identity (Regex.RegExBase "")) -> l
-        | Lens.Swap (Lens.Identity (Regex.RegExBase ""), l) -> l
-        | Lens.Swap (l, Lens.Identity (Regex.RegExBase "")) -> l
-        | Lens.Union (l, Lens.Identity (Regex.RegExEmpty))   -> l
-        | Lens.Union (Lens.Identity (Regex.RegExEmpty), l)   -> l
+        | Lens.Concat(Lens.Identity r, l') ->
+          if is_equal (Regex.compare r Regex.one) then
+            l'
+          else
+            l
+        | Lens.Concat(l', Lens.Identity r) ->
+          if is_equal (Regex.compare r Regex.one) then
+            l'
+          else
+            l
+        | Lens.Swap (Lens.Identity r, l') ->
+          if is_equal (Regex.compare r Regex.one) then
+            l'
+          else
+            l
+        | Lens.Swap (l', Lens.Identity r) ->
+          if is_equal (Regex.compare r Regex.one) then
+            l'
+          else
+            l
+        | Lens.Union (l', Lens.Identity r) ->
+          if is_equal (Regex.compare r Regex.zero) then
+            l'
+          else
+            l
+        | Lens.Union (Lens.Identity r, l') ->
+          if is_equal (Regex.compare r Regex.zero) then
+            l'
+          else
+            l
         | _ -> l
       end
     in
@@ -349,8 +377,8 @@ let simplify_lens : Lens.t -> Lens.t =
       begin match l with
         | Lens.Disconnect(r1,r2,s1,s2) ->
           Lens.Concat
-            (Lens.Disconnect(r1,Regex.RegExBase "",s1,"")
-            ,Lens.Disconnect(Regex.RegExBase "",r2,"",s2))
+            (Lens.Disconnect(r1,Regex.one,s1,"")
+            ,Lens.Disconnect(Regex.one,r2,"",s2))
         | _ -> l
       end
     in
@@ -364,23 +392,27 @@ let simplify_lens : Lens.t -> Lens.t =
     in
     let separate_emptystring_consts_current_level (l:Lens.t) : Lens.t =
       begin match l with
-        | Lens.Disconnect(Regex.RegExBase "",Regex.RegExBase "",_,_) -> l
-        | Lens.Disconnect(Regex.RegExBase "",Regex.RegExBase s2,_,_) ->
-          let sl = string_to_singlecharstring_list s2 in
-          let (fs,ls) = split_by_last_exn sl in
-          List.fold_right
-            ~f:(fun s acc ->
-                Lens.Concat(Lens.Disconnect(Regex.RegExBase "",Regex.RegExBase s,"",s),acc))
-            ~init:(Lens.Disconnect(Regex.RegExBase "",Regex.RegExBase ls,"",ls))
-            fs
-        | Lens.Disconnect(Regex.RegExBase s1,Regex.RegExBase "",_,_) ->
-          let sl = string_to_singlecharstring_list s1 in
-          let (fs,ls) = split_by_last_exn sl in
-          List.fold_right
-            ~f:(fun s acc ->
-                Lens.Concat(Lens.Disconnect(Regex.make_base s,Regex.make_base "",s,""),acc))
-            ~init:(Lens.Disconnect(Regex.make_base ls,Regex.make_base "",ls,""))
-            fs
+        | Lens.Disconnect(r1,r2,_,_) ->
+          begin match (r1.node,r2.node) with
+            | (Regex.RegExBase "", Regex.RegExBase "") -> l
+            | (Regex.RegExBase "",Regex.RegExBase s2) ->
+              let sl = string_to_singlecharstring_list s2 in
+              let (fs,ls) = split_by_last_exn sl in
+              List.fold_right
+                ~f:(fun s acc ->
+                    Lens.Concat(Lens.Disconnect(Regex.one,Regex.make_base s,"",s),acc))
+                ~init:(Lens.Disconnect(Regex.one,Regex.make_base ls,"",ls))
+                fs
+            | (Regex.RegExBase s1,Regex.RegExBase "") ->
+              let sl = string_to_singlecharstring_list s1 in
+              let (fs,ls) = split_by_last_exn sl in
+              List.fold_right
+                ~f:(fun s acc ->
+                    Lens.Concat(Lens.Disconnect(Regex.make_base s,Regex.one,s,""),acc))
+                ~init:(Lens.Disconnect(Regex.make_base ls,Regex.one,ls,""))
+                fs
+            | _ -> l
+          end
         | _ -> l
       end
     in
@@ -398,7 +430,12 @@ let simplify_lens : Lens.t -> Lens.t =
             | (None, sso) -> (Some l1, sso)
             | (Some l2, sso) -> (Some (Lens.Concat (l1,l2)),sso)
           end
-        | Lens.Disconnect(Regex.RegExBase s1,Regex.RegExBase s2,_,_) -> (None, Some (s1,s2))
+        | Lens.Disconnect(r1,r2,_,_) ->
+          begin match (r1.node,r2.node) with
+            | (Regex.RegExBase s1,Regex.RegExBase s2) ->
+              (None, Some (s1,s2))
+            | _ -> (Some l, None)
+          end
         | _ -> (Some l, None)
       end
     in
@@ -412,8 +449,12 @@ let simplify_lens : Lens.t -> Lens.t =
           Option.map
             ~f:(fun l1 -> Lens.Concat (l1,l2))
             (try_insert_into_leftmost_const l1 s1 s2)
-        | Lens.Disconnect (Regex.RegExBase t1,Regex.RegExBase t2,_,_) ->
-          Some (Lens.Disconnect (Regex.RegExBase (s1^t1),Regex.RegExBase (s2^t2),s1^t1,s2^t2))
+        | Lens.Disconnect (r1,r2,_,_) ->
+          begin match (r1.node,r2.node) with
+            | (Regex.RegExBase t1,Regex.RegExBase t2) ->
+              Some (Lens.Disconnect (Regex.make_base (s1^t1),Regex.make_base (s2^t2),s1^t1,s2^t2))
+            | _ -> None
+          end
         | _ -> None
       end
     in
@@ -450,7 +491,7 @@ let simplify_lens : Lens.t -> Lens.t =
     % maximally_factor_lens
     % separate_emptystring_consts
   in
-  
+
   fold_until_fixpoint
     ~is_eq:Lens.is_eq
     (perform_cleanups

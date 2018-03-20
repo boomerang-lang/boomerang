@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Ounit_general_extensions
 open Optician
 open Star_semiring_tree
@@ -27,6 +27,8 @@ struct
       None
 
   let requires_mapping v = v mod 100 = 0
+  module Default = IntModule
+  let extract_default _ = failwith "TODO"
 end
 
 module CompatibilityIntModule =
@@ -34,6 +36,8 @@ struct
   include IntModule
   let are_compatible = is_equal %% compare
   let requires_mapping v = v mod 100 = 0
+  module Default = IntModule
+  let extract_default _ = failwith "TODO"
 end
 
 module IntNormalizedPTST =
@@ -121,3 +125,8 @@ let assert_lens_float_option_equal =
               1
           | _ -> 1
         end)
+
+let assert_regex_equal =
+  assert_equal
+    ~printer:Regex.show
+    ~cmp:Regex.compare

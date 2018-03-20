@@ -1,5 +1,7 @@
-open Stdlib
+open MyStdlib
 open Star_semiring_tree
+
+module type DefaultData = Data
 
 module type BaseAlignment =
 sig
@@ -23,6 +25,8 @@ sig
   val hash_fold_t : t hash_folder
   val get_alignment : t -> t -> Alignment.t option
   val requires_mapping : t -> bool
+  module Default : DefaultData
+  val extract_default : t -> Default.t option
 end
 
 module type PlusData =
@@ -35,6 +39,8 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  module Default : DefaultData
+  val extract_default : t -> Default.t option
 end
 
 module type TimesData =
@@ -47,6 +53,8 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  module Default : DefaultData
+  val extract_default : t -> Default.t option
 end
 
 module type StarData =
@@ -59,6 +67,8 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  module Default : DefaultData
+  val extract_default : t -> Default.t option
 end
 
 module Position = PairOf(IntModule)(IntModule)

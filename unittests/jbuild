@@ -1,11 +1,15 @@
 (jbuild_version 1)
 
-(executable
- ((name synth_unittests)
-  (modules (synth_unittests ounit_general_extensions ounit_extensions))
-  (libraries (ounit stdlib optician))))
+(executables
+ ((names (synth_unittests lang_unittests))
+  (libraries (ounit myStdlib optician))))
 
 (alias
  ((name    runtest)
   (deps    (synth_unittests.exe))
+  (action  (run ${^}))))
+
+(alias
+ ((name    runtest)
+  (deps    (lang_unittests.exe))
   (action  (run ${^}))))

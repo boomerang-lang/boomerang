@@ -1643,34 +1643,36 @@ let rec subregexp_list
      | Empty -> []
    end)
 
-open Stdlib
+open MyStdlib
 open Optician
 open Lang
 
 let rec to_optician_regexp r =
   begin match r.desc with
     | CSet cs -> Regex.from_char_set cs
-    | String s -> Regex.RegExBase s
+    | String s -> Regex.make_base s
     | Alt (r1,r2) -> 
-      Regex.RegExOr
-        (to_optician_regexp r1
-        ,to_optician_regexp r2)
+      Regex.make_or
+        (to_optician_regexp r1)
+        (to_optician_regexp r2)
     | Seq (r1,r2) ->
-      Regex.RegExConcat
-        (to_optician_regexp r1
-        ,to_optician_regexp r2)
+      Regex.make_concat
+        (to_optician_regexp r1)
+        (to_optician_regexp r2)
     | Star r ->
-      Regex.RegExStar (to_optician_regexp r)
+      Regex.make_star (to_optician_regexp r)
     | Iter (r,i1,i2) ->
       let r = to_optician_regexp r in
       if i2 < 0 then
-        Regex.RegExConcat(Regex.iterate_n_times i1 r, Regex.RegExStar r)
+        Regex.make_concat
+          (Regex.iterate_n_times i1 r)
+          (Regex.make_star r)
       else
         Regex.iterate_m_to_n_times
           i1
           i2
           r
-    | Empty -> Regex.RegExEmpty
+    | Empty -> Regex.empty
     | Diff _ 
     | Complement _
     | Inter _

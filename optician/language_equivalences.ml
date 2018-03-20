@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Normalized_lang
 open Permutation
@@ -8,7 +8,7 @@ let rec to_dnf_regex (r:Regex.t) : dnf_regex =
   let atom_to_dnf_regex (a:atom) : dnf_regex =
     [([a],["";""])]
   in
-  begin match r with
+  begin match r.node with
   | Regex.RegExEmpty -> []
   | Regex.RegExBase c -> [([],[c])]
   | Regex.RegExConcat (r1,r2) ->
@@ -119,5 +119,5 @@ and dnf_lens_to_lens ((clauses,_):dnf_lens) : Lens.t =
   let clause_lenses = List.map ~f:clause_lens_to_lens clauses in
   List.fold_left
     ~f:(fun acc l -> Lens.Union (acc, l))
-    ~init:(Lens.Identity (Regex.RegExEmpty))
+    ~init:(Lens.Identity (Regex.empty))
     clause_lenses

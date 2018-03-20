@@ -75,7 +75,8 @@ test matches_cex TITLE_MODERN "\"title\"=\"title\"" = true
 
 let title_converter
   : (lens in TITLE_LEGACY <=> TITLE_MODERN_FIELD) =
-  synth TITLE_LEGACY <=> TITLE_MODERN_FIELD 
+  synth TITLE_LEGACY <=> TITLE_MODERN_FIELD using
+  {createrex ("<Field Id=1>title</Field>","\"title\"=\"title\",") }
 
 let TYPE_LEGACY : regexp = "<Field Id=2>" . TEXT_FIELD . "</Field>" 
 
@@ -102,7 +103,8 @@ let DESCRIPTION_MODERN_FIELD : regexp = "" | DESCRIPTION_MODERN . ","
 
 let description_converter
   : (lens in DESCRIPTION_LEGACY <=> DESCRIPTION_MODERN_FIELD) =
-  synth DESCRIPTION_LEGACY <=> DESCRIPTION_MODERN_FIELD 
+  synth DESCRIPTION_LEGACY <=> DESCRIPTION_MODERN_FIELD using
+  {createrex ("<Field Id=4>this is a bad bug</Field>","\"description\"=\"this is a bad bug\",") }
 
 let WORKITEM_LEGACY
   : regexp =

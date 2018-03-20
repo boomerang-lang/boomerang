@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lenscontext
 open Converter
 open Regexcontext
@@ -401,7 +401,7 @@ struct
                 | None -> (best,best_cost)
                 | Some (l,c) ->
                   let cost = c +. f in
-                  if cost <=. best_cost then
+                  if cost <. best_cost then
                     (Some l,cost)
                   else
                     (best,best_cost)

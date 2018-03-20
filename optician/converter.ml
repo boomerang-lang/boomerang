@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Eval
 open Lens_put
@@ -137,7 +137,7 @@ let rec exampled_regex_to_regex
     (er:exampled_regex)
   : Regex.t =
   begin match er with
-    | ERegExEmpty -> Regex.make_empty
+    | ERegExEmpty -> Regex.empty
     | ERegExBase (s,_) -> Regex.make_base s
     | ERegExConcat (er1,er2,_) ->
       Regex.make_concat
@@ -190,7 +190,7 @@ let rec exampled_regex_to_exampled_dnf_regex
           ill
       else
         exampled_atom_to_exampled_dnf_regex
-          (EAClosed (s,s,Lens.Identity (Regex.RegExClosed s),ss,ill,ss))
+          (EAClosed (s,s,Lens.Identity (Regex.make_closed s),ss,ill,ss))
           ill
   end
 

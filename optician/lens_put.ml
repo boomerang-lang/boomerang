@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Eval
 open Normalized_lang

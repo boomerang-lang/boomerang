@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 
 type entry =
   { mutable laps : float list

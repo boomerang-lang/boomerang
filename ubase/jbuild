@@ -1,5 +1,6 @@
 (jbuild_version 1)
 
 (library
-  ((name ubase)
+ ((name ubase)
+  (libraries (unix))
 ))

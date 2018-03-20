@@ -4,4 +4,4 @@
  ((name        optician)
   (preprocess (pps (ppx_deriving.std ppx_hash)))
   (synopsis "Bijective Lens Synthesis")
-  (libraries (stdlib))))
+  (libraries (myStdlib))))

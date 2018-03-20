@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 
 (** To be an ordered metric space, we require the space to have a distance
   * metric (a function distance : X -> X -> double) and a total ordering (a function

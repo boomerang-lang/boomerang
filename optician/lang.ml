@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Printf
 
 
@@ -32,23 +32,35 @@ end
 
 module Regex =
 struct
-  type t =
+  type t = t_node hash_consed
+  and t_node =
     | RegExEmpty
     | RegExBase of string
     | RegExConcat of t * t
-    | RegExOr of t * t 
+    | RegExOr of t * t
     | RegExStar of t
     | RegExClosed of t
   [@@deriving ord, show, hash]
 
-  let one = RegExBase ""
+  let hash_t_node
+      (r:t_node)
+    : int =
+    begin match r with
+      | RegExEmpty -> 31
+      | RegExBase s -> String.hash s + 63
+      | RegExConcat (r1,r2) -> 91 * (r1.hkey + 133 * r2.hkey)
+      | RegExOr (r1,r2) -> 157 * (r1.hkey + 139 * r2.hkey)
+      | RegExStar r -> 821 * r.hkey + 4
+      | RegExClosed r -> 1213 * r.hkey + 8
+    end
 
-  let zero = RegExEmpty
+  let table = HashConsTable.create 100000
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node show_t_node table
 
   let separate_plus
       (r:t)
     : (t * t) option =
-    begin match r with
+    begin match r.node with
       | RegExOr (r1,r2) -> Some (r1,r2)
       | _ -> None
     end
@@ -56,7 +68,7 @@ struct
   let separate_times
       (r:t)
     : (t * t) option =
-    begin match r with
+    begin match r.node with
       | RegExConcat (r1,r2) -> Some (r1,r2)
       | _ -> None
     end
@@ -64,7 +76,7 @@ struct
   let separate_star
       (r:t)
     : t option =
-    begin match r with
+    begin match r.node with
       | RegExStar r' -> Some r'
       | _ -> None
     end
@@ -72,34 +84,34 @@ struct
   let separate_closed
       (r:t)
     : t option =
-    begin match r with
+    begin match r.node with
       | RegExClosed r -> Some r
       | _ -> None
     end
 
-  let make_empty : t = RegExEmpty
+  let empty : t = hashcons RegExEmpty
 
   let make_concat
       (r1:t)
       (r2:t)
     : t =
-    RegExConcat (r1,r2)
+    hashcons (RegExConcat (r1,r2))
 
   let make_or
       (r1:t)
       (r2:t)
     : t =
-    RegExOr (r1,r2)
+    hashcons (RegExOr (r1,r2))
 
   let make_star
       (r:t)
     : t =
-    RegExStar r
+    hashcons (RegExStar r)
 
   let make_closed
       (r:t)
     : t =
-    RegExClosed r
+    hashcons (RegExClosed r)
 
   let make_plus = make_or
 
@@ -108,7 +120,11 @@ struct
   let make_base
       (s:string)
     : t =
-    RegExBase s
+    hashcons (RegExBase s)
+
+  let one = make_base ""
+
+  let zero = empty
 
   let fold_downward_upward
       ~init:(init:'b)
@@ -127,7 +143,7 @@ struct
         (downward_acc:'b)
         (r:t)
       : 'a =
-      begin match r with
+      begin match r.node with
         | RegExEmpty -> upward_empty downward_acc
         | RegExBase s -> upward_base downward_acc s
         | RegExConcat (r1,r2) ->
@@ -186,16 +202,16 @@ struct
     : 'a =
     snd
       (fold
-         ~empty_f:(RegExEmpty,empty_f)
-         ~base_f:(fun s -> (RegExBase s, base_f s))
+         ~empty_f:(empty,empty_f)
+         ~base_f:(fun s -> (make_base s, base_f s))
          ~concat_f:(fun (r1,x1) (r2,x2) ->
-             (RegExConcat (r1,r2), concat_f r1 r2 x1 x2))
+             (make_concat r1 r2, concat_f r1 r2 x1 x2))
          ~or_f:(fun (r1,x1) (r2,x2) ->
-             (RegExOr (r1,r2), or_f r1 r2 x1 x2))
+             (make_or r1 r2, or_f r1 r2 x1 x2))
          ~star_f:(fun (r',x') ->
-             (RegExStar r', star_f r' x'))
+             (make_star r', star_f r' x'))
          ~closed_f:(fun (r',x') ->
-             (RegExClosed r', closed_f r' x'))
+             (make_closed r', closed_f r' x'))
          r)
 
 
@@ -204,12 +220,12 @@ struct
       (r:t)
     : t =
     fold
-      ~empty_f:(f RegExEmpty)
-      ~base_f:(fun s -> f (RegExBase s))
-      ~concat_f:(fun r1 r2 -> f (RegExConcat (r1,r2)))
-      ~or_f:(fun r1 r2 -> f (RegExOr (r1,r2)))
-      ~star_f:(fun r' -> f (RegExStar r'))
-      ~closed_f:(fun r' -> f (RegExClosed r'))
+      ~empty_f:(f empty)
+      ~base_f:(fun s -> f (make_base s))
+      ~concat_f:(fun r1 r2 -> f (make_concat r1 r2))
+      ~or_f:(fun r1 r2 -> f (make_or r1 r2))
+      ~star_f:(fun r' -> f (make_star r'))
+      ~closed_f:(fun r' -> f (make_closed r'))
       r
 
   let rec applies_for_every_applicable_level
@@ -219,56 +235,56 @@ struct
     %
     fold
       ~empty_f:(
-        let empty_r = RegExEmpty in
+        let empty_r = empty in
         let level_contribution = option_to_empty_or_singleton (f empty_r) in
         (empty_r, level_contribution))
       ~base_f:(fun s ->
-          let base_r = RegExBase s in
+          let base_r = make_base s in
           let level_contribution = option_to_empty_or_singleton (f base_r) in
           (base_r, level_contribution))
       ~concat_f:(fun (r1,r1s) (r2,r2s) ->
-          let concat_r = RegExConcat (r1,r2) in
+          let concat_r = make_concat r1 r2 in
           let level_contribution = option_to_empty_or_singleton (f concat_r) in
           let recursed_lefts =
             List.map
-              ~f:(fun r1' -> RegExConcat (r1',r2))
+              ~f:(fun r1' -> make_concat r1' r2)
               r1s
           in
           let recursed_rights =
             List.map
-              ~f:(fun r2' -> RegExConcat (r1,r2'))
+              ~f:(fun r2' -> make_concat r1 r2')
               r2s
           in
           (concat_r, level_contribution@recursed_lefts@recursed_rights))
       ~or_f:(fun (r1,r1s) (r2,r2s) ->
-          let or_r = RegExOr (r1,r2) in
+          let or_r = make_or r1 r2 in
           let level_contribution = option_to_empty_or_singleton (f or_r) in
           let recursed_lefts =
             List.map
-              ~f:(fun r1' -> RegExOr (r1',r2))
+              ~f:(fun r1' -> make_or r1' r2)
               r1s
           in
           let recursed_rights =
             List.map
-              ~f:(fun r2' -> RegExOr (r1,r2'))
+              ~f:(fun r2' -> make_or r1 r2')
               r2s
           in
           (or_r, level_contribution@recursed_lefts@recursed_rights))
       ~star_f:(fun (r',r's) ->
-          let star_r = RegExStar r' in
+          let star_r = make_star r' in
           let level_contribution = option_to_empty_or_singleton (f star_r) in
           let recursed_inner =
             List.map
-              ~f:(fun r'' -> RegExStar r'')
+              ~f:(fun r'' -> make_star r'')
               r's
           in
           (star_r, level_contribution@recursed_inner))
       ~closed_f:(fun (r',r's) ->
-          let closed_r = RegExClosed r' in
+          let closed_r = make_closed r' in
           let level_contribution = option_to_empty_or_singleton (f closed_r) in
           let recursed_inner =
             List.map
-              ~f:(fun r'' -> RegExClosed r'')
+              ~f:(fun r'' -> make_closed r'')
               r's
           in
           (closed_r, level_contribution@recursed_inner))
@@ -292,29 +308,29 @@ struct
 	  in let helper ((m, n) : int * int) : t =
 		     let rec innerHelper (i : int) (r : t) : t =
 			     if i > n then r else
-				     innerHelper (i + 1) (RegExOr(r, RegExBase (String.of_char (charOf i))))
+				     innerHelper (i + 1) (make_or r (make_base (String.of_char (charOf i))))
 		     in if n < m then failwith "Malformed Character Set" else
-		     if n = m then RegExBase (String.of_char (charOf m)) else
-			     innerHelper (m + 1) (RegExBase (String.of_char (charOf m)))
+		     if n = m then make_base (String.of_char (charOf m)) else
+			     innerHelper (m + 1) (make_base (String.of_char (charOf m)))
 	  in
-	  List.fold_left l ~init: RegExEmpty
-		  ~f: (fun r x -> if r = RegExEmpty then helper x else RegExOr (r, (helper x)))
+	  List.fold_left l ~init:empty
+		  ~f: (fun r x -> if r = empty then helper x else make_or r (helper x))
 
   let iterate_n_times (n : int) (r : t) : t =
 	  let rec helper (index : int) (temp : t) : t =
-		  if index > n then temp else helper (index + 1) (RegExConcat(r, temp)) in
-	  if n < 0 then RegExEmpty else if n = 0 then RegExBase "" else helper 2 r
+		  if index > n then temp else helper (index + 1) (make_concat r temp) in
+	  if n < 0 then empty else if n = 0 then one else helper 2 r
 
   let iterate_m_to_n_times (m : int) (n : int) (r : t) : t =
 	  let rec helper (index : int) (temp : t) : t =
 		  if index > n then temp else
-			  helper (index + 1) (RegExOr(temp, iterate_n_times index r)) in
-	 if n < m then RegExEmpty else helper (m + 1) (iterate_n_times m r)
+			  helper (index + 1) (make_or temp (iterate_n_times index r)) in
+	 if n < m then empty else helper (m + 1) (iterate_n_times m r)
 
   let rec is_empty
       (r:t)
     : bool =
-    begin match r with
+    begin match r.node with
       | RegExConcat (r1,r2) ->
         is_empty r1 || is_empty r2
       | RegExOr (r1,r2) ->
@@ -332,7 +348,7 @@ struct
   let rec is_singleton
       (r:t)
     : bool =
-    begin match r with
+    begin match r.node with
       | RegExBase _ ->
         true
       | RegExStar r ->
@@ -351,7 +367,7 @@ struct
   let rec representative
       (r:t)
     : string option =
-    begin match r with
+    begin match r.node with
       | RegExConcat (r1,r2) ->
         option_bind
           ~f:(fun s ->
@@ -746,7 +762,7 @@ type declaration =
 
 type program = declaration list
 
-type synth_problems = (Id.t * Regex.t * bool) list * (specification list) 
+type synth_problems = (Id.t * Regex.t * bool) list * (specification list)
 
 (***** }}} *****)
 

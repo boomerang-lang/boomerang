@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 
 (***** The main LensContext module {{{ *****)
@@ -40,7 +40,7 @@ module LensContext = struct
       | Lens.Closed _ -> ()
       | _ -> failwith "not closed into lens context"
     end;
-    begin match (r1,r2) with
+    begin match (r1.node,r2.node) with
       | (Regex.RegExClosed r1, Regex.RegExClosed r2) ->
         { outgoing = update_outgoing lc.outgoing r1 r2 l;
           equivs   = update_equivs lc.equivs r1 r2       ; }
@@ -70,7 +70,7 @@ module LensContext = struct
     let rec shortest_path_internal (accums:(Lens.t * Regex.t) list) : Lens.t =
       let satisfying_path_option =
         List.find
-          ~f:(fun (_,n) -> n = r2)
+          ~f:(fun (_,n) -> is_equal (Regex.compare n r2))
           accums
       in
       begin match satisfying_path_option with
@@ -94,9 +94,9 @@ module LensContext = struct
     in
     let regex1_rep = DS.find_representative lc.equivs r1 in
     let regex2_rep = DS.find_representative lc.equivs r2 in
-    if regex1_rep <> regex2_rep then
+    if not (is_equal (Regex.compare regex1_rep regex2_rep)) then
       None
-    else if r1 = r2 then
+    else if is_equal (Regex.compare r1 r2) then
       Some (Lens.Identity r1)
     else
       Some (shortest_path_internal (get_outgoing_edges outgoing r1))

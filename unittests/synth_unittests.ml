@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open OUnit2
 open Ounit_general_extensions
 open Ounit_extensions
@@ -847,8 +847,8 @@ let test_kinda_rigid_synth_empty _ =
     (Some (Lens.zero,0.))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       Regex.make_empty
-       Regex.make_empty
+       Regex.empty
+       Regex.empty
        []
        []
        []
@@ -1249,8 +1249,8 @@ let test_alignment_to_lens_concat_projs_swap _ =
                  (Lens.make_const "a4" "b2")
              ;Lens.make_concat
                  (Lens.make_disconnect
-                    (Regex.RegExBase "")
-                    (Regex.RegExClosed (Regex.RegExBase "w"))
+                    (Regex.make_base "")
+                    (Regex.make_closed (Regex.make_base "w"))
                     ""
                     "w")
                  (Lens.make_const "" "b4")])))

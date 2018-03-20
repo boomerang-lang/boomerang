@@ -1012,7 +1012,7 @@ let res_zip f r ra rb =
 
 (* * Balign.res_unzip : ('a -> ('a * 'a)) -> res -> mark -> mark -> (res * res * res) *)
 (* A mark is a TmI.t. *)
-let res_unzip f r start len =
+let res_unzip f r start len=
 (* [Balign.res_unzip f d start len] returs [p, a, b] with: *)
 (* . [Balign.res_zip f^{-1} p a b] = [d] *)
 (* . [dom a] = [dom b] is [start] <= . < [start + len] *)

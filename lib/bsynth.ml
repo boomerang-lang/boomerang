@@ -26,7 +26,7 @@ open Bsyntax
 open Bident
 open Benv
 
-open Stdlib
+open MyStdlib
 open Optician 
 open Lang
 

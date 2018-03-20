@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 
 module NonemptyLabelledPlusTimesStarTreeOf
     (PD : Data)

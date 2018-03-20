@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name        stdlib)
-  (modules     (stdlib
+ ((name        myStdlib)
+  (modules     (myStdlib
                 util
                 algebra
                 my_dict
@@ -15,6 +15,7 @@
                 my_tree
                 my_list_extensions
                 string_utilities
+                my_hash_cons
                 ))
   (preprocess (pps (ppx_deriving.std ppx_hash)))
   (synopsis "Standard Library for OCaml")

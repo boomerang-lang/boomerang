@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Regexcontext
 
@@ -9,30 +9,30 @@ let simplify_regex : Regex.t -> Regex.t =
       regex_semiring
   in
   let rec clean_regex (r:Regex.t) : Regex.t =
-    begin match r with
+    begin match r.node with
       | Regex.RegExConcat(x,y) ->
         let x = clean_regex x in
         let y = clean_regex y in
-        begin match (x,y) with
+        begin match (x.node,y.node) with
           | (Regex.RegExBase "",_) -> y
           | (_,Regex.RegExBase "") -> x
-          | (Regex.RegExEmpty,_) -> Regex.RegExEmpty
-          | (_,Regex.RegExEmpty) -> Regex.RegExEmpty
-          | _ -> Regex.RegExConcat(x,y)
+          | (Regex.RegExEmpty,_) -> Regex.empty
+          | (_,Regex.RegExEmpty) -> Regex.empty
+          | _ -> Regex.make_concat x y
         end
       | Regex.RegExOr(x,y) ->
         let x = clean_regex x in
         let y = clean_regex y in
-        begin match (x,y) with
+        begin match (x.node,y.node) with
           | (Regex.RegExEmpty,_) -> y
           | (_,Regex.RegExEmpty) -> x
-          | _ -> Regex.RegExOr(x,y)
+          | _ -> Regex.make_or x y
         end
       | Regex.RegExStar(x) ->
         let x = clean_regex x in
-        begin match x with
-          | Regex.RegExEmpty -> Regex.RegExBase ""
-          | _ -> Regex.RegExStar x
+        begin match x.node with
+          | Regex.RegExEmpty -> Regex.make_base ""
+          | _ -> Regex.make_star x
         end
       | _ -> r
     end
@@ -42,11 +42,11 @@ let simplify_regex : Regex.t -> Regex.t =
     let rec retrieve_rightmost_concated_base
         (r:Regex.t)
       : (Regex.t option * string option) =
-      begin match r with
+      begin match r.node with
         | Regex.RegExConcat (r1,r2) ->
           begin match retrieve_rightmost_concated_base r2 with
             | (None, so) -> (Some r1, so)
-            | (Some r2, so) -> (Some (Regex.RegExConcat (r1,r2)),so)
+            | (Some r2, so) -> (Some (Regex.make_concat r1 r2),so)
           end
         | Regex.RegExBase s -> (None, Some s)
         | _ -> (Some r, None)
@@ -56,20 +56,20 @@ let simplify_regex : Regex.t -> Regex.t =
         (r:Regex.t)
         (s1:string)
       : Regex.t option =
-      begin match r with
+      begin match r.node with
         | Regex.RegExConcat (r1,r2) ->
           Option.map
-            ~f:(fun r1 -> Regex.RegExConcat (r1,r2))
+            ~f:(fun r1 -> Regex.make_concat r1 r2)
             (try_insert_into_leftmost_concated_base r1 s1)
         | Regex.RegExBase s2 ->
-          Some (Regex.RegExBase (s1^s2))
+          Some (Regex.make_base (s1^s2))
         | _ -> None
       end
     in
     let merge_concated_bases_current_level
         (r:Regex.t)
       : Regex.t =
-      begin match r with
+      begin match r.node with
         | Regex.RegExConcat (r1,r2) ->
           begin match retrieve_rightmost_concated_base r1 with
             | (r1o,Some s1) ->
@@ -78,7 +78,7 @@ let simplify_regex : Regex.t -> Regex.t =
                 | Some r2 ->
                   begin match r1o with
                     | None -> r2
-                    | Some r1 -> Regex.RegExConcat (r1,r2)
+                    | Some r1 -> Regex.make_concat r1 r2
                   end
               end
             | (_, None) -> r
@@ -100,7 +100,7 @@ let simplify_regex : Regex.t -> Regex.t =
 let rec iteratively_deepen
     (r:Regex.t)
   : Regex.t =
-  begin match r with
+  begin match r.node with
     | Regex.RegExEmpty -> r
     | Regex.RegExBase _ -> r
     | Regex.RegExConcat (r1,r2) ->
@@ -113,7 +113,7 @@ let rec iteratively_deepen
       Regex.make_closed (Regex.make_or r1 r2)
     | Regex.RegExStar r' ->
       let r' = iteratively_deepen r' in
-      Regex.make_closed (Regex.RegExStar r')
+      Regex.make_closed (Regex.make_star r')
     | Regex.RegExClosed _ ->
       failwith "shouldn't happen"
   end
@@ -124,7 +124,7 @@ let get_dnf_size
   let rec get_dnf_size_internal
       (r:Regex.t)
     : int * int =
-    begin match r with
+    begin match r.node with
       | Regex.RegExEmpty -> (0,0)
       | Regex.RegExBase _ -> (0,1)
       | Regex.RegExConcat (r1,r2) ->

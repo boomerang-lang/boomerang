@@ -3,11 +3,11 @@
 (ocamllex (src2fcl))
 
 (library
-  ((name hbase)
-   (libraries (ubase unix))
+ ((name hbase)
+  (libraries (ubase unix str))
 ))
 
 (executable
   ((name baker)
    (libraries (hbase))
-))    
+))

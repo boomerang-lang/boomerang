@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Regex_utilities
 open Star_semiring_tree_alignment
@@ -236,6 +236,9 @@ struct
                  v.parsings.output_data
                  p)
            v.parsings.arg2_data)
+
+    module Default = IntModule
+    let extract_default _ = failwith "ah"
   end
 
   module TD =
@@ -304,6 +307,9 @@ struct
                  v.parsings.output_data
                  p)
            v.parsings.arg2_data)
+
+    module Default = IntModule
+    let extract_default _ = failwith "ah"
   end
 
   module SD =
@@ -349,6 +355,9 @@ struct
                  v.parsings.output_data
                  p)
            v.parsings.arg2_data)
+
+    module Default = IntModule
+    let extract_default _ = failwith "ah"
   end
 
   module BD =
@@ -451,6 +460,9 @@ struct
                  output_parsings_strings
                  p)
            arg2_parsings_strings)
+
+    module Default = IntModule
+    let extract_default _ = failwith "ah"
   end
 
   module Alignment = PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)

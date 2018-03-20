@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 
 (***** The main RegexContext module {{{ *****)

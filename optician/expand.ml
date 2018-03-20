@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 open Lenscontext
 open Synth_structs
@@ -27,20 +27,20 @@ let star_depth_regex_fold
   fst
     (Regex.fold_downward_upward
        ~init:0
-       ~upward_empty:(fun i -> ((empty_f i), Regex.RegExEmpty))
-       ~upward_base:(fun i s -> (base_f i s, Regex.RegExBase s))
+       ~upward_empty:(fun i -> ((empty_f i), Regex.empty))
+       ~upward_base:(fun i s -> (base_f i s, Regex.make_base s))
        ~upward_concat:(fun i (x1,r1) (x2,r2) ->
            (concat_f i x1 x2
-           ,Regex.RegExConcat (r1,r2)))
+           ,Regex.make_concat r1 r2))
        ~upward_or:(fun i (x1,r1) (x2,r2) ->
            (or_f i x1 x2
-           ,Regex.RegExOr (r1,r2)))
+           ,Regex.make_or r1 r2))
        ~upward_star:(fun i (x',r') ->
            (star_f i x'
-           ,Regex.RegExStar r'))
+           ,Regex.make_star r'))
        ~upward_closed:(fun i (x',r') ->
            (closed_f i r' x'
-           ,Regex.RegExClosed r'))
+           ,Regex.make_closed r'))
        ~downward_star:(fun d -> d+1)
        r)
 
@@ -177,7 +177,7 @@ let force_expand
     (problem_elts:RegexIntSet.t)
   : Regex.t -> (Regex.t * int) =
   star_depth_regex_fold
-    ~empty_f:(fun _ -> (Regex.make_empty,0))
+    ~empty_f:(fun _ -> (Regex.empty,0))
     ~base_f:(fun _ s -> (Regex.make_base s,0))
     ~concat_f:(fun _ (lr,le) (rr,re) ->
         (Regex.make_concat lr rr, le+re))
@@ -202,10 +202,10 @@ let rec reveal
     (star_depth:int)
     (r:Regex.t)
   : (Regex.t * int) list =
-  begin match r with
+  begin match r.node with
     | Regex.RegExClosed r' ->
       if get_rep_var lc r' = reveal_ident && star_depth = 0 then
-        [(Regex.RegExClosed r',0)]
+        [(Regex.make_closed r',0)]
       else
         List.map
           ~f:(fun (r,exp) -> (r,exp+1))
@@ -218,21 +218,21 @@ let rec reveal
       let r1_exposes = reveal lc reveal_ident star_depth r1 in
       let r2_exposes = reveal lc reveal_ident star_depth r2 in
       (List.map
-         ~f:(fun (r1e,exp) -> (Regex.RegExConcat (r1e,r2),exp))
+         ~f:(fun (r1e,exp) -> (Regex.make_concat r1e r2,exp))
          r1_exposes)
       @
       (List.map
-         ~f:(fun (r2e,exp) -> (Regex.RegExConcat (r1,r2e),exp))
+         ~f:(fun (r2e,exp) -> (Regex.make_concat r1 r2e,exp))
          r2_exposes)
     | Regex.RegExOr (r1,r2) ->
       let r1_exposes = reveal lc reveal_ident star_depth r1 in
       let r2_exposes = reveal lc reveal_ident star_depth r2 in
       (List.map
-         ~f:(fun (r1e,exp) -> (Regex.RegExOr (r1e,r2),exp))
+         ~f:(fun (r1e,exp) -> (Regex.make_or r1e r2,exp))
          r1_exposes)
       @
       (List.map
-         ~f:(fun (r2e,exp) -> (Regex.RegExOr (r1,r2e),exp))
+         ~f:(fun (r2e,exp) -> (Regex.make_or r1 r2e,exp))
          r2_exposes)
     | Regex.RegExStar r' ->
       let r'_exposes_with_unfold =
@@ -251,22 +251,24 @@ let rec reveal
       in
       let star_r'_exposes_underneath =
         (List.map
-           ~f:(fun (r'e,exp) -> (Regex.RegExStar r'e,exp))
+           ~f:(fun (r'e,exp) -> (Regex.make_star r'e,exp))
            r'_exposes_underneath)
       in
       let unrolled_r'_exposes_left =
         (List.map
            ~f:(fun (r'e,exp) ->
-               (Regex.RegExOr(Regex.RegExBase "",
-                              Regex.RegExConcat (r'e, Regex.RegExStar r'e))
+               (Regex.make_or
+                  Regex.one
+                  (Regex.make_concat r'e (Regex.make_star r'e))
                ,exp+1))
            r'_exposes_with_unfold)
       in
       let unrolled_r'_exposes_right =
         (List.map
            ~f:(fun (r'e,exp) ->
-               (Regex.RegExOr(Regex.RegExBase "",
-                              Regex.RegExConcat (Regex.RegExStar r'e, r'e))
+               (Regex.make_or
+                  Regex.one
+                  (Regex.make_concat (Regex.make_star r'e) r'e)
                ,exp+1))
            r'_exposes_with_unfold)
       in

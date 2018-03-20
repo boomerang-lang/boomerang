@@ -1,4 +1,4 @@
-open Stdlib
+open MyStdlib
 open Lang
 
 
@@ -62,6 +62,7 @@ type exampled_regex =
   | ERegExOr of exampled_regex  * exampled_regex * (int list list) example_data
   | ERegExStar of exampled_regex * (int list list) example_data
   | ERegExClosed of Regex.t * example_string_data * (int list list) example_data
+[@@deriving show]
 
 let extract_example_data (er:exampled_regex) : parsing_example_data =
   begin match er with

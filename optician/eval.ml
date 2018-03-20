@@ -3,7 +3,7 @@ open Lang
 open Normalized_lang
 
 let rec to_empty_exampled_regex (r:Regex.t) : exampled_regex =
-  begin match r with
+  begin match r.node with
   | Regex.RegExEmpty -> ERegExEmpty
   | Regex.RegExBase s -> ERegExBase (s,empty_parsing_example_data)
   | Regex.RegExConcat (r1,r2) ->
@@ -42,7 +42,7 @@ let rec regex_to_dfa
     (r:Regex.t)
     (inside_var:bool)
   : dfa =
-  begin match r with
+  begin match r.node with
   | Regex.RegExEmpty ->
       let final = ref QAccept in
       (ref (State (fun _ -> [])), final)
