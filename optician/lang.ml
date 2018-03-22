@@ -29,7 +29,6 @@ end
 
 
 (**** Regex {{{ *****)
-
 module Regex =
 struct
   type t = t_node hash_consed
@@ -42,20 +41,8 @@ struct
     | RegExClosed of t
   [@@deriving ord, show, hash]
 
-  let hash_t_node
-      (r:t_node)
-    : int =
-    begin match r with
-      | RegExEmpty -> 31
-      | RegExBase s -> String.hash s + 63
-      | RegExConcat (r1,r2) -> 91 * (r1.hkey + 133 * r2.hkey)
-      | RegExOr (r1,r2) -> 157 * (r1.hkey + 139 * r2.hkey)
-      | RegExStar r -> 821 * r.hkey + 4
-      | RegExClosed r -> 1213 * r.hkey + 8
-    end
-
   let table = HashConsTable.create 100000
-  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node show_t_node table
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
 
   let separate_plus
       (r:t)

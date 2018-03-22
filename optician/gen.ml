@@ -301,7 +301,7 @@ struct
                       expand
                         lc
                         qe)
-                  (List.dedup ~compare:QueueElement.compare qes)
+                  (List.dedup_and_sort ~compare:QueueElement.compare qes)
               in
               let pq' = PQ.push_all
                    q

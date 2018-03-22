@@ -16,6 +16,7 @@
                 my_list_extensions
                 string_utilities
                 my_hash_cons
+                my_hash_cons_set
                 ))
   (preprocess (pps (ppx_deriving.std ppx_hash)))
   (synopsis "Standard Library for OCaml")

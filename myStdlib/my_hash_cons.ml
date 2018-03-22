@@ -43,17 +43,6 @@ end
 include HashConsContainer
 
 (* Functorial interface *)
-module type S =
-sig
-  type key
-  type t
-  val create : int -> t
-  val clear : t -> unit
-  val hashcons : t -> key -> key hash_consed
-  val iter : (key hash_consed -> unit) -> t -> unit
-  val stats : t -> int * int * int * int * int * int
-end
-
 module HashConsTable = struct
   let gentag =
     let r = ref 0 in
@@ -140,7 +129,7 @@ module HashConsTable = struct
     in
     loop 0
 
-  let hashcons hfun cmpfun showfun t d =
+  let hashcons hfun cmpfun t d =
     let hkey = hfun d land max_int in
     let index = hkey mod (Array.length t.table) in
     let bucket = t.table.(index) in
@@ -172,16 +161,16 @@ module HashConsTable = struct
     (len, count t, totlen, lens.(0), lens.(len/2), lens.(len-1))
 end
 
-module HashConsOf(D_IOC : Data -> Data) =
-struct
-  module rec Implementation : Data =
-  struct
-    module Underlying = D_IOC(Implementation)
-    type t = Underlying.t hash_consed
-    [@@deriving ord, show, hash]
-  end
+module type HashConsData =
+sig
+  type t = t_node hash_consed
+  and t_node
+  val show : t shower
+  val pp : t pper
+  val compare : t comparer
+  val hash : t hasher
+  val hash_fold_t : t hash_folder
 end
-
 
 module Hmap = struct
 
@@ -611,4 +600,3 @@ module Hset = struct
       else
         false
 end
-

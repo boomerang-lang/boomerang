@@ -153,6 +153,16 @@ module type Data = sig
   val hash_fold_t : t hash_folder
 end
 
+module type UniqueRefData = sig
+  type t
+  val show : t shower
+  val pp : t pper
+  val compare : t comparer
+  val hash : t hasher
+  val hash_fold_t : t hash_folder
+  val uid : t -> int
+end
+
 module UnitModule = struct
   type t = unit
   [@@deriving ord, show, hash]
@@ -973,8 +983,8 @@ let set_minus_lose_order (cmp:'a -> 'a -> comparison)
     | (_,[]) -> l1
     end
   in
-  let ordered_l1 = List.dedup (List.sort ~cmp:cmp l1) in
-  let ordered_l2 = List.dedup (List.sort ~cmp:cmp l2) in
+  let ordered_l1 = List.dedup_and_sort (List.sort ~cmp:cmp l1) in
+  let ordered_l2 = List.dedup_and_sort (List.sort ~cmp:cmp l2) in
   set_minus_ordered ordered_l1 ordered_l2
 
 let pairwise_maintain_invariant
@@ -1088,7 +1098,7 @@ let rec append_into_correct_list ((k,v):'a * 'b list) (l:('a * 'b list) list)
   end
 
 let group_by_values (l:('a list * 'b) list) : ('a list * 'b) list =
-  let empty_value_list = List.dedup (List.map ~f:(fun v -> (snd v,[])) l) in
+  let empty_value_list = List.dedup_and_sort (List.map ~f:(fun v -> (snd v,[])) l) in
   let l' = List.fold_left
   ~f:(fun acc (k,v) ->
     append_into_correct_list (v,k) acc)

@@ -47,12 +47,8 @@ let star_depth_regex_fold
 (***** }}} *****)
 
 (**** GetSets {{{ *****)
-module RegexSet = SetOf(Regex)
-
 module IntSet = SetOf(IntModule)
-
 module RegexIntSet = SetOf(PairOf(Regex)(IntModule))
-
 module RegexToIntSetDict = DictOf(Regex)(IntSet)
 
 let get_current_set

@@ -4,10 +4,12 @@
 
 (library
  ((name hbase)
+  (modules (env error info int mapplus memo misc name src2fcl))
   (libraries (ubase unix str))
 ))
 
 (executable
-  ((name baker)
-   (libraries (hbase))
+ ((name baker)
+  (modules (baker))
+  (libraries (hbase))
 ))
