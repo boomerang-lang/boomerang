@@ -277,18 +277,18 @@ struct
   (* We insert (k,v) into our dict using insert_downward, which gives us
    * "kicked" up configuration. We return the tree contained in the "kicked"
    * configuration. *)
-  let insert_or_merge
-      ~merge:(merge: value -> value -> value)
+  let insert_or_combine
+      ~combiner:(combiner: value -> value -> value)
       (d: t)
       (k: key)
       (v: value)
     : t =
-    match insert_downward merge d k v with
+    match insert_downward combiner d k v with
       | Up(l,(k1,v1),r) -> Two(l,(k1,v1),r)
       | Done x -> x
 
   let insert : t -> key -> value -> t =
-    insert_or_merge ~merge:(fun _ n -> n)
+    insert_or_combine ~combiner:(fun _ n -> n)
 
   (* Upward phase for removal where the parent of the hole is a Two node. 
    * See cases (1-2) on the handout. n is the (key,value) pair contained in

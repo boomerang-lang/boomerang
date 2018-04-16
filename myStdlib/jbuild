@@ -17,7 +17,8 @@
                 string_utilities
                 my_hash_cons
                 my_hash_cons_set
+                my_hash_cons_dict
                 ))
   (preprocess (pps (ppx_deriving.std ppx_hash)))
   (synopsis "Standard Library for OCaml")
-  (libraries (core str))))
+  (libraries (core str posix-math))))

@@ -47,9 +47,7 @@ let star_depth_regex_fold
 (***** }}} *****)
 
 (**** GetSets {{{ *****)
-module RegexSet = SetOf(Regex)
-
-module IntSet = SetOf(IntModule)
+module IntSet = HCSetOf(IntModule)
 
 module RegexIntSet = SetOf(PairOf(Regex)(IntModule))
 
@@ -92,8 +90,8 @@ let rec get_transitive_set
           s2)
     ~star_f:(fun _ -> ident)
     ~closed_f:(fun star_depth r s ->
-        RegexToIntSetDict.insert_or_merge
-          ~merge:IntSet.union
+        RegexToIntSetDict.insert_or_combine
+          ~combiner:IntSet.union
           s
           (get_rep_var lc r)
           (IntSet.singleton star_depth))
@@ -108,7 +106,7 @@ let reachables_set_minus
     : ((IntSet.t,IntSet.t) either) option =
     let max_s1 = IntSet.max_exn s1 in
     let max_s2 = IntSet.max_exn s2 in
-    let c = IntSet.compare_elt max_s1 max_s2 in
+    let c = Int.compare max_s1 max_s2 in
     if is_equal c then
       None
     else if is_lt c then
@@ -116,14 +114,14 @@ let reachables_set_minus
         (Right
            (IntSet.filter
               ~f:(fun x ->
-                  is_gt (IntSet.compare_elt x max_s1))
+                  is_gt (Int.compare x max_s1))
               s2))
     else
       Some
         (Left
            (IntSet.filter
               ~f:(fun x ->
-                  is_gt (IntSet.compare_elt x max_s2))
+                  is_gt (Int.compare x max_s2))
               s1))
   in
   let problem_elts_options_list =
@@ -357,11 +355,11 @@ let fix_problem_elts
   let problem_elements =
     (List.map
        ~f:(fun e -> Left e)
-       (RegexIntSet.as_list (RegexIntSet.minus s1 s2)))
+       (RegexIntSet.as_list (RegexIntSet.diff s1 s2)))
     @
     (List.map
        ~f:(fun e -> Right e)
-       (RegexIntSet.as_list (RegexIntSet.minus s2 s1)))
+       (RegexIntSet.as_list (RegexIntSet.diff s2 s1)))
   in
   begin match problem_elements with
     | [] ->

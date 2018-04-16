@@ -8,3 +8,4 @@ include My_tree
 include My_list_extensions
 include My_hash_cons
 include My_hash_cons_set
+include My_hash_cons_dict

@@ -164,7 +164,7 @@ module SymmetricQueueElement = struct
 
     let compare
         (e1:t)
-        (e2:t) 
+        (e2:t)
       : int =
       Float.compare e1 e2
   end
@@ -172,20 +172,19 @@ module SymmetricQueueElement = struct
   let priority
       (qe : t)
     : Priority.t =
-    let probability_of_choice
+    let information_content_of_choice
         (n:int)
       : float =
-      1. /. (Float.of_int n)
+      Math.log2 (Float.of_int n)
     in
     let ps_of_choices =
       List.map
-        ~f:probability_of_choice
+        ~f:information_content_of_choice
         qe.expansion_choices
     in
-    1. -.
     List.fold_left
-      ~f:( *. )
-      ~init:1.
+      ~f:( +. )
+      ~init:0.
       ps_of_choices
 end
 
@@ -249,7 +248,24 @@ struct
         strings  : string list   ;
         atoms    : Regex.t list  ;
       }
-    [@@deriving ord, show, hash]
+    [@@deriving show, hash]
+
+    let compare
+        (td1:t)
+        (td2:t)
+      : int =
+      compare_parsing_example_data td1.parsings td2.parsings
+
+    let hash_fold_t
+        (s:Base__Hash.state)
+        (td:t)
+      : Base__Hash.state =
+      hash_fold_parsing_example_data s td.parsings
+
+    let hash
+        (td:t)
+      : int =
+      hash_parsing_example_data td.parsings
 
     let make
         (parsings:int list list example_data)
@@ -384,6 +400,8 @@ struct
     module Alignment =
     struct
       include Lens
+      let hash _ = 1
+      let hash_fold_t s _ = s
       let cost _ = 1.
     end
 
@@ -392,44 +410,47 @@ struct
         (v2:t)
       : Lens.t option =
       (*TODO contextual lenses*)
-      let creater_args_parsings = v1.parsings.arg1_data in
-      let creater_results_parsings = v2.parsings.output_data in
-      let createl_args_parsings = v2.parsings.arg1_data in
-      let createl_results_parsings = v1.parsings.output_data in
-      let creater_args_strings = v1.strings.arg1_data in
-      let creater_results_strings = v2.strings.output_data in
-      let createl_args_strings = v2.strings.arg1_data in
-      let createl_results_strings = v1.strings.output_data in
-      let is_eq_creater =
-        is_equal
-          (compare_list
-             ~cmp:(compare_list ~cmp:Int.compare)
-             creater_args_parsings
-             creater_results_parsings)
-        &&
-        is_equal
-          (compare_list
-             ~cmp:(String.compare)
-             creater_args_strings
-             creater_results_strings)
-      in
-      let is_eq_createl =
-        is_equal
-          (compare_list
-             ~cmp:(compare_list ~cmp:Int.compare)
-             createl_args_parsings
-             createl_results_parsings)
-        &&
-        is_equal
-          (compare_list
-             ~cmp:(String.compare)
-             createl_args_strings
-             createl_results_strings)
-      in
-      if is_eq_creater && is_eq_createl then
-        Some (Lens.make_ident v1.regex)
-      else
+      if Regex.compare v1.regex v2.regex <> 0 then
         None
+      else
+        let creater_args_parsings = v1.parsings.arg1_data in
+        let creater_results_parsings = v2.parsings.output_data in
+        let createl_args_parsings = v2.parsings.arg1_data in
+        let createl_results_parsings = v1.parsings.output_data in
+        let creater_args_strings = v1.strings.arg1_data in
+        let creater_results_strings = v2.strings.output_data in
+        let createl_args_strings = v2.strings.arg1_data in
+        let createl_results_strings = v1.strings.output_data in
+        let is_eq_creater =
+          is_equal
+            (compare_list
+               ~cmp:(compare_list ~cmp:Int.compare)
+               creater_args_parsings
+               creater_results_parsings)
+          &&
+          is_equal
+            (compare_list
+               ~cmp:(String.compare)
+               creater_args_strings
+               creater_results_strings)
+        in
+        let is_eq_createl =
+          is_equal
+            (compare_list
+               ~cmp:(compare_list ~cmp:Int.compare)
+               createl_args_parsings
+               createl_results_parsings)
+          &&
+          is_equal
+            (compare_list
+               ~cmp:(String.compare)
+               createl_args_strings
+               createl_results_strings)
+        in
+        if is_eq_creater && is_eq_createl then
+          Some (Lens.make_ident v1.regex)
+        else
+          None
 
     let cost
         (_:unit)
@@ -463,6 +484,11 @@ struct
 
     module Default = IntModule
     let extract_default _ = failwith "ah"
+
+    let information_content
+        (v:t)
+      : float =
+      Regex.information_content v.regex
   end
 
   module Alignment = PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
@@ -561,11 +587,14 @@ struct
                   end)
               ([],cdl,cdr,md)
           in
-          if MatchDict.is_empty md then
+          let l_handled =
             fold_on_head_with_default
               ~f:Lens.make_or
               ~default:Lens.zero
               (List.rev ll)
+          in
+          if MatchDict.is_empty md then
+            l_handled
           else
             let mapping_triples =
               List.map
@@ -645,9 +674,11 @@ struct
                 ~f:Lens.make_or
                 l_list_r
             in
-            Lens.make_compose
-              (Lens.make_compose l_l l_m)
-              l_r
+            Lens.make_or
+              l_handled
+              (Lens.make_compose
+                 (Lens.make_compose l_l l_m)
+                 l_r)
         | Alignment.Nonempty.Star (_,_,a) ->
           Lens.make_star (nonempty_alignment_to_lens a)
         | Alignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->

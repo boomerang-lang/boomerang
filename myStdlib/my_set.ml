@@ -26,7 +26,7 @@ struct
   let intersect s1 s2 = 
     D.fold (fun x _ s -> if member s2 x then insert x s else s) 
       empty s1
-  let minus s1 s2 =
+  let diff s1 s2 =
     D.fold (fun x _ s -> if not (member s2 x) then insert x s else s)
       empty s1
   let remove x s = D.remove s x

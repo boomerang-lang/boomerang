@@ -47,9 +47,10 @@ let star_depth_regex_fold
 (***** }}} *****)
 
 (**** GetSets {{{ *****)
-module IntSet = SetOf(IntModule)
-module RegexIntSet = SetOf(PairOf(Regex)(IntModule))
-module RegexToIntSetDict = DictOf(Regex)(IntSet)
+module IntSet = HCSetOf(IntModule)
+module HCRegexInt = HashConsOf(PairOf(Regex)(IntModule))
+module RegexIntSet = HCSetOf(HCRegexInt)
+module RegexToIntSetDict = HCDictOf(Regex)(IntSet)
 
 let get_current_set
     (lc:LensContext.t)
@@ -68,7 +69,7 @@ let get_current_set
     ~star_f:(fun _ s -> s)
     ~closed_f:(fun i r' _ ->
         let r'' = get_rep_var lc r' in
-        RegexIntSet.singleton (r'',i))
+        RegexIntSet.singleton (HCRegexInt.hashcons (r'',i)))
 
 let rec get_transitive_set
     (lc:LensContext.t)
@@ -88,8 +89,8 @@ let rec get_transitive_set
           s2)
     ~star_f:(fun _ -> ident)
     ~closed_f:(fun star_depth r s ->
-        RegexToIntSetDict.insert_or_merge
-          ~merge:IntSet.union
+        RegexToIntSetDict.insert_or_combine
+          ~combiner:IntSet.union
           s
           (get_rep_var lc r)
           (IntSet.singleton star_depth))
@@ -104,7 +105,7 @@ let reachables_set_minus
     : ((IntSet.t,IntSet.t) either) option =
     let max_s1 = IntSet.max_exn s1 in
     let max_s2 = IntSet.max_exn s2 in
-    let c = IntSet.compare_elt max_s1 max_s2 in
+    let c = Int.compare max_s1 max_s2 in
     if is_equal c then
       None
     else if is_lt c then
@@ -112,14 +113,14 @@ let reachables_set_minus
         (Right
            (IntSet.filter
               ~f:(fun x ->
-                  is_gt (IntSet.compare_elt x max_s1))
+                  is_gt (Int.compare x max_s1))
               s2))
     else
       Some
         (Left
            (IntSet.filter
               ~f:(fun x ->
-                  is_gt (IntSet.compare_elt x max_s2))
+                  is_gt (Int.compare x max_s2))
               s1))
   in
   let problem_elts_options_list =
@@ -152,7 +153,7 @@ let reachables_set_minus
           ~f:(fun (acc:RegexIntSet.t) ((k,s):(Regex.t * IntSet.t)) ->
               IntSet.fold
                 ~f:(fun (i:int) (acc:RegexIntSet.t) ->
-                    RegexIntSet.insert (k,i) acc)
+                    RegexIntSet.add (HCRegexInt.hashcons (k,i)) acc)
                 ~init:acc
                 s
             )
@@ -182,7 +183,7 @@ let force_expand
     ~star_f:(fun _ (r,e) ->
         (Regex.make_star r, e))
     ~closed_f:(fun star_depth r (r_expanded,e) ->
-        if RegexIntSet.member problem_elts (get_rep_var lc r,star_depth) then
+        if RegexIntSet.member problem_elts (HCRegexInt.hashcons (get_rep_var lc r,star_depth)) then
           (r_expanded,e+1)
         else
           (Regex.make_closed r,0))
@@ -351,11 +352,11 @@ let fix_problem_elts
   let problem_elements =
     (List.map
        ~f:(fun e -> Left e)
-       (RegexIntSet.as_list (RegexIntSet.minus s1 s2)))
+       (RegexIntSet.as_list (RegexIntSet.diff s1 s2)))
     @
     (List.map
        ~f:(fun e -> Right e)
-       (RegexIntSet.as_list (RegexIntSet.minus s2 s1)))
+       (RegexIntSet.as_list (RegexIntSet.diff s2 s1)))
   in
   begin match problem_elements with
     | [] ->
@@ -364,11 +365,13 @@ let fix_problem_elts
     | h::_ ->
       let new_problems =
         begin match h with
-          | Left (v,star_depth) ->
+          | Left d ->
+            let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (QueueElement.get_r2 qe) in
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (QueueElement.get_r1 qe,e,exp)) exposes
-          | Right (v,star_depth) ->
+          | Right d ->
+            let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (QueueElement.get_r1 qe) in
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (e,QueueElement.get_r2 qe,exp)) exposes

@@ -1,20 +1,44 @@
 open MyStdlib
 
+module type BaseData = sig
+  include Data
+  val information_content : t -> float
+end
+
+module type LabelData = sig
+  include Data
+  val as_count : t -> int
+end
+
+
 module NonemptyLabelledPlusTimesStarTreeOf
     (PD : Data)
     (TD : Data)
     (SD : Data)
-    (BD : Data)
-    (L  : Data) =
+    (BD : BaseData)
+    (L  : LabelData) =
 struct
-  type t =
+  type t = t_node hash_consed
+  and t_node =
     | Base of BD.t
     | Plus of PD.t * l list
     | Times of TD.t * l list
     | Star of SD.t * l
-
   and l = t * L.t
   [@@deriving ord, show, hash]
+
+  let table = HashConsTable.create 10
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
+
+  let uid (t:t) = t.tag
+
+  let mk_base bl = hashcons (Base bl)
+
+  let mk_plus pl ls = hashcons (Plus (pl,ls))
+
+  let mk_times tl ls = hashcons (Times (tl,ls))
+
+  let mk_star sl l = hashcons (Star (sl,l))
 
   let fold_downward_upward
       (type a)
@@ -33,7 +57,7 @@ struct
         (downward_acc:b)
         (nptst:t)
       : a =
-      begin match nptst with
+      begin match nptst.node with
         | Base bd ->
           upward_base downward_acc bd
         | Plus (pd,ts) ->
@@ -83,16 +107,41 @@ struct
       ~upward_times:(thunk_of times_f)
       ~upward_star:(thunk_of star_f)
       v
+
+  let information_content
+    : t -> float =
+    fold
+      ~base_f:BD.information_content
+      ~plus_f:(fun _ lfl ->
+          let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
+          let (n,f) =
+            List.fold_left
+              ~f:(fun (n_acc,f_acc) (n,f) ->
+                  (n_acc+n
+                  ,f_acc +. (f *. (Float.of_int n))))
+              ~init:(0,0.)
+              nfl
+          in
+          (Math.log2 @$ Float.of_int @$ List.length lfl)
+          +. (f /. Float.of_int n))
+      ~times_f:(fun _ lfl ->
+          let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
+          List.fold_left
+            ~f:(fun acc (n,f) ->
+                acc +. (f *. (Float.of_int n)))
+            ~init:0.
+            nfl)
+      ~star_f:(fun _ _ f -> f)
 end
 
 module LabelledPlusTimesStarTreeOf
-    (BD : Data)
     (PD : Data)
     (TD : Data)
     (SD : Data)
-    (L  : Data) =
+    (BD : BaseData)
+    (L  : LabelData) =
 struct
-  module Nonempty = NonemptyLabelledPlusTimesStarTreeOf(BD)(PD)(TD)(SD)(L)
+  module Nonempty = NonemptyLabelledPlusTimesStarTreeOf(PD)(TD)(SD)(BD)(L)
 
   type t =
     | Empty
@@ -242,8 +291,9 @@ module NormalizedPlusTimesStarTreeOf
     (PD : Data)
     (TD : Data)
     (SD : Data)
-    (BD : Data) =
+    (BD : BaseData) =
 struct
+
   module NormalizationScript =
   struct
     module PD_NormalizationLabel =
@@ -295,12 +345,18 @@ struct
 
   module NonNormalizedTree = PlusTimesStarTreeOf(PD)(TD)(SD)(BD)
 
+  module IntLabel =
+  struct
+    include IntModule
+    let as_count = ident
+  end
+
   include LabelledPlusTimesStarTreeOf
       (PD)
       (TD)
       (SD)
       (BD)
-      (IntModule)
+      (IntLabel)
 
   let from_tree : NonNormalizedTree.t -> t * NormalizationScript.t =
     NonNormalizedTree.fold
@@ -309,7 +365,7 @@ struct
           (Nonempty nt
           ,NormalizationScript.Nonempty nns))
       ~base_f:(fun bl ->
-          (Base bl
+          (Nonempty.mk_base bl
           ,NormalizationScript.Base bl))
       ~plus_f:(fun p nsnts ->
           let (nts,nss) = List.unzip nsnts in
@@ -330,7 +386,7 @@ struct
               ~label:p
               ~perm:perm
           in
-          (Plus (p,nvs)
+          (Nonempty.mk_plus p nvs
           ,NormalizationScript.Plus (norm_label,nss)))
       ~times_f:(fun t nsnts ->
           let (nts,nss) = List.unzip nsnts in
@@ -351,9 +407,9 @@ struct
               ~label:t
               ~perm:perm
           in
-          (Times (t,nvs)
+          (Nonempty.mk_times t nvs
           ,NormalizationScript.Times (norm_label,nss)))
       ~star_f:(fun s (t,ns) ->
-          (Star (s,(t,1))
+          (Nonempty.mk_star s (t,1)
           ,NormalizationScript.Star (s,ns)))
 end

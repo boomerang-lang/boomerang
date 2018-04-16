@@ -1,6 +1,5 @@
 open MyStdlib
 open Lang
-open Regexcontext
 
 let simplify_regex : Regex.t -> Regex.t =
   let maximally_factor_regex : Regex.t -> Regex.t =

@@ -27,6 +27,7 @@ sig
   val requires_mapping : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
+  val information_content : t -> float
 end
 
 module type PlusData =
@@ -99,7 +100,7 @@ struct
   let rec requires_mapping
       (nt:NormalizedTree.Nonempty.t)
     : bool =
-    begin match nt with
+    begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
         || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
@@ -152,8 +153,8 @@ struct
       TD.t ->
       TD.t ->
       (position * position * t) list ->
-      position list ->
-      position list ->
+      (position * float) list ->
+      (position * float) list ->
       t
 
     val mk_star :
@@ -168,9 +169,6 @@ struct
     val get_minimal_alignment :
       NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> t option
 
-    val get_alignment_distance :
-      NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> float option
-
     val to_nonempty_and_cost :
       t ->
       NormalizedTree.NormalizationScript.nonempty_t ->
@@ -181,7 +179,6 @@ struct
   module rec NonemptyNormalizedPlusStarTreeAlignment : NonemptyNormalizedPlusStarTreeAlignmentType =
   struct
     module IntPair = PairOf(IntModule)(IntModule)
-
 
     module MappingDict =
     struct
@@ -266,10 +263,10 @@ struct
             (p2:Position.t)
             (a:NonemptyNormalizedPlusStarTreeAlignment.t)
           : IndirectAlignmentMapping.t =
-          IndirectAlignmentMapping.insert_or_merge
-            ~merge:(fun d1 d2 ->
+          IndirectAlignmentMapping.insert_or_combine
+            ~combiner:(fun d1 d2 ->
                 SingleAlignmentMapping.merge_to_dict
-                  ~combiner:(fun _ _ -> failwith "bad kvps")
+                  ~combiner:(fun v1 v2 -> failwith "bad kvps")
                   d1
                   d2)
             d
@@ -309,11 +306,14 @@ struct
 
       let insert_kvp_list
           (d:t)
-        : (Position.t * Position.t * NonemptyNormalizedPlusStarTreeAlignment.t) list
-          -> t =
+          (kvps:(Position.t
+                 * Position.t
+                 * NonemptyNormalizedPlusStarTreeAlignment.t) list)
+        : t =
         List.fold_left
           ~f:add_alignment
           ~init:d
+          kvps
 
       let from_kvp_list
         : (Position.t * Position.t * NonemptyNormalizedPlusStarTreeAlignment.t) list
@@ -382,14 +382,27 @@ struct
         (IntPair)
 
     type t =
+      {
+        node : t_node        ;
+        mutable cost : float option [@hash.ignore];
+      }
+    and t_node =
       | Plus of PD.t * PD.t * MappingDict.t * CreateDict.t * CreateDict.t
       | Times of TD.t * TD.t
                  * (position * position * t) list
-                 * position list
-                 * position list
+                 * (position * float) list
+                 * (position * float) list
       | Star of SD.t * SD.t * t
       | Base of BD.Alignment.t
     [@@deriving ord, show, hash]
+
+    let mk_t
+        (tn:t_node)
+      : t =
+      {
+        node = tn ;
+        cost = None   ;
+      }
 
     let mk_plus
         (pd1:PD.t)
@@ -410,81 +423,104 @@ struct
         CreateDict.from_kvp_list
           right_creates
       in
-      Plus 
-        (pd1,pd2,md,cld,crd)
+      mk_t
+        (Plus
+           (pd1
+           ,pd2
+           ,md
+           ,cld
+           ,crd))
 
     let mk_times
         (td1:TD.t)
         (td2:TD.t)
         (ms:(position * position * t) list)
-        (p1:position list)
-        (p2:position list)
+        (p1:(position * float) list)
+        (p2:(position * float) list)
       : t =
-      Times (td1,td2,ms,p1,p2)
+      mk_t
+        (Times
+           (td1
+           ,td2
+           ,ms
+           ,p1
+           ,p2))
 
     let mk_star (sd1:SD.t) (sd2:SD.t) (nt:t) : t =
-      Star (sd1,sd2,nt)
+      mk_t
+        (Star (sd1,sd2,nt))
 
     let mk_base (b:BD.Alignment.t) : t =
-      Base b
+      mk_t (Base b)
 
     let rec cost
         (nt:t)
       : float =
-      begin match nt with
-        | Plus (_,_,md,cdl,cdr) ->
-          let all_matches = MappingDict.all_alignments md in
-          let associated_edge_count
-              (pleft:position)
-              (pright:position)
-            : float =
-            let left_count = MappingDict.edge_count_left md pleft in
-            let right_count = MappingDict.edge_count_right md pright in
-            Float.of_int (left_count + right_count - 1)
+      begin match nt.cost with
+        | Some c -> c
+        | None ->
+          let c =
+            begin match nt.node with
+              | Plus (_,_,md,cdl,cdr) ->
+                let position_cost
+                    (iam:MappingDict.IndirectAlignmentMapping.t)
+                    (p:position)
+                  : float =
+                  let associated_edges =
+                    MappingDict.SingleAlignmentMapping.value_list
+                      (MappingDict.IndirectAlignmentMapping.lookup_exn
+                         iam
+                         p)
+                  in
+                  let edge_costs = List.map ~f:cost associated_edges in
+                  let average_edge_cost = FloatList.average edge_costs in
+                  let edge_count = List.length associated_edges in
+                  let choice_cost = Math.log2 (Float.of_int edge_count) in
+                  average_edge_cost +. choice_cost
+                in
+                let side_cost
+                    (iam:MappingDict.IndirectAlignmentMapping.t)
+                  : float =
+                  let positions =
+                    MappingDict.IndirectAlignmentMapping.key_list
+                      iam
+                  in
+                  let positions_cost =
+                    List.map
+                      ~f:(position_cost iam)
+                      positions
+                  in
+                  FloatList.average positions_cost
+                in
+                let left_cost =
+                  side_cost
+                    (MappingDict.indirect_mapping_left md)
+                in
+                let right_cost =
+                  side_cost
+                    (MappingDict.indirect_mapping_right md)
+                in
+                left_cost +. right_cost
+              | Times (_,_,als,pleft,pright) ->
+                let recursive_costs =
+                  List.map
+                    ~f:(fun (_,_,a) -> cost a)
+                    als
+                in
+                let left_costs = List.map ~f:snd pleft in
+                let right_costs = List.map ~f:snd pright in
+                let merge_costs = List.fold_left ~f:(+.) ~init:0. in
+                (merge_costs recursive_costs)
+                +. (merge_costs left_costs)
+                +. (merge_costs right_costs)
+              | Star (_,_,a) ->
+                cost a
+              | Base (a) ->
+                BD.Alignment.cost a
+            end
           in
-          let cost_of_edge
-              ((p1,p2,a):position * position * t)
-            : float =
-            let plain_cost = cost a in
-            let associated_edges = associated_edge_count p1 p2 in
-            1. -. ((1. -. plain_cost) /. associated_edges)
-          in
-          let edge_cost =
-            List.fold_left
-              ~f:(+.)
-              ~init:0.
-              (List.map ~f:(cost_of_edge) all_matches)
-          in
-          edge_cost /. ((Float.of_int (List.length all_matches) +. 1.))
-        | Times (_,_,als,pleft,pright) ->
-          let mapped_count = List.length als in
-          let unmapped_left_count = List.length pleft in
-          let unmapped_right_count = List.length pright in
-          let total_size =
-            Float.of_int
-              (mapped_count
-               + unmapped_left_count
-               + unmapped_right_count
-               + 1)
-          in
-          let unnormalized_unmapped_cost =
-            Float.of_int (unmapped_left_count + unmapped_right_count)
-          in
-          let unnormalized_recursive_cost =
-            List.fold_left
-              ~f:(fun acc (_,_,a') -> acc +. (cost a'))
-              ~init:0.
-              als
-          in
-          let unnormalized_cost =
-            unnormalized_unmapped_cost +.
-            unnormalized_recursive_cost
-          in
-          (unnormalized_cost /. total_size)
-        | Star (_,_,a) ->
-          cost a
-        | Base (a) ->
-          BD.Alignment.cost a
+          nt.cost <- Some c;
+          c
       end
 
     (* Anders apologizes to whoever reads this code *)
@@ -495,10 +531,6 @@ struct
       DictOf(NormalizedTree.Nonempty)(ProcessedTreeInfo)
     module PlusDataTreeProcessedInfoDict =
       DictOf(NormalizedTree.Nonempty)(ProcessedPlusTreeInfo)
-    module DataTreeMappingCostDict =
-      DictOf
-        (PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty))
-        (FloatModule)
     module PrioritiedRemainingElements =
     struct
       include QuintupleOf
@@ -536,15 +568,14 @@ struct
       PriorityQueueOf(PrioritiedRemainingElements)
     module RemainingPlusElementsPQueue =
       PriorityQueueOf(PrioritiedRemainingPlusElements)
-    let rec get_alignment_distance
-        (t1:NormalizedTree.Nonempty.t)
-        (t2:NormalizedTree.Nonempty.t)
-      : float option =
-      Option.map
-        ~f:(fun al -> cost al)
-        (get_minimal_alignment t1 t2)
+    module GetMinimalAlignmentArg =
+    struct
+      include HashConsOf(PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty))
+      let create t1 t2 = hashcons (t1,t2)
+    end
 
-    and get_minimal_alignment_plus
+    let get_minimal_alignment_plus
+        (recursive_f:GetMinimalAlignmentArg.t -> t option)
         (pl1:PD.t)
         (pl2:PD.t)
         (tts1:NormalizedTree.Nonempty.l list)
@@ -558,8 +589,8 @@ struct
           : PlusDataTreeProcessedInfoDict.t =
           List.foldi
             ~f:(fun i d (t,c) ->
-                PlusDataTreeProcessedInfoDict.insert_or_merge
-                  ~merge:(fun _ _ -> failwith "shouldnt merge")
+                PlusDataTreeProcessedInfoDict.insert_or_combine
+                  ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
                   t
                   (i,0,c,0))
@@ -574,20 +605,17 @@ struct
         let cd2 = CreateDict.empty in
         (*TODO: required creates*)
         (*TODO: required puts*)
-        let tree_priorities =
-          DataTreeMappingCostDict.from_kvp_list
-            (cartesian_filter_map
-               ~f:(fun t1 t2 ->
-                   Option.map
-                     ~f:(fun d -> ((t1,t2),d))
-                     (get_alignment_distance t1 t2))
-               t1_keys
-               t2_keys)
+        let relevant_trees =
+          (cartesian_filter
+             ~f:(fun t1 t2 ->
+                 Option.is_some (recursive_f (GetMinimalAlignmentArg.create t1 t2)))
+             t1_keys
+             t2_keys)
         in
         let pq =
           RemainingPlusElementsPQueue.singleton
             ({
-              to_process = (DataTreeMappingCostDict.key_list tree_priorities);
+              to_process = relevant_trees;
               positions = MappingDict.empty;
               left_costs = PositionCostDict.empty;
               right_costs = PositionCostDict.empty;
@@ -667,7 +695,7 @@ struct
                                   ()
                               | (Some (i1,p1,c1,u1), Some (i2,p2,c2,u2)) ->
                                 if u1 > 0 && u2 > 0 then
-                                  PrioritiedRemainingPlusElements.make
+                                  (PrioritiedRemainingPlusElements.make
                                     ~to_process:t1t2s
                                     ~positions:aligns
                                     ~left_costs:cd1
@@ -675,13 +703,12 @@ struct
                                     ~processed_left:d1
                                     ~processed_right:d2
                                     ~priority:f
-                                    ()
+                                    ())
                                 else
                                   let alignment =
                                     Option.value_exn
-                                      (get_minimal_alignment
-                                         t1
-                                         t2)
+                                      (recursive_f
+                                        (GetMinimalAlignmentArg.create t1 t2))
                                   in
                                   let fully_processed = (c1-p1) = (c2-p2) in
                                   let t1t2s =
@@ -690,7 +717,7 @@ struct
                                     else
                                       (t1,t2)::t1t2s
                                   in
-                                  let index_to = max (c1-p1) (c2-p2) in
+                                  let index_to = min (c1-p1) (c2-p2) in
                                   let p1_new = p1 + index_to in
                                   let p2_new = p2 + index_to in
                                   let ranges =
@@ -786,10 +813,11 @@ struct
                   cd2
                   (MappingDict.indirect_mapping_right aligns)
               in
-              Plus (pl1,pl2,aligns,cd1,cd2))
+              mk_t (Plus (pl1,pl2,aligns,cd1,cd2)))
           alignment_info_option
 
-    and get_minimal_alignment_times
+    let get_minimal_alignment_times
+        (recursive_f:GetMinimalAlignmentArg.t -> t option)
         (tl1:TD.t)
         (tl2:TD.t)
         (tts1:NormalizedTree.Nonempty.l list)
@@ -803,8 +831,8 @@ struct
           : DataTreeProcessedInfoDict.t =
           List.foldi
             ~f:(fun i d (t,c) ->
-                DataTreeProcessedInfoDict.insert_or_merge
-                  ~merge:(fun _ _ -> failwith "shouldnt merge")
+                DataTreeProcessedInfoDict.insert_or_combine
+                  ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
                   t
                   (i,0,c))
@@ -815,19 +843,18 @@ struct
         let d2 = list_to_dict tts2 in
         let t1_keys = DataTreeProcessedInfoDict.key_list d1 in
         let t2_keys = DataTreeProcessedInfoDict.key_list d2 in
-        let tree_priorities =
-          DataTreeMappingCostDict.from_kvp_list
-            (cartesian_filter_map
-               ~f:(fun t1 t2 ->
-                   Option.map
-                     ~f:(fun d -> ((t1,t2),d))
-                     (get_alignment_distance t1 t2))
-               t1_keys
-               t2_keys)
+        let relevant_trees =
+          (cartesian_filter
+             ~f:(fun t1 t2 ->
+                 Option.is_some
+                   (recursive_f
+                      (GetMinimalAlignmentArg.create t1 t2)))
+             t1_keys
+             t2_keys)
         in
         let pq =
           RemainingElementsPQueue.singleton
-            ((DataTreeMappingCostDict.key_list tree_priorities)
+            (relevant_trees
             ,[]
             ,d1
             ,d2
@@ -835,14 +862,14 @@ struct
         in
         let alignment_info_option =
           fold_until_completion
-            ~f:(fun pq ->
+            ~f:(fun (pq,best_option) ->
                 begin match RemainingElementsPQueue.pop pq with
-                  | None -> Right None
+                  | None -> Right best_option
                   | Some (([],aligns,d1,d2,_),f,pq) ->
                     let is_safe =
                       DataTreeProcessedInfoDict.for_all
                         ~f:(fun a (_,p,c) ->
-                            p >= c
+                            p = c
                             ||
                             not (requires_mapping a))
                     in
@@ -850,22 +877,43 @@ struct
                       let leftover_left =
                         List.concat_map
                           ~f:(fun (i1,p,c) ->
+                              let t = fst @$ List.nth_exn tts1 i1 in
                               List.map
-                                ~f:(fun i2 -> (i1,i2))
+                                ~f:(fun i2 -> ((i1,i2),NormalizedTree.Nonempty.information_content t))
                                 (range p c))
                           (DataTreeProcessedInfoDict.value_list d1)
                       in
                       let leftover_right =
                         List.concat_map
                           ~f:(fun (i1,p,c) ->
+                              let t = fst @$ List.nth_exn tts2 i1 in
                               List.map
-                                ~f:(fun i2 -> (i1,i2))
+                                ~f:(fun i2 -> (i1,i2),NormalizedTree.Nonempty.information_content t)
                                 (range p c))
                           (DataTreeProcessedInfoDict.value_list d2)
                       in
-                      Right (Some (aligns,leftover_left,leftover_right))
+                      let alignment =
+                        mk_times
+                          tl1
+                          tl2
+                          aligns
+                          leftover_left
+                          leftover_right
+                      in
+                      let cost = cost alignment in
+                      let best =
+                        begin match best_option with
+                          | None -> Some (alignment,cost)
+                          | Some (a,c) ->
+                            if is_lt @$ Float.compare cost c then
+                              Some (alignment,cost)
+                            else
+                              best_option
+                        end
+                      in
+                      Left (pq,best)
                     else
-                      Left pq
+                      Left (pq,best_option)
                   | Some ((t1t2s,aligns,d1,d2,_),f,pq) ->
                     let to_add = remove_all_elements t1t2s in
                     let queue_elements =
@@ -879,18 +927,13 @@ struct
                               | (_      ,    None) ->
                                 (t1t2s,aligns,d1,d2,f)
                               | (Some (i1,p1,c1), Some (i2,p2,c2)) ->
-                                let alignment_cost =
-                                  (DataTreeMappingCostDict.lookup_exn
-                                     tree_priorities
-                                     (t1,t2))
-                                in
                                 let alignment =
                                   Option.value_exn
-                                    (get_minimal_alignment
-                                       t1
-                                       t2)
+                                    (recursive_f
+                                      (GetMinimalAlignmentArg.create t1 t2))
                                 in
-                                let index_to = max (c1-p1) (c2-p2) in
+                                let alignment_cost = cost alignment in
+                                let index_to = min (c1-p1) (c2-p2) in
                                 let p1_new = p1 + index_to in
                                 let p2_new = p2 + index_to in
                                 let ranges =
@@ -932,43 +975,74 @@ struct
                             end)
                         to_add
                     in
-                    Left (RemainingElementsPQueue.push_all pq queue_elements)
+                    Left (RemainingElementsPQueue.push_all pq queue_elements,best_option)
                 end)
-            pq
+            (pq,None)
         in
-        Option.map
-          ~f:(fun (aligns,pleft,pright) ->
-              mk_times
-                tl1
-                tl2
-                aligns
-                pleft
-                pright)
-          alignment_info_option
+        Option.map ~f:fst alignment_info_option
 
-    and get_minimal_alignment
-        (t1:NormalizedTree.Nonempty.t)
-        (t2:NormalizedTree.Nonempty.t)
+    let get_minimal_alignment_internal
+        (recursive_f:GetMinimalAlignmentArg.t -> t option)
+        (arg:GetMinimalAlignmentArg.t)
       : t option =
-      begin match (t1,t2) with
+      let (t1,t2) = arg.node in
+      begin match (t1.node,t2.node) with
         | (NormalizedTree.Nonempty.Plus (pl1,pts1),
            NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
-          get_minimal_alignment_plus pl1 pl2 pts1 pts2
+          get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
         | (NormalizedTree.Nonempty.Times (tl1,tts1),
            NormalizedTree.Nonempty.Times (tl2,tts2)) ->
-          get_minimal_alignment_times tl1 tl2 tts1 tts2
+          get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
         | (NormalizedTree.Nonempty.Star (sl1,(sts1,_)),
            NormalizedTree.Nonempty.Star (sl2,(sts2,_))) ->
           if not (SD.are_compatible sl1 sl2) then
             None
           else
             Option.map
-              ~f:(fun a -> Star (sl1,sl2,a))
-              (get_minimal_alignment sts1 sts2)
+              ~f:(fun a -> mk_star sl1 sl2 a)
+              (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
         | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
-          Option.map ~f:(fun a -> Base a) (BD.get_alignment bd1 bd2)
+          Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
         | _ -> None
       end
+
+    module UnfixedGetMinimalAlignment =
+    struct
+      module Arg = GetMinimalAlignmentArg
+      module Result = OptionOf(NonemptyNormalizedPlusStarTreeAlignment)
+      let f
+          (recursive_f:Arg.t -> Result.t)
+          (arg:Arg.t)
+        : Result.t =
+        let (t1,t2) = arg.node in
+        begin match (t1.node,t2.node) with
+          | (NormalizedTree.Nonempty.Plus (pl1,pts1),
+             NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
+            get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
+          | (NormalizedTree.Nonempty.Times (tl1,tts1),
+             NormalizedTree.Nonempty.Times (tl2,tts2)) ->
+            get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
+          | (NormalizedTree.Nonempty.Star (sl1,(sts1,_)),
+             NormalizedTree.Nonempty.Star (sl2,(sts2,_))) ->
+            if not (SD.are_compatible sl1 sl2) then
+              None
+            else
+              Option.map
+                ~f:(fun a -> mk_star sl1 sl2 a)
+                (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
+          | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
+            Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
+          | _ -> None
+        end
+    end
+
+    module Memo = FixHCMemoizerOf(UnfixedGetMinimalAlignment)
+
+    let rec get_minimal_alignment
+        (sts1:NormalizedTree.Nonempty.t)
+        (sts2:NormalizedTree.Nonempty.t)
+      : t option =
+      Memo.evaluate (GetMinimalAlignmentArg.create sts1 sts2)
 
     let rec to_nonempty_and_cost
         (nta:NonemptyNormalizedPlusStarTreeAlignment.t)
@@ -977,7 +1051,7 @@ struct
       : Nonempty.t * float =
       let cost = cost nta in
       let al:Nonempty.t =
-        begin match (nta,ns1,ns2) with
+        begin match (nta.node,ns1,ns2) with
           | (Plus (pl1,pl2,md,cd1,cd2),Plus(pnl1,nsl1),Plus(pnl2,nsl2)) ->
             let createdict_to_createlist
                 (cd:CreateDict.t)
@@ -989,7 +1063,7 @@ struct
                   ~f:(fun (s,t) ->
                       (CountedPermutation.apply_inverse_exn left_perm s
                       ,CountedPermutation.apply_inverse_exn right_perm t))
-                  (CreateDict.as_kvp_list cd1)
+                  (CreateDict.as_kvp_list cd)
               in
               let sorted_clp =
                 List.sort
@@ -1025,7 +1099,7 @@ struct
                 List.map
                   ~f:(fun (p1,p2,nta) ->
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
-                      let i2 = CountedPermutation.apply_inverse_exn perm1 p1 in
+                      let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
                         List.nth_exn
                           nsl1
@@ -1039,7 +1113,7 @@ struct
                       (i1,i2,fst (to_nonempty_and_cost nta ns1 ns2)))
                   (MappingDict.all_alignments md)
               in
-              Plus (pl1,pl2,all_aligns,cl1,cl2)
+              Plus (pl1',pl2',all_aligns,cl1,cl2)
           | (Times(tl1,tl2,als,pl1,pl2)
             ,Times(tnl1,nsl1)
             ,Times(tnl2,nsl2)) ->
@@ -1067,9 +1141,19 @@ struct
               NormalizedTree.NormalizationScript.TD_NormalizationLabel.get_perm
                 tnl2
             in
-            if tl1 <> tl1' || tl2 <> tl2' then
-              failwith "bad application of normalization script"
+            if not (is_equal (TD.compare tl1 tl1')) || not (is_equal (TD.compare tl2 tl2')) then
+              failwith ("bad application of normalization script"
+                ^ TD.show tl1 ^ TD.show tl1')
             else
+              let pl1 = List.map ~f:fst pl1 in
+              let pl2 = List.map ~f:fst pl2 in
+              (*print_endline "startprojections";
+              print_endline (string_of_list show_position pl1);
+              print_endline (string_of_list show_position pl2);
+              print_endline (string_of_list (fun (p1,p2,_) -> show_position p1 ^ "," ^ show_position p2) als);
+              print_endline (CountedPermutation.show perm1);
+              print_endline (CountedPermutation.show perm2);
+              print_endline "endprojections\n\n\n";*)
               let projs1 = transform_projection_list perm1 pl1 in
               let projs2 = transform_projection_list perm2 pl2 in
               let aligns =
@@ -1090,7 +1174,7 @@ struct
                       (i1,i2,fst (to_nonempty_and_cost al ns1 ns2)))
                   als
               in
-              Times (tl1,tl2,aligns,projs1,projs2)
+              Times (tl1',tl2',aligns,projs1,projs2)
           | (Star (sl1,sl2,ns'),Star (sl1',ns1'), Star (sl2',ns2')) ->
             if (sl1 <> sl1') || (sl2 <> sl2') then
               failwith "bad application of normalization script"
@@ -1131,6 +1215,8 @@ struct
     begin match (normalized_t1,normalized_t2) with
       | (NormalizedTree.Empty,NormalizedTree.Empty) -> (Some Empty,0.)
       | (NormalizedTree.Nonempty nt1,NormalizedTree.Nonempty nt2) ->
+        (*print_endline (NormalizedTree.NormalizationScript.show script1);
+        print_endline (NormalizedTree.NormalizationScript.show script2);*)
         let (script1,script2) =
           begin match (script1,script2) with
             | (Nonempty script1,Nonempty script2) -> (script1,script2)

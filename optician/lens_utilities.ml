@@ -1,6 +1,5 @@
 open MyStdlib
 open Lang
-open Regexcontext
 open Regex_utilities
 open Lenscontext
 

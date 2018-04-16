@@ -18,7 +18,7 @@ let test_normalize_tree_empty _ =
 let test_normalize_tree_base _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Base 12345)
+       (IntNormalizedPTST.Nonempty.mk_base 12345)
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Base 12345))
     (IntNormalizedPTST.from_tree
@@ -28,9 +28,9 @@ let test_normalize_tree_base _ =
 let test_normalize_tree_star _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Star
-          (54321
-       ,(IntNormalizedPTST.Nonempty.Base 12345,1)))
+       (IntNormalizedPTST.Nonempty.mk_star
+          54321
+          (IntNormalizedPTST.Nonempty.mk_base 12345,1))
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Star
            (54321
@@ -44,9 +44,9 @@ let test_normalize_tree_star _ =
 let test_normalize_tree_plus_nodupes _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Plus
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,1)]))
+       (IntNormalizedPTST.Nonempty.mk_plus
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -65,9 +65,9 @@ let test_normalize_tree_plus_nodupes _ =
 let test_normalize_tree_plus_dupes _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Plus
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,2)]))
+       (IntNormalizedPTST.Nonempty.mk_plus
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,2)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -87,13 +87,77 @@ let test_normalize_tree_plus_dupes _ =
              ,[IntNormalizedPTST.NonNormalizedTree.Base 12345
               ;IntNormalizedPTST.NonNormalizedTree.Base 12345]))))
 
+let test_normalize_tree_plus_many_dupes_with_times _ =
+  assert_normalized_tree_script_equal
+    (IntNormalizedPTST.Nonempty
+       (IntNormalizedPTST.Nonempty.mk_plus
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_times 123 [],7)])
+    ,IntNormalizedPTST.NormalizationScript.Nonempty
+        (IntNormalizedPTST.NormalizationScript.Plus
+           (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
+              ~label:54321
+              ~perm:([CountedPermutation.make_element
+                        ~old_index:0
+                        ~new_index:(0,0)
+                     ;CountedPermutation.make_element
+                         ~old_index:1
+                         ~new_index:(0,1)
+                     ;CountedPermutation.make_element
+                         ~old_index:2
+                         ~new_index:(0,2)
+                     ;CountedPermutation.make_element
+                         ~old_index:3
+                         ~new_index:(0,3)
+                     ;CountedPermutation.make_element
+                         ~old_index:4
+                         ~new_index:(0,4)
+                     ;CountedPermutation.make_element
+                         ~old_index:5
+                         ~new_index:(0,5)
+                     ;CountedPermutation.make_element
+                         ~old_index:6
+                         ~new_index:(0,6)])
+           ,[IntNormalizedPTST.NormalizationScript.mk_times
+               (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:123 ~perm:[])
+               []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:246 ~perm:[])
+                []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:369 ~perm:[])
+                []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:492 ~perm:[])
+                []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:615 ~perm:[])
+                []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:738 ~perm:[])
+                []
+            ;IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:861 ~perm:[])
+                []])))
+    (IntNormalizedPTST.from_tree
+       (IntNormalizedPTST.NonNormalizedTree.Nonempty
+          (IntNormalizedPTST.NonNormalizedTree.Plus
+             (54321
+             ,[IntNormalizedPTST.NonNormalizedTree.mk_times 123 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 246 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 369 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 492 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 615 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 738 []
+              ;IntNormalizedPTST.NonNormalizedTree.mk_times 861 []]))))
+
 let test_normalize_tree_plus_complex_perm _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Plus
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,1)
-           ;(IntNormalizedPTST.Nonempty.Base 12346,2)]))
+       (IntNormalizedPTST.Nonempty.mk_plus
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)
+          ;(IntNormalizedPTST.Nonempty.mk_base 12346,2)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -121,9 +185,9 @@ let test_normalize_tree_plus_complex_perm _ =
 let test_normalize_tree_times_nodupes _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Times
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,1)]))
+       (IntNormalizedPTST.Nonempty.mk_times
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Times
            (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make
@@ -142,9 +206,9 @@ let test_normalize_tree_times_nodupes _ =
 let test_normalize_tree_times_dupes _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Times
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,2)]))
+       (IntNormalizedPTST.Nonempty.mk_times
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,2)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Times
            (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make
@@ -167,10 +231,10 @@ let test_normalize_tree_times_dupes _ =
 let test_normalize_tree_times_complex_perm _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
-       (IntNormalizedPTST.Nonempty.Times
-          (54321
-          ,[(IntNormalizedPTST.Nonempty.Base 12345,1)
-           ;(IntNormalizedPTST.Nonempty.Base 12346,2)]))
+       (IntNormalizedPTST.Nonempty.mk_times
+          54321
+          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)
+          ;(IntNormalizedPTST.Nonempty.mk_base 12346,2)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Times
            (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make
@@ -202,6 +266,7 @@ let normalize_from_tree_suite = "Test NormalizedPTST from_tree" >:::
     "test_normalize_tree_star" >:: test_normalize_tree_star;
     "test_normalize_tree_plus_nodupes" >:: test_normalize_tree_plus_nodupes;
     "test_normalize_tree_plus_dupes" >:: test_normalize_tree_plus_dupes;
+    "test_normalize_tree_plus_many_dupes_with_times" >:: test_normalize_tree_plus_many_dupes_with_times;
     "test_normalize_tree_plus_complex_perm" >:: test_normalize_tree_plus_complex_perm;
     "test_normalize_tree_times_nodupes" >:: test_normalize_tree_times_nodupes;
     "test_normalize_tree_times_dupes" >:: test_normalize_tree_times_dupes;
@@ -241,29 +306,29 @@ let test_cost_times_singleton _ =
 
 let test_cost_times_unmapped_left _ =
   assert_float_equal
-    0.5
+    5.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
           5
           5
           []
-          [(0,0)]
+          [((0,0),5.)]
           []))
 
 let test_cost_times_unmapped_right _ =
   assert_float_equal
-    0.5
+    5.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
           5
           5
           []
           []
-          [(0,0)]))
+          [((0,0),5.)]))
 
 let test_cost_times_recursive _ =
   assert_float_equal
-    (1. /. 3.)
+    5.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
           5
@@ -275,11 +340,11 @@ let test_cost_times_recursive _ =
               []
               [])]
           []
-          [(1,0)]))
+          [((1,0),5.)]))
 
 let test_cost_times_imperfect_rec _ =
   assert_float_equal
-    (1. /. 4.)
+    8.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_times
           5
@@ -290,7 +355,7 @@ let test_cost_times_imperfect_rec _ =
               8
               8
               []
-              [(0,0)]
+              [((0,0),8.)]
               [])]
           []
           []))
@@ -384,7 +449,7 @@ let test_cost_plus_double_rec _ =
 
 let test_cost_plus_single_merge _ =
   assert_float_equal
-    (1. /. 3.)
+    1.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
           5
@@ -406,7 +471,7 @@ let test_cost_plus_single_merge _ =
 
 let test_cost_plus_crossing_merge _ =
   assert_float_equal
-    (8. /. 15.)
+    2.
     (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.cost
        (IPTSTA.NonemptyNormalizedPlusStarTreeAlignment.mk_plus
           5
@@ -507,12 +572,12 @@ let test_get_minimal_alignment_and_cost_times_emptytimes _ =
              ,[]
              ,[0]
              ,[]))))
-    ,0.5)
+    ,2.)
     (IPTSTA.get_minimal_alignment_and_cost
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (1,[])])))
+             ,[IPTST.Base (2)])))
        (IPTST.Nonempty
           (IPTST.Times (1,[]))))
 
@@ -561,12 +626,12 @@ let test_get_minimal_alignment_and_cost_easy_times_project_left _ =
                    ,[]))]
              ,[0]
              ,[]))))
-    ,1. /. 3.)
+    ,2.)
     (IPTSTA.get_minimal_alignment_and_cost
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (2,[]);IPTST.Times (1,[])])))
+             ,[IPTST.Base 2;IPTST.Times (1,[])])))
        (IPTST.Nonempty
           (IPTST.Times
              (1
@@ -664,6 +729,50 @@ let test_get_minimal_alignment_and_cost_easy_plus_bijection _ =
              (1
              ,[IPTST.Plus (1,[])]))))
 
+let test_get_minimal_alignment_and_cost_hard_plus_bijection _ =
+  assert_alignment_option_cost_equal
+    ((Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Plus
+             (1
+             ,1
+             ,[(2
+               ,1
+               ,IPTSTA.Nonempty.Plus
+                   (0
+                   ,0
+                 ,[]
+                 ,[]
+                   ,[]))
+              ;(1
+               ,2
+               ,IPTSTA.Nonempty.Plus
+                   (2
+                   ,2
+                 ,[]
+                 ,[]
+                   ,[]))
+              ;(0
+               ,0
+               ,IPTSTA.Nonempty.Plus
+                   (1
+                   ,1
+                 ,[]
+                 ,[]
+                   ,[]))]
+             ,[0;2;1]
+             ,[0;2;1]))))
+    ,0.)
+    (IPTSTA.get_minimal_alignment_and_cost
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Plus (1,[]);IPTST.Plus (2,[]);IPTST.Plus (0,[])])))
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Plus (1,[]);IPTST.Plus (0,[]);IPTST.Plus (2,[])]))))
+
 let alignment_distance_suite = "Test get_minimal_alignment_and_cost" >:::
   [
     "test_get_minimal_alignment_and_cost_empty" >:: test_get_minimal_alignment_and_cost_empty;
@@ -677,6 +786,7 @@ let alignment_distance_suite = "Test get_minimal_alignment_and_cost" >:::
     "test_get_minimal_alignment_and_cost_emptyplus_emptyplus" >:: test_get_minimal_alignment_and_cost_emptyplus_emptyplus;
     "test_get_minimal_alignment_and_cost_plus_emptyplus" >:: test_get_minimal_alignment_and_cost_plus_emptyplus;
     "test_get_minimal_alignment_and_cost_easy_plus_bijection" >:: test_get_minimal_alignment_and_cost_easy_plus_bijection;
+    "test_get_minimal_alignment_and_cost_hard_plus_bijection" >:: test_get_minimal_alignment_and_cost_hard_plus_bijection;
   ]
 
 let _ = run_test_tt_main alignment_distance_suite
@@ -886,7 +996,7 @@ let test_kinda_rigid_synth_project_lastname _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.make_base "") names "" "")
                 (Lens.make_const "" "")))
-       ,1. /. 3.))
+       ,20.8017588726))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -924,7 +1034,7 @@ let test_kinda_rigid_synth_project_firstname _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.make_base "") name "" "A")
                 (Lens.make_const "" " ")))
-       ,1. /. 3.))
+       ,20.8017588726))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -954,7 +1064,7 @@ let test_kinda_rigid_synth_disconnect _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.one) name "" "A")
                 (Lens.make_const "" "")))
-       ,1. /. 3.))
+       ,37.6035177451))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -992,7 +1102,7 @@ let test_kinda_rigid_synth_project_last_from_put _ =
              (Lens.make_concat
                 (Lens.make_disconnect name (Regex.make_base "") "A" "")
                 (Lens.make_const "" "")))
-       ,1. /. 3.))
+       ,20.8017588726))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        firstlast
@@ -1030,7 +1140,7 @@ let test_kinda_rigid_synth_project_first_from_put _ =
              (Lens.make_concat
                 (Lens.make_ident name_opened)
                 (Lens.make_const "" "")))
-       ,1. /. 3.))
+       ,20.8017588726))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        firstlast
@@ -1394,55 +1504,57 @@ let test_alignment_to_lens_or_crossing_creates _ =
   in
   assert_lens_option_equal
     (Some
-       (Lens.make_compose
-         (Lens.make_compose
+       (Lens.make_or
+          Lens.zero
+          (Lens.make_compose
+             (Lens.make_compose
+                (Lens.make_or
+                   (Lens.make_or
+                      (Lens.make_or
+                         (Lens.make_concat
+                            (Lens.make_const "" "0")
+                            (Lens.make_ident (Regex.make_base "t")))
+                         (Lens.make_concat
+                            (Lens.make_const "" "1")
+                            (Lens.make_ident (Regex.make_base "t"))))
+                      (Lens.make_concat
+                         (Lens.make_const "" "1")
+                         (Lens.make_ident (Regex.make_base "u")))
+                   )
+                   (Lens.make_concat
+                      (Lens.make_const "" "0")
+                      (Lens.make_ident (Regex.make_base "u"))))
+                (Lens.make_or
+                   (Lens.make_or
+                      (Lens.make_or
+                         (Lens.make_concat
+                            (Lens.make_const "1" "1")
+                            (Lens.make_ident (Regex.make_base "u")))
+                         (Lens.make_concat
+                            (Lens.make_const  "0" "1")
+                            (Lens.make_const "u" "t")))
+                      (Lens.make_concat
+                         (Lens.make_const "1" "0")
+                         (Lens.make_const "t" "u")))
+                   (Lens.make_concat
+                      (Lens.make_const "0" "0")
+                      (Lens.make_ident (Regex.make_base "t")))))
              (Lens.make_or
                 (Lens.make_or
                    (Lens.make_or
                       (Lens.make_concat
-                         (Lens.make_const "" "0")
+                         (Lens.make_const "1" "")
                          (Lens.make_ident (Regex.make_base "t")))
                       (Lens.make_concat
-                         (Lens.make_const "" "1")
+                         (Lens.make_const "0" "")
                          (Lens.make_ident (Regex.make_base "t"))))
                    (Lens.make_concat
-                      (Lens.make_const "" "1")
-                      (Lens.make_ident (Regex.make_base "u")))
-                )
+                      (Lens.make_const "0" "")
+                      (Lens.make_ident (Regex.make_base "u"))))
                 (Lens.make_concat
-                    (Lens.make_const "" "0")
-                    (Lens.make_ident (Regex.make_base "u"))))
-             (Lens.make_or
-               (Lens.make_or
-                  (Lens.make_or
-                     (Lens.make_concat
-                        (Lens.make_const "1" "1")
-                        (Lens.make_ident (Regex.make_base "u")))
-                     (Lens.make_concat
-                        (Lens.make_const  "0" "1")
-                        (Lens.make_const "u" "t")))
-                  (Lens.make_concat
-                     (Lens.make_const "1" "0")
-                     (Lens.make_const "t" "u")))
-               (Lens.make_concat
-                  (Lens.make_const "0" "0")
-                  (Lens.make_ident (Regex.make_base "t")))))
-         (Lens.make_or
-            (Lens.make_or
-               (Lens.make_or
-                  (Lens.make_concat
-                     (Lens.make_const "1" "")
-                     (Lens.make_ident (Regex.make_base "t")))
-                  (Lens.make_concat
-                     (Lens.make_const "0" "")
-                     (Lens.make_ident (Regex.make_base "t"))))
-               (Lens.make_concat
-                  (Lens.make_const "0" "")
-                  (Lens.make_ident (Regex.make_base "u"))))
-            (Lens.make_concat
-               (Lens.make_const "1" "")
-               (Lens.make_ident (Regex.make_base "u"))))))
-(StarSemiringTreeRep.alignment_to_lens
+                   (Lens.make_const "1" "")
+                   (Lens.make_ident (Regex.make_base "u")))))))
+    (StarSemiringTreeRep.alignment_to_lens
        (StarSemiringTreeRep.Alignment.NonemptyTree
           (StarSemiringTreeRep.Alignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data

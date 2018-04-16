@@ -18,6 +18,12 @@ let (%%)
   : 'a -> 'b -> 'd =
   fun a b -> f (g a b)
 
+let (@$)
+    (f:'a -> 'b)
+    (x:'a)
+  : 'b =
+  f x
+
 let curry
     (f:('a * 'b) -> 'c)
     (x:'a)
@@ -153,7 +159,7 @@ module type Data = sig
   val hash_fold_t : t hash_folder
 end
 
-module type UniqueRefData = sig
+module type UIDData = sig
   type t
   val show : t shower
   val pp : t pper
@@ -166,16 +172,25 @@ end
 module UnitModule = struct
   type t = unit
   [@@deriving ord, show, hash]
+
+  let uid _ = 0
 end
 
 module IntModule = struct
   type t = int
   [@@deriving ord, show, hash]
+
+  let uid = ident
 end
 
 module BoolModule = struct
   type t = bool
   [@@deriving ord, show, hash]
+
+  let uid
+      (b:bool)
+    : int =
+    if b then 1 else 0
 end
 
 module FloatModule = struct
@@ -187,16 +202,21 @@ module RefOf(D:Data) : Data with type t = D.t ref = struct
   type t = D.t ref
   [@@deriving show]
 
+  let uid
+      (x:t)
+    : int =
+    Obj.magic x
+
   let compare
       (x:t)
       (y:t)
     : int =
-    Int.compare (Obj.magic x) (Obj.magic y)
+    Int.compare (uid x) (uid y)
 
   let hash_fold_t : ('a ref) hash_folder =
-    fun hs -> (Int.hash_fold_t hs) % (fun xr -> ((Obj.magic xr)))
+    fun hs -> (Int.hash_fold_t hs) % (fun xr -> uid xr)
 
-  let hash : 'a hasher = Int.hash % (fun xr -> ((Obj.magic xr)))
+  let hash : 'a hasher = Int.hash % (fun xr -> uid xr)
 end
 
 module OptionOf
@@ -442,6 +462,16 @@ let cartesian_filter_map
        ~f:f
        l1
        l2)
+
+let cartesian_filter
+    ~f:(f:'a -> 'b -> bool)
+    (l1:'a list)
+    (l2:'b list)
+  : ('a * 'b) list =
+  cartesian_filter_map
+    ~f:(fun x y -> if f x y then Some (x,y) else None)
+    l1
+    l2
 
 let remove_all_elements
     (l:'a list)
@@ -707,13 +737,13 @@ let triple_partitions (n:int) : (int * int * int) list =
         end)
     list_split_partitions
 
-let rec sort_and_partition ~cmp:(f:'a -> 'a -> comparison) (l:'a list) : 'a list list =
+let rec sort_and_partition ~cmp:(cmp:'a -> 'a -> comparison) (l:'a list) : 'a list list =
   let rec merge_sorted_partitions (l1:'a list list) (l2:'a list list) : 'a list list =
     begin match (l1,l2) with
     | (h1::t1,h2::t2) ->
         let rep1 = List.hd_exn h1 in
         let rep2 = List.hd_exn h2 in
-        let comparison = f rep1 rep2 in
+        let comparison = cmp rep1 rep2 in
         if (comparison = 0) then
           ((h1@h2)::(merge_sorted_partitions t1 t2))
         else if (comparison < 0) then
@@ -728,8 +758,8 @@ let rec sort_and_partition ~cmp:(f:'a -> 'a -> comparison) (l:'a list) : 'a list
   | _ ->
       let len = List.length l in
       let (l1, l2) = split_at_index_exn l (len/2) in
-      let sorted_partitioned_l1 = sort_and_partition f l1 in
-      let sorted_partitioned_l2 = sort_and_partition f l2 in
+      let sorted_partitioned_l1 = sort_and_partition ~cmp:cmp l1 in
+      let sorted_partitioned_l2 = sort_and_partition ~cmp:cmp l2 in
       merge_sorted_partitions sorted_partitioned_l1 sorted_partitioned_l2
   end
 
@@ -1200,4 +1230,6 @@ struct
       1.0
     else
       (Float.of_int n) *. (factorial (n - 1))
+
+  include Posix_math
 end

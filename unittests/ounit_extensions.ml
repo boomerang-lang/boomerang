@@ -29,13 +29,17 @@ struct
   let requires_mapping v = v mod 100 = 0
   module Default = IntModule
   let extract_default _ = failwith "TODO"
+  let information_content v = Float.of_int @$ v mod 123
 end
 
 module CompatibilityIntModule =
 struct
   include IntModule
+  let compare x y = compare (x mod 123) (y mod 123)
+  let hash_fold_t s x = hash_fold_t s (x mod 123)
+  let hash x = hash (x mod 123)
   let are_compatible = is_equal %% compare
-  let requires_mapping v = v mod 100 = 0
+  let requires_mapping v = v mod 246 = 0
   module Default = IntModule
   let extract_default _ = failwith "TODO"
 end
@@ -120,7 +124,7 @@ let assert_lens_float_option_equal =
           | (None,None) -> 0
           | (Some (l1,f1), Some (l2,f2)) ->
             if Lens.is_eq l1 l2 then
-              Float.compare f1 f2
+              (if Float.abs (f1 -. f2) <. 0.000001 then 0 else 1)
             else
               1
           | _ -> 1

@@ -19,7 +19,8 @@ open Core
 open Util
 open My_hash_cons
 
-module HSetOf(D : HashConsData) = struct
+module HCSetOf(D : UIDData) = struct
+  module Element = D
 
   type elt = D.t
 
@@ -48,11 +49,11 @@ module HSetOf(D : HashConsData) = struct
 
   let zero_bit k m = phys_equal (k land m) 0
 
-  let rec mem k t =
+  let rec member t k =
     match t.node with
     | Empty -> false
-    | Leaf j -> phys_equal k.tag j.tag
-    | Branch (_, m, l, r) -> mem k (if zero_bit k.tag m then l else r)
+    | Leaf j -> phys_equal (D.uid k) (D.uid j)
+    | Branch (_, m, l, r) -> member (if zero_bit (D.uid k) m then l else r) k
 
   let lowest_bit x = x land (-x)
 
@@ -76,14 +77,14 @@ module HSetOf(D : HashConsData) = struct
       match t.node with
       | Empty -> leaf k
       | Leaf j ->
-          if phys_equal j.tag k.tag then t else join (k.tag, leaf k, j.tag, t)
+          if phys_equal (D.uid j) (D.uid k) then t else join (D.uid k, leaf k, D.uid j, t)
       | Branch (p,m,t0,t1) ->
-          if match_prefix k.tag p m then
-            if zero_bit k.tag m
+          if match_prefix (D.uid k) p m then
+            if zero_bit (D.uid k) m
             then branch (p, m, ins t0, t1)
             else branch (p, m, t0, ins t1)
           else
-            join (k.tag, leaf k, p, t)
+            join (D.uid k, leaf k, p, t)
     in ins t
 
   let branch x =
@@ -96,22 +97,25 @@ module HSetOf(D : HashConsData) = struct
     let rec rmv t =
       match t.node with
       | Empty -> empty
-      | Leaf j -> if phys_equal k.tag j.tag then empty else t
+      | Leaf j -> if phys_equal (D.uid k) (D.uid j) then empty else t
       | Branch (p,m,t0,t1) ->
-          if match_prefix k.tag p m then
-            if zero_bit k.tag m
+          if match_prefix (D.uid k) p m then
+            if zero_bit (D.uid k) m
             then branch (p, m, rmv t0, t1)
             else branch (p, m, t0, rmv t1)
           else t
     in rmv t
 
   let rec merge (s,t) : t =
-    match s.node, t.node with
-    | Empty, _  -> t
-    | _, Empty  -> s
-    | Leaf k, _ -> add k t
-    | _, Leaf k -> add k s
-    | Branch (p,m,s0,s1), Branch (q,n,t0,t1) ->
+    if phys_equal s.tag t.tag then
+      s
+    else
+      match s.node, t.node with
+      | Empty, _  -> t
+      | _, Empty  -> s
+      | Leaf k, _ -> add k t
+      | _, Leaf k -> add k s
+      | Branch (p,m,s0,s1), Branch (q,n,t0,t1) ->
         if phys_equal m n && match_prefix q p m then
           (* The trees have the same prefix. Merge the subtrees. *)
           branch (p, m, merge (s0,t0), merge (s1,t1))
@@ -119,7 +123,7 @@ module HSetOf(D : HashConsData) = struct
           (* [q] contains [p]. Merge [t] with a subtree of [s]. *)
           if zero_bit q m then
             branch (p, m, merge (s0,t), s1)
-                else
+          else
             branch (p, m, s0, merge (s1,t))
         else if unsigned_lt n m && match_prefix p q n then
           (* [p] contains [q]. Merge [s] with a subtree of [t]. *)
@@ -137,7 +141,7 @@ module HSetOf(D : HashConsData) = struct
     match (s1.node,s2.node) with
     | Empty, _ -> true
     | _, Empty -> false
-    | Leaf k1, _ -> mem k1 s2
+    | Leaf k1, _ -> member s2 k1
     | Branch _, Leaf _ -> false
     | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
         if phys_equal m1 m2 && phys_equal p1 p2 then
@@ -151,12 +155,15 @@ module HSetOf(D : HashConsData) = struct
           false
 
   let rec inter s1 s2 =
-    match (s1.node,s2.node) with
-    | Empty, _ -> empty
-    | _, Empty -> empty
-    | Leaf k1, _ -> if mem k1 s2 then s1 else empty
-    | _, Leaf k2 -> if mem k2 s1 then s2 else empty
-    | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
+    if (s1.tag = s2.tag) then
+      s1
+    else
+      match (s1.node,s2.node) with
+      | Empty, _ -> empty
+      | _, Empty -> empty
+      | Leaf k1, _ -> if member s2 k1 then s1 else empty
+      | _, Leaf k2 -> if member s1 k2 then s2 else empty
+      | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
         if phys_equal m1 m2 && phys_equal p1 p2 then
           merge (inter l1 l2, inter r1 r2)
         else if unsigned_lt m1 m2 && match_prefix p2 p1 m1 then
@@ -167,12 +174,15 @@ module HSetOf(D : HashConsData) = struct
           empty
 
   let rec diff s1 s2 =
-    match (s1.node,s2.node) with
-    | Empty, _ -> empty
-    | _, Empty -> s1
-    | Leaf k1, _ -> if mem k1 s2 then empty else s1
-    | _, Leaf k2 -> remove k2 s1
-    | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
+    if (s1 = s2) then
+      empty
+    else
+      match (s1.node,s2.node) with
+      | Empty, _ -> empty
+      | _, Empty -> s1
+      | Leaf k1, _ -> if member s2 k1 then empty else s1
+      | _, Leaf k2 -> remove k2 s1
+      | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
         if phys_equal m1 m2 && phys_equal p1 p2 then
           merge (diff l1 l2, diff r1 r2)
         else if unsigned_lt m1 m2 && match_prefix p2 p1 m1 then
@@ -182,7 +192,7 @@ module HSetOf(D : HashConsData) = struct
             merge (l1, diff r1 s2)
         else if unsigned_lt m2 m1 && match_prefix p1 p2 m2 then
           if zero_bit p1 m2 then diff s1 l2 else diff s1 r2
-              else
+        else
           s1
 
   let rec cardinal t =
@@ -197,11 +207,11 @@ module HSetOf(D : HashConsData) = struct
     | Leaf k -> f k
     | Branch (_,_,t0,t1) -> iter f t0; iter f t1
 
-  let rec fold f s accu =
+  let rec fold ~f:f ~init:accu s =
     match s.node with
     | Empty -> accu
     | Leaf k -> f k accu
-    | Branch (_,_,t0,t1) -> fold f t0 (fold f t1 accu)
+    | Branch (_,_,t0,t1) -> fold ~f:f ~init:(fold ~f:f ~init:accu t1) t0
 
   let rec for_all p t =
     match t.node with
@@ -215,7 +225,7 @@ module HSetOf(D : HashConsData) = struct
     | Leaf k -> p k
     | Branch (_,_,t0,t1) -> exists p t0 || exists p t1
 
-  let rec filter pr t =
+  let rec filter ~f:pr t =
     match t.node with
     | Empty -> empty
     | Leaf k -> if pr k then t else empty
@@ -236,26 +246,26 @@ module HSetOf(D : HashConsData) = struct
     | Leaf k -> k
     | Branch (_, _,t0,_) -> choose t0   (* we know that [t0] is non-empty *)
 
-  let elements s =
-    let rec elements_aux acc t =
+  let as_list s =
+    let rec as_list_internal acc t =
       match t.node with
       | Empty -> acc
       | Leaf k -> k :: acc
-      | Branch (_,_,l,r) -> elements_aux (elements_aux acc l) r
+      | Branch (_,_,l,r) -> as_list_internal (as_list_internal acc r) l
     in
-    elements_aux [] s
+    as_list_internal [] s
 
-  let rec min_elt t =
+  let rec min_exn t =
     match t.node with
     | Empty -> raise Not_found
     | Leaf k -> k
-    | Branch (_,_,s,t) -> min (min_elt s) (min_elt t)
+    | Branch (_,_,s,t) -> min (min_exn s) (min_exn t)
 
-  let rec max_elt t =
+  let rec max_exn t =
     match t.node with
     | Empty -> raise Not_found
     | Leaf k -> k
-    | Branch (_,_,s,t) -> max (max_elt s) (max_elt t)
+    | Branch (_,_,s,t) -> max (max_exn s) (max_exn t)
 
   let equal x y = x.tag = y.tag
 
@@ -265,7 +275,7 @@ module HSetOf(D : HashConsData) = struct
 
   let show t =
     let aux x acc = (D.show x) ^ (if acc = "" then acc else "," ^ acc) in
-    let elts = fold aux t "" in
+    let elts = fold ~f:aux ~init:"" t in
     "{" ^ elts ^ "}"
 
   let make l = List.fold_right ~f:add ~init:empty l
@@ -274,8 +284,8 @@ module HSetOf(D : HashConsData) = struct
     match (s1.node,s2.node) with
     | Empty, _ -> false
     | _, Empty -> false
-    | Leaf k1, _ -> mem k1 s2
-    | _, Leaf k2 -> mem k2 s1
+    | Leaf k1, _ -> member s2 k1
+    | _, Leaf k2 -> member s1 k2
     | Branch (p1,m1,l1,r1), Branch (p2,m2,l2,r2) ->
         if phys_equal m1 m2 && phys_equal p1 p2 then
           intersect l1 l2 || intersect r1 r2

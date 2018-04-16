@@ -1,7 +1,6 @@
 open MyStdlib
 open Lenscontext
 open Converter
-open Regexcontext
 open Lang
 open Regex_utilities
 open Lens_utilities
@@ -381,6 +380,19 @@ struct
       : Lens.t option =
       begin match SPQ.pop pq with
         | Some (qe,f,pq) ->
+          if !verbose then
+            (print_endline "popped";
+             print_endline ("r1: " ^ Regex.show (SymmetricQueueElement.get_r1 qe));
+             print_endline "\n\n";
+             print_endline ("r2: " ^ Regex.show (SymmetricQueueElement.get_r2 qe));
+             print_endline "\n\n";
+             print_endline ("priority: " ^ (SymmetricQueueElement.Priority.show f));
+             print_endline "\n\n";
+             print_endline ("exps_perfed: " ^ (string_of_int (SymmetricQueueElement.get_expansions_performed qe)));
+             print_endline "\n\n";
+             print_endline ("exps_inferred: " ^ (string_of_int (SymmetricQueueElement.get_expansions_inferred qe)));
+             print_endline "\n\n";
+             print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe))));
           let r1 = (SymmetricQueueElement.get_r1 qe) in
           let r2 = (SymmetricQueueElement.get_r2 qe) in
           if f >=. best_cost then
@@ -401,7 +413,7 @@ struct
                 | None -> (best,best_cost)
                 | Some (l,c) ->
                   let cost = c +. f in
-                  if cost <. best_cost then
+                  if cost <=. best_cost then
                     (Some l,cost)
                   else
                     (best,best_cost)

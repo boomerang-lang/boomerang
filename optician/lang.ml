@@ -44,6 +44,8 @@ struct
   let table = HashConsTable.create 100000
   let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
 
+  let uid (r:t) = r.tag
+
   let separate_plus
       (r:t)
     : (t * t) option =
@@ -377,6 +379,38 @@ struct
       (r:t)
     : string =
     Option.value_exn (representative r)
+
+  let information_content
+      (r:t)
+    : float =
+    let include_choice_info
+        ((f,n):float * int)
+      : float =
+      f +. (Math.log2 (Float.of_int n))
+    in
+    let rec information_content_internal
+        (r:t)
+      : float * int =
+      begin match r.node with
+        | RegExOr(r1,r2) ->
+          let (ic1,n1) = information_content_internal r1 in
+          let (ic2,n2) = information_content_internal r2 in
+          let n1f = Float.of_int n1 in
+          let n2f = Float.of_int n2 in
+          (((ic1 *. n1f) +. (ic2 *. n2f)) /. (n1f +. n2f)
+          ,n1 + n2)
+        | RegExConcat (r1,r2) ->
+          let (ic1,n1) = information_content_internal r1 in
+          let (ic2,n2) = information_content_internal r2 in
+          (ic1 +. ic2,n1*n2)
+        | RegExBase _ -> (0.,1)
+        | RegExEmpty -> (0.,0)
+        | RegExClosed r -> information_content_internal r
+        | RegExStar r ->
+          (include_choice_info (information_content_internal r),1)
+      end
+    in
+    include_choice_info (information_content_internal r)
 end
 
 let regex_semiring = (module Regex : Semiring.Sig with type t = Regex.t)
