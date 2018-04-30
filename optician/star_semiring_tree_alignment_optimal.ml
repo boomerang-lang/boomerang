@@ -490,7 +490,10 @@ struct
                       ~f:(position_cost iam)
                       positions
                   in
-                  FloatList.average positions_cost
+                  if List.is_empty positions_cost then
+                    0.
+                  else
+                    FloatList.average positions_cost
                 in
                 let left_cost =
                   side_cost

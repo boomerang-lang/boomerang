@@ -14,6 +14,36 @@ let get_rep_var
   else
     r
 
+let stochastic_star_depth_regex_fold
+    (type a)
+    ~empty_f:(empty_f:int -> a)
+    ~base_f:(base_f:int -> string -> a)
+    ~concat_f:(concat_f:int -> a -> a -> a)
+    ~or_f:(or_f:int -> Probability.t -> a -> a -> a)
+    ~star_f:(star_f:int -> Probability.t -> a -> a)
+    ~closed_f:(closed_f:int -> StochasticRegex.t -> a -> a)
+    (r:StochasticRegex.t)
+  : a =
+  fst
+    (StochasticRegex.fold_downward_upward
+       ~init:0
+       ~upward_empty:(fun i -> ((empty_f i), StochasticRegex.empty))
+       ~upward_base:(fun i s -> (base_f i s, StochasticRegex.make_base s))
+       ~upward_concat:(fun i (x1,r1) (x2,r2) ->
+           (concat_f i x1 x2
+           ,StochasticRegex.make_concat r1 r2))
+       ~upward_or:(fun i p (x1,r1) (x2,r2) ->
+           (or_f i p x1 x2
+           ,StochasticRegex.make_or r1 r2 p))
+       ~upward_star:(fun i p (x',r') ->
+           (star_f i p x'
+           ,StochasticRegex.make_star r' p))
+       ~upward_closed:(fun i (x',r') ->
+           (closed_f i r' x'
+           ,StochasticRegex.make_closed r'))
+       ~downward_star:(fun d -> d+1)
+       r)
+
 let star_depth_regex_fold
     (type a)
     ~empty_f:(empty_f:int -> a)
@@ -55,7 +85,8 @@ module RegexToIntSetDict = DictOf(Regex)(IntSet)
 
 let get_current_set
     (lc:LensContext.t)
-  : Regex.t -> RegexIntSet.t =
+    (sr:StochasticRegex.t)
+  : RegexIntSet.t =
   star_depth_regex_fold
     ~empty_f:(fun _ -> RegexIntSet.empty)
     ~base_f:(fun _ _ -> RegexIntSet.empty)
@@ -71,6 +102,7 @@ let get_current_set
     ~closed_f:(fun i r' _ ->
         let r'' = get_rep_var lc r' in
         RegexIntSet.singleton (r'',i))
+    (StochasticRegex.to_regex sr)
 
 let rec get_transitive_set
     (lc:LensContext.t)
@@ -173,21 +205,26 @@ let reachables_set_minus
 let force_expand
     (lc:LensContext.t)
     (problem_elts:RegexIntSet.t)
-  : Regex.t -> (Regex.t * int) =
-  star_depth_regex_fold
-    ~empty_f:(fun _ -> (Regex.empty,0))
-    ~base_f:(fun _ s -> (Regex.make_base s,0))
+    (r:StochasticRegex.t)
+  : (StochasticRegex.t * int) =
+  stochastic_star_depth_regex_fold
+    ~empty_f:(fun _ -> (StochasticRegex.empty,0))
+    ~base_f:(fun _ s -> (StochasticRegex.make_base s,0))
     ~concat_f:(fun _ (lr,le) (rr,re) ->
-        (Regex.make_concat lr rr, le+re))
-    ~or_f:(fun _ (lr,le) (rr,re) ->
-        (Regex.make_or lr rr, le+re))
-    ~star_f:(fun _ (r,e) ->
-        (Regex.make_star r, e))
+        (StochasticRegex.make_concat lr rr, le+re))
+    ~or_f:(fun _ p (lr,le) (rr,re) ->
+        (StochasticRegex.make_or lr rr p, le+re))
+    ~star_f:(fun _ p (r,e) ->
+        (StochasticRegex.make_star r p, e))
     ~closed_f:(fun star_depth r (r_expanded,e) ->
-        if RegexIntSet.member problem_elts (get_rep_var lc r,star_depth) then
+        if RegexIntSet.member
+            problem_elts
+            (get_rep_var lc (StochasticRegex.to_regex r),star_depth)
+        then
           (r_expanded,e+1)
         else
-          (Regex.make_closed r,0))
+          (StochasticRegex.make_closed r,0))
+    r
 (***** }}} *****)
 
 
@@ -198,12 +235,13 @@ let rec reveal
     (lc:LensContext.t)
     (reveal_ident:Regex.t)
     (star_depth:int)
-    (r:Regex.t)
-  : (Regex.t * int) list =
-  begin match r.node with
-    | Regex.RegExClosed r' ->
-      if get_rep_var lc r' = reveal_ident && star_depth = 0 then
-        [(Regex.make_closed r',0)]
+    (r:StochasticRegex.t)
+  : (StochasticRegex.t * int) list =
+  begin match StochasticRegex.node r with
+    | StochasticRegex.Closed r' ->
+      let r'_base = StochasticRegex.to_regex r' in
+      if get_rep_var lc r'_base = reveal_ident && star_depth = 0 then
+        [(StochasticRegex.make_closed r',0)]
       else
         List.map
           ~f:(fun (r,exp) -> (r,exp+1))
@@ -212,27 +250,27 @@ let rec reveal
              reveal_ident
              star_depth
              r')
-    | Regex.RegExConcat (r1,r2) ->
+    | StochasticRegex.Concat (r1,r2) ->
       let r1_exposes = reveal lc reveal_ident star_depth r1 in
       let r2_exposes = reveal lc reveal_ident star_depth r2 in
       (List.map
-         ~f:(fun (r1e,exp) -> (Regex.make_concat r1e r2,exp))
+         ~f:(fun (r1e,exp) -> (StochasticRegex.make_concat r1e r2,exp))
          r1_exposes)
       @
       (List.map
-         ~f:(fun (r2e,exp) -> (Regex.make_concat r1 r2e,exp))
+         ~f:(fun (r2e,exp) -> (StochasticRegex.make_concat r1 r2e,exp))
          r2_exposes)
-    | Regex.RegExOr (r1,r2) ->
+    | StochasticRegex.Or (r1,r2,p) ->
       let r1_exposes = reveal lc reveal_ident star_depth r1 in
       let r2_exposes = reveal lc reveal_ident star_depth r2 in
       (List.map
-         ~f:(fun (r1e,exp) -> (Regex.make_or r1e r2,exp))
+         ~f:(fun (r1e,exp) -> (StochasticRegex.make_or r1e r2 p,exp))
          r1_exposes)
       @
       (List.map
-         ~f:(fun (r2e,exp) -> (Regex.make_or r1 r2e,exp))
+         ~f:(fun (r2e,exp) -> (StochasticRegex.make_or r1 r2e p,exp))
          r2_exposes)
-    | Regex.RegExStar r' ->
+    | StochasticRegex.Star (r',p) ->
       let r'_exposes_with_unfold =
         reveal
           lc
@@ -249,30 +287,34 @@ let rec reveal
       in
       let star_r'_exposes_underneath =
         (List.map
-           ~f:(fun (r'e,exp) -> (Regex.make_star r'e,exp))
+           ~f:(fun (r'e,exp) -> (StochasticRegex.make_star r'e p,exp))
            r'_exposes_underneath)
       in
       let unrolled_r'_exposes_left =
         (List.map
            ~f:(fun (r'e,exp) ->
-               (Regex.make_or (Regex.one)
-                              (Regex.make_concat r'e (Regex.make_star r'e))
-               ,exp+1))
+               StochasticStarSemiring.unfold_left
+                 stochastic_regex_star_semiring
+                 r'e
+                 p
+               ,exp+1)
            r'_exposes_with_unfold)
       in
       let unrolled_r'_exposes_right =
         (List.map
            ~f:(fun (r'e,exp) ->
-               (Regex.make_or (Regex.one)
-                              (Regex.make_concat (Regex.make_star r'e) r'e)
-               ,exp+1))
+               StochasticStarSemiring.unfold_right
+                 stochastic_regex_star_semiring
+                 r'e
+                 p
+               ,exp+1)
            r'_exposes_with_unfold)
       in
       star_r'_exposes_underneath@
       unrolled_r'_exposes_left@
       unrolled_r'_exposes_right
-    | Regex.RegExEmpty -> []
-    | Regex.RegExBase _ -> []
+    | StochasticRegex.Empty -> []
+    | StochasticRegex.Base _ -> []
   end
 (***** }}} *****)
 
@@ -281,15 +323,15 @@ let expand_once
     (qe:SymmetricQueueElement.t)
   : SymmetricQueueElement.t list =
   let expanders =
-    [StarSemiring.left_unfold_all_stars regex_star_semiring
-    ;StarSemiring.right_unfold_all_stars regex_star_semiring
-    ;Regex.applies_for_every_applicable_level
-        (fun r -> (Regex.separate_closed r))]
+    [StochasticStarSemiring.left_unfold_all_stars stochastic_regex_star_semiring
+    ;StochasticStarSemiring.right_unfold_all_stars stochastic_regex_star_semiring
+    ;StochasticRegex.applies_for_every_applicable_level
+        (fun r -> (StochasticRegex.separate_closed r))]
   in
 
   let retrieve_new_problems_from_expander
-      (transform:Regex.t -> Regex.t list)
-    : (Regex.t * Regex.t) list =
+      (transform:StochasticRegex.t -> StochasticRegex.t list)
+    : (StochasticRegex.t * StochasticRegex.t) list =
     (List.map
        ~f:(fun le -> (le, SymmetricQueueElement.get_r2 qe))
        (transform (SymmetricQueueElement.get_r1 qe)))
@@ -329,11 +371,19 @@ let expand_once
 (**** ExpandRequired {{{ *****)
 let expand_required
     (lc:LensContext.t)
-    (r1:Regex.t)
-    (r2:Regex.t)
-  : (Regex.t * Regex.t * int) =
-  let r1_transitive_vars = get_transitive_set lc r1 in
-  let r2_transitive_vars = get_transitive_set lc r2 in
+    (r1:StochasticRegex.t)
+    (r2:StochasticRegex.t)
+  : (StochasticRegex.t * StochasticRegex.t * int) =
+  let r1_transitive_vars =
+    get_transitive_set
+      lc
+      (StochasticRegex.to_regex r1)
+  in
+  let r2_transitive_vars =
+    get_transitive_set
+      lc
+      (StochasticRegex.to_regex r2)
+  in
   let (left_unreachables,right_unreachables) =
     reachables_set_minus
       r1_transitive_vars

@@ -196,7 +196,7 @@ let rec exampled_regex_to_exampled_dnf_regex
 
 let regex_to_exampled_dnf_regex
     (lc:LensContext.t)
-    (r:Regex.t)
+    (r:StochasticRegex.t)
     (es:(int * string) list example_data)
   : exampled_dnf_regex option =
   let er_option = regex_to_exampled_regex r es in

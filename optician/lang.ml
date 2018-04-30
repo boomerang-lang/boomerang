@@ -41,7 +41,7 @@ struct
     | RegExClosed of t
   [@@deriving ord, show, hash]
 
-  let table = HashConsTable.create 100000
+  let table = HashConsTable.create 10000
   let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
 
   let uid (r:t) = r.tag
@@ -372,7 +372,7 @@ struct
       | RegExEmpty -> None
       | RegExClosed r -> representative r
       | RegExBase s -> Some s
-      | RegExStar _ -> Some ""
+      | RegExStar r -> representative r
     end
 
   let rec representative_exn
@@ -380,6 +380,12 @@ struct
     : string =
     Option.value_exn (representative r)
 
+  let likelihood_star : float = 0.8
+  let info_content_star_multiplier : float =
+    likelihood_star /. (1. -. likelihood_star)
+  let info_content_star_const : float =
+    -4. *. (Math.log2 likelihood_star)
+    -. (Math.log2 (1. -. likelihood_star))
   let information_content
       (r:t)
     : float =
@@ -407,7 +413,8 @@ struct
         | RegExEmpty -> (0.,0)
         | RegExClosed r -> information_content_internal r
         | RegExStar r ->
-          (include_choice_info (information_content_internal r),1)
+          let base = include_choice_info (information_content_internal r) in
+          ((info_content_star_multiplier *. base) +. info_content_star_const,1)
       end
     in
     include_choice_info (information_content_internal r)
@@ -415,6 +422,490 @@ end
 
 let regex_semiring = (module Regex : Semiring.Sig with type t = Regex.t)
 let regex_star_semiring = (module Regex : StarSemiring.Sig with type t = Regex.t)
+
+(**** Regex {{{ *****)
+module StochasticRegex =
+struct
+  type t = l hash_consed
+  and l =
+    {
+      node  : t_node                                     ;
+      mutable regex : (Regex.t option) [@hash.ignore] ;
+    }
+  and t_node =
+    | Empty
+    | Base of string
+    | Concat of t * t
+    | Or of t * t * Probability.t
+    | Star of t * Probability.t
+    | Closed of t
+  [@@deriving show,hash]
+
+  let rec compare
+      (r1:t)
+      (r2:t)
+    : int =
+    compare_hash_consed
+      compare_l
+      r1
+      r2
+  and compare_l
+      (l1:l)
+      (l2:l)
+    : int =
+    compare_t_node
+      l1.node
+      l2.node
+  and compare_t_node
+      (t1:t_node)
+      (t2:t_node)
+    : int =
+    begin match (t1,t2) with
+      | (Empty,Empty) -> 0
+      | (Empty,_    ) -> -1
+      | (_    ,Empty) -> 1
+      | (Base s1,Base s2) -> String.compare s1 s2
+      | (Base _ ,_      ) -> -1
+      | (_      ,Base _ ) -> 1
+      | (Concat (r11,r12),Concat (r21,r22)) ->
+        pair_compare
+          compare
+          compare
+          (r11,r12)
+          (r21,r22)
+      | (Concat _        ,_               ) -> -1
+      | (_               ,Concat _        ) -> 1
+      | (Or (r11,r12,p1),Or (r21,r22,p2)) ->
+        triple_compare
+          compare
+          compare
+          Float.compare
+          (r11,r12,p1)
+          (r21,r22,p2)
+      | (Or _        ,_           ) -> -1
+      | (_           ,Or _        ) -> 1
+      | (Star (r1,p1),Star (r2,p2)) ->
+        pair_compare
+          compare
+          Float.compare
+          (r1,p1)
+          (r2,p2)
+      | (Star _      ,_           ) -> -1
+      | (_           ,Star _      ) -> 1
+      | (Closed r1,Closed r2) -> compare r1 r2
+    end
+
+  let table = HashConsTable.create 10000
+  let mk_l
+      (r:t_node)
+    : l =
+    {
+      node  = r    ;
+      regex = None ;
+    }
+  let mk_t = HashConsTable.hashcons hash_l compare_l table % mk_l
+
+  let uid (r:t) = r.tag
+
+  let node (r:t) =
+    r.node.node
+
+  let separate_plus
+      (r:t)
+    : (t * t * Probability.t) option =
+    begin match node r with
+      | Or (r1,r2,p) -> Some (r1,r2,p)
+      | _ -> None
+    end
+
+  let separate_times
+      (r:t)
+    : (t * t) option =
+    begin match node r with
+      | Concat (r1,r2) -> Some (r1,r2)
+      | _ -> None
+    end
+
+  let separate_star
+      (r:t)
+    : (t * Probability.t) option =
+    begin match node r with
+      | Star (r',p) -> Some (r',p)
+      | _ -> None
+    end
+
+  let separate_closed
+      (r:t)
+    : t option =
+    begin match node r with
+      | Closed r -> Some r
+      | _ -> None
+    end
+
+  let empty : t = mk_t Empty
+
+  let make_concat
+      (r1:t)
+      (r2:t)
+    : t =
+    mk_t (Concat (r1,r2))
+
+  let make_or
+      (r1:t)
+      (r2:t)
+      (p:Probability.t)
+    : t =
+    mk_t (Or (r1,r2,p))
+
+  let make_star
+      (r:t)
+      (p:Probability.t)
+    : t =
+    mk_t (Star (r,p))
+
+  let make_closed
+      (r:t)
+    : t =
+    mk_t (Closed r)
+
+  let make_plus = make_or
+
+  let make_times = make_concat
+
+  let make_base
+      (s:string)
+    : t =
+    mk_t (Base s)
+
+  let one = make_base ""
+
+  let zero = empty
+
+  let fold_downward_upward
+      ~init:(init:'b)
+      ~upward_empty:(upward_empty:'b -> 'a)
+      ~upward_base:(upward_base:'b -> string -> 'a)
+      ~upward_concat:(upward_concat:'b -> 'a -> 'a -> 'a)
+      ~upward_or:(upward_or:'b -> Probability.t -> 'a -> 'a -> 'a)
+      ~upward_star:(upward_star:'b -> Probability.t -> 'a -> 'a)
+      ~upward_closed:(upward_closed:'b -> 'a -> 'a)
+      ?downward_concat:(downward_concat:'b -> 'b = ident)
+      ?downward_or:(downward_or:'b -> 'b = ident)
+      ?downward_star:(downward_star:'b -> 'b = ident)
+      ?downward_closed:(downward_closed:'b -> 'b = ident)
+    : t -> 'a =
+    let rec fold_downward_upward_internal
+        (downward_acc:'b)
+        (r:t)
+      : 'a =
+      begin match node r with
+        | Empty -> upward_empty downward_acc
+        | Base s -> upward_base downward_acc s
+        | Concat (r1,r2) ->
+          let downward_acc' = downward_concat downward_acc in
+          upward_concat
+            downward_acc
+            (fold_downward_upward_internal downward_acc' r1)
+            (fold_downward_upward_internal downward_acc' r2)
+        | Or (r1,r2,p) ->
+          let downward_acc' = downward_or downward_acc in
+          upward_or
+            downward_acc
+            p
+            (fold_downward_upward_internal downward_acc' r1)
+            (fold_downward_upward_internal downward_acc' r2)
+        | Star (r',p) ->
+          let downward_acc' = downward_star downward_acc in
+          upward_star
+            downward_acc
+            p
+            (fold_downward_upward_internal downward_acc' r')
+        | Closed r' ->
+          let downward_acc' = downward_closed downward_acc in
+          upward_closed
+            downward_acc
+            (fold_downward_upward_internal downward_acc' r')
+      end
+    in
+    fold_downward_upward_internal init
+
+  let fold
+      ~empty_f:(empty_f:'a)
+      ~base_f:(base_f:string -> 'a)
+      ~concat_f:(concat_f:'a -> 'a -> 'a)
+      ~or_f:(or_f:Probability.t -> 'a -> 'a -> 'a)
+      ~star_f:(star_f:Probability.t -> 'a -> 'a)
+      ~closed_f:(closed_f:'a -> 'a)
+      (r:t)
+    : 'a =
+    fold_downward_upward
+      ~init:()
+      ~upward_empty:(thunk_of empty_f)
+      ~upward_base:(thunk_of base_f)
+      ~upward_concat:(thunk_of concat_f)
+      ~upward_or:(thunk_of or_f)
+      ~upward_star:(thunk_of star_f)
+      ~upward_closed:(thunk_of closed_f)
+      r
+
+  let fold_with_subcomponents
+      ~empty_f:(empty_f:'a)
+      ~base_f:(base_f:string -> 'a)
+      ~concat_f:(concat_f:t -> t -> 'a -> 'a -> 'a)
+      ~or_f:(or_f:t -> t -> Probability.t -> 'a -> 'a -> 'a)
+      ~star_f:(star_f:t -> Probability.t -> 'a -> 'a)
+      ~closed_f:(closed_f:t -> 'a -> 'a)
+      (r:t)
+    : 'a =
+    snd
+      (fold
+         ~empty_f:(empty,empty_f)
+         ~base_f:(fun s -> (make_base s, base_f s))
+         ~concat_f:(fun (r1,x1) (r2,x2) ->
+             (make_concat r1 r2, concat_f r1 r2 x1 x2))
+         ~or_f:(fun p (r1,x1) (r2,x2) ->
+             (make_or r1 r2 p, or_f r1 r2 p x1 x2))
+         ~star_f:(fun p (r',x') ->
+             (make_star r' p, star_f r' p x'))
+         ~closed_f:(fun (r',x') ->
+             (make_closed r', closed_f r' x'))
+         r)
+
+  let rec apply_at_every_level
+      (f:t -> t)
+      (r:t)
+    : t =
+    fold
+      ~empty_f:(f empty)
+      ~base_f:(fun s -> f (make_base s))
+      ~concat_f:(fun r1 r2 -> f (make_concat r1 r2))
+      ~or_f:(fun p r1 r2 -> f (make_or r1 r2 p))
+      ~star_f:(fun p r' -> f (make_star r' p))
+      ~closed_f:(fun r' -> f (make_closed r'))
+      r
+
+  let rec applies_for_every_applicable_level
+      (f:t -> t option)
+    : t -> t list =
+    snd
+    %
+    fold
+      ~empty_f:(
+        let empty_r = empty in
+        let level_contribution = option_to_empty_or_singleton (f empty_r) in
+        (empty_r, level_contribution))
+      ~base_f:(fun s ->
+          let base_r = make_base s in
+          let level_contribution = option_to_empty_or_singleton (f base_r) in
+          (base_r, level_contribution))
+      ~concat_f:(fun (r1,r1s) (r2,r2s) ->
+          let concat_r = make_concat r1 r2 in
+          let level_contribution = option_to_empty_or_singleton (f concat_r) in
+          let recursed_lefts =
+            List.map
+              ~f:(fun r1' -> make_concat r1' r2)
+              r1s
+          in
+          let recursed_rights =
+            List.map
+              ~f:(fun r2' -> make_concat r1 r2')
+              r2s
+          in
+          (concat_r, level_contribution@recursed_lefts@recursed_rights))
+      ~or_f:(fun p (r1,r1s) (r2,r2s) ->
+          let or_r = make_or r1 r2 p in
+          let level_contribution = option_to_empty_or_singleton (f or_r) in
+          let recursed_lefts =
+            List.map
+              ~f:(fun r1' -> make_or r1' r2 p)
+              r1s
+          in
+          let recursed_rights =
+            List.map
+              ~f:(fun r2' -> make_or r1 r2' p)
+              r2s
+          in
+          (or_r, level_contribution@recursed_lefts@recursed_rights))
+      ~star_f:(fun p (r',r's) ->
+          let star_r = make_star r' p in
+          let level_contribution = option_to_empty_or_singleton (f star_r) in
+          let recursed_inner =
+            List.map
+              ~f:(fun r'' -> make_star r'' p)
+              r's
+          in
+          (star_r, level_contribution@recursed_inner))
+      ~closed_f:(fun (r',r's) ->
+          let closed_r = make_closed r' in
+          let level_contribution = option_to_empty_or_singleton (f closed_r) in
+          let recursed_inner =
+            List.map
+              ~f:(fun r'' -> make_closed r'')
+              r's
+          in
+          (closed_r, level_contribution@recursed_inner))
+
+  let rec size
+    : t -> int =
+    fold
+      ~empty_f:1
+      ~base_f:(fun _ -> 1)
+      ~concat_f:(fun n1 n2 -> 1+n1+n2)
+      ~or_f:(fun _ n1 n2 -> 1+n1+n2)
+      ~star_f:(fun _ n -> 1+n)
+      ~closed_f:(fun n -> n+1)
+
+  let from_regex
+      (r:Regex.t)
+    : t =
+    snd
+      (Regex.fold
+         ~empty_f:(0.,empty)
+         ~base_f:(fun s -> (1.,make_base s))
+         ~concat_f:(fun (i1,r1) (i2,r2) -> (i1 *. i2,make_concat r1 r2))
+         ~or_f:(fun (i1,r1) (i2,r2) -> (i1 +. i2,make_or r1 r2 (i1 /. (i1 +. i2))))
+         ~star_f:(fun (_,r) -> (1.,make_star r 0.8))
+         ~closed_f:(fun (i,r) -> (i,make_closed r))
+         r)
+
+  let rec to_regex
+    (r:t)
+    : Regex.t =
+    begin match r.node.regex with
+      | None ->
+        let ans =
+          begin match node r with
+            | Empty -> Regex.empty
+            | Base s -> Regex.make_base s
+            | Concat (r1,r2) ->
+              let r1 = to_regex r1 in
+              let r2 = to_regex r2 in
+              Regex.make_concat r1 r2
+            | Or (r1,r2,_) ->
+              let r1 = to_regex r1 in
+              let r2 = to_regex r2 in
+              Regex.make_or r1 r2
+            | Star (r,_) ->
+              let r = to_regex r in
+              Regex.make_star r
+            | Closed r ->
+              let r = to_regex r in
+              Regex.make_closed r
+          end
+        in
+        r.node.regex <- Some ans;
+        ans
+      | Some ans -> ans
+    end
+
+  let rec is_empty
+      (r:t)
+    : bool =
+    begin match node r with
+      | Concat (r1,r2) ->
+        is_empty r1 || is_empty r2
+      | Or (r1,r2,_) ->
+        is_empty r1 && is_empty r2
+      | Empty ->
+        true
+      | Closed r ->
+        is_empty r
+      | Star (r,_) ->
+        false
+      | Base _ ->
+        false
+    end
+
+  let rec is_singleton
+      (r:t)
+    : bool =
+    begin match node r with
+      | Base _ ->
+        true
+      | Star (r,_) ->
+        is_empty r
+      | Closed r ->
+        is_singleton r
+      | Empty ->
+        false
+      | Or (r1,r2,_) ->
+        (is_singleton r1 && is_empty r2)
+        || (is_singleton r2 && is_empty r1)
+      | Concat (r1,r2) ->
+        is_singleton r1 && is_singleton r2
+    end
+
+  let rec representative
+      (r:t)
+    : string option =
+    begin match node r with
+      | Concat (r1,r2) ->
+        option_bind
+          ~f:(fun s ->
+              Option.map
+                ~f:(fun s' -> s^s')
+                (representative r2))
+          (representative r1)
+      | Or (r1,r2,p) ->
+        begin match representative r1 with
+          | Some s -> Some s
+          | None -> representative r2
+        end
+      | Empty -> None
+      | Closed r -> representative r
+      | Base s -> Some s
+      | Star (r,_) -> begin match representative r with
+          | None -> Some ""
+          | Some s -> Some s
+        end
+    end
+
+  let rec representative_exn
+      (r:t)
+    : string =
+    Option.value_exn (representative r)
+
+  let likelihood_star : float = 0.8
+  let info_content_star_multiplier : float =
+    likelihood_star /. (1. -. likelihood_star)
+  let info_content_star_const : float =
+    -4. *. (Math.log2 likelihood_star)
+    -. (Math.log2 (1. -. likelihood_star))
+  let rec information_content
+      (r:t)
+    : float =
+    begin match node r with
+      | Or(r1,r2,p) ->
+        let ic1 = information_content r1 in
+        let ic2 = information_content r2 in
+        let not_p = Probability.not p in
+        ((ic1 +. Probability.information_content p) *. p) +.
+        ((ic2 +. Probability.information_content not_p) *. not_p)
+      | Concat (r1,r2) ->
+        let ic1 = information_content r1 in
+        let ic2 = information_content r2 in
+        ic1 +. ic2
+      | Base _ -> 0.
+      | Empty -> 0.
+      | Closed r -> information_content r
+      | Star (r,p) ->
+        let ic = information_content r in
+        let not_p = Probability.not p in
+        let multiplier = p /. not_p in
+        (multiplier *. ic) +.
+        (multiplier *. (Probability.information_content p)) +.
+        (Probability.information_content not_p)
+    end
+end
+
+let stochastic_regex_star_semiring =
+  (module StochasticRegex : StochasticStarSemiring.Sig with type t = StochasticRegex.t)
+
+let regex_semiring = (module Regex : Semiring.Sig with type t = Regex.t)
+let regex_star_semiring = (module Regex : StarSemiring.Sig with type t = Regex.t)
+
+
+
 (***** }}} *****)
 
 

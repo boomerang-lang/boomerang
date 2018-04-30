@@ -114,8 +114,8 @@ struct
 
   let kinda_rigid_synth
       (lc:LensContext.t)
-      (r1:Regex.t)
-      (r2:Regex.t)
+      (r1:StochasticRegex.t)
+      (r2:StochasticRegex.t)
       (creater_exs:create_examples)
       (createl_exs:create_examples)
       (putr_exs:put_examples)
@@ -191,17 +191,30 @@ struct
           StarSemiringTreeRep.exampled_dnf_regex_to_tree
             exampled_r2
         in
-        let (alignment_opt,cost) =
-          StarSemiringTreeRep.Alignment.get_minimal_alignment_and_cost
-            exampled_r1_tree
-            exampled_r2_tree
-        in
-        Option.map
-          ~f:(fun al ->
-              (Option.value_exn
-                 (StarSemiringTreeRep.alignment_to_lens al))
-            ,cost)
-          alignment_opt
+        if !optimal then
+          let (alignment_opt,cost) =
+            StarSemiringTreeRep.OptimalAlignment.get_minimal_alignment_and_cost
+              exampled_r1_tree
+              exampled_r2_tree
+          in
+          Option.map
+            ~f:(fun al ->
+                (Option.value_exn
+                   (StarSemiringTreeRep.alignment_to_lens al))
+              ,cost)
+            alignment_opt
+        else
+          let (alignment_opt,cost) =
+            StarSemiringTreeRep.GreedyAlignment.get_minimal_alignment_and_cost
+              exampled_r1_tree
+              exampled_r2_tree
+          in
+          Option.map
+            ~f:(fun al ->
+                (Option.value_exn
+                   (StarSemiringTreeRep.alignment_to_lens_greedy al))
+              ,cost)
+            alignment_opt
       | _ -> failwith "bad examples"
     end
 
@@ -366,13 +379,14 @@ struct
 
   let gen_symmetric_lens
       (lc:LensContext.t)
-      (r1:Regex.t)
-      (r2:Regex.t)
+      (r1:StochasticRegex.t)
+      (r2:StochasticRegex.t)
       (creater_exs:create_examples)
       (createl_exs:create_examples)
       (putr_exs:put_examples)
       (putl_exs:put_examples)
     : Lens.t option =
+    let attempts = ref 0 in
     let rec gen_symmetric_lens_queuing
         (pq:SPQ.t)
         (best:Lens.t option)
@@ -382,11 +396,15 @@ struct
         | Some (qe,f,pq) ->
           if !verbose then
             (print_endline "popped";
-             print_endline ("r1: " ^ Regex.show (SymmetricQueueElement.get_r1 qe));
+             print_endline ("attempt #" ^ (string_of_int !attempts));
+             attempts := !attempts+1;
+             print_endline ("r1: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r1 qe));
              print_endline "\n\n";
-             print_endline ("r2: " ^ Regex.show (SymmetricQueueElement.get_r2 qe));
+             print_endline ("r2: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r2 qe));
              print_endline "\n\n";
              print_endline ("priority: " ^ (SymmetricQueueElement.Priority.show f));
+             print_endline "\n\n";
+             print_endline ("bestpriority: " ^ (SymmetricQueueElement.Priority.show best_cost));
              print_endline "\n\n";
              print_endline ("exps_perfed: " ^ (string_of_int (SymmetricQueueElement.get_expansions_performed qe)));
              print_endline "\n\n";
@@ -398,6 +416,7 @@ struct
           if f >=. best_cost then
             best
           else
+            (* TODO fix *)
             let lco =
               kinda_rigid_synth
                 lc
@@ -508,6 +527,8 @@ let gen_symmetric_lens
   let lc = LensContext.insert_list LensContext.empty existing_lenses in
   let r1 = iteratively_deepen r1 in
   let r2 = iteratively_deepen r2 in
+  let r1 = StochasticRegex.from_regex r1 in
+  let r2 = StochasticRegex.from_regex r2 in
   if !verbose then
     print_endline "Synthesis Start";
   let lens_option =

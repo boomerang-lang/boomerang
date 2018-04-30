@@ -505,6 +505,11 @@ struct
   let remove : t -> key -> t =
     remove_or_update ~updater:(fun _ -> None)
 
+  let update
+      ~updater:(updater:value -> value)
+    : t -> key -> t =
+    remove_or_update ~updater:(Option.some % updater)
+
   (* TODO:
    * Write a lookup function that returns the value of the given key
    * in our dictionary and returns it as an option, or return None

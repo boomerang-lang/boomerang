@@ -2,7 +2,7 @@ open MyStdlib
 open Ounit_general_extensions
 open Optician
 open Star_semiring_tree
-open Star_semiring_tree_alignment
+open Star_semiring_alignment_greedy
 open Synth_structs
 open Lang
 
@@ -38,7 +38,7 @@ struct
   let compare x y = compare (x mod 123) (y mod 123)
   let hash_fold_t s x = hash_fold_t s (x mod 123)
   let hash x = hash (x mod 123)
-  let are_compatible = is_equal %% compare
+  let are_compatible x y = is_equal (compare (x mod 7) (y mod 7))
   let requires_mapping v = v mod 246 = 0
   module Default = IntModule
   let extract_default _ = failwith "TODO"
@@ -81,7 +81,9 @@ let assert_alignment_option_equal =
 let assert_alignment_option_cost_equal =
   assert_equal
     ~printer:(AlignmentOptionCost.show)
-    ~cmp:(AlignmentOptionCost.compare)
+    ~cmp:(pair_compare
+          IntPTSTAlignmentOption.compare
+          (fun f1 f2 -> if Float.abs (f1 -. f2) <. 0.000001 then 0 else 1))
 
 let assert_rxtree_equal =
   assert_equal
@@ -90,8 +92,8 @@ let assert_rxtree_equal =
 
 let assert_alignment_equal =
   assert_equal
-    ~printer:StarSemiringTreeRep.Alignment.show
-    ~cmp:StarSemiringTreeRep.Alignment.compare
+    ~printer:StarSemiringTreeRep.OptimalAlignment.show
+    ~cmp:StarSemiringTreeRep.OptimalAlignment.compare
 
 let assert_lens_equal =
   assert_equal

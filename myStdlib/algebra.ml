@@ -2,6 +2,23 @@ open Core
 open Util
 open My_dict
 open My_set
+open String_utilities
+
+module Probability =
+struct
+  type t = Float.t
+  [@@deriving ord, show, hash]
+
+  let not
+      (p:t)
+    : t =
+    1. -. p
+
+  let information_content
+      (p:t)
+    : Float.t =
+    Float.neg (Math.log2 p)
+end
 
 module Semiring =
 struct 
@@ -124,7 +141,7 @@ struct
                S.make_times)))
 end
 
-module StarSemiring =
+module StochasticStarSemiring =
 struct
   module type Sig =
   sig
@@ -133,13 +150,37 @@ struct
     val applies_for_every_applicable_level : (t -> t option) -> t -> t list
     val zero : t
     val one : t
-    val separate_plus : t -> (t * t) option
-    val separate_times : t -> (t * t) option
-    val separate_star : t -> t option
-    val make_plus : t -> t -> t
+    val separate_star : t -> (t * Probability.t) option
+    val make_plus : t -> t -> Probability.t -> t
     val make_times : t -> t -> t
-    val make_star : t -> t
+    val make_star : t -> Probability.t -> t
   end
+
+  let unfold_left
+      (type t)
+      (module S : Sig with type t = t)
+      (r:S.t)
+      (p:Probability.t)
+    : S.t =
+    S.make_plus
+      S.one
+      (S.make_times
+         r
+         (S.make_star r p))
+      p
+
+  let unfold_right
+      (type t)
+      (module S : Sig with type t = t)
+      (r:S.t)
+      (p:Probability.t)
+    : S.t =
+    S.make_plus
+      S.one
+      (S.make_times
+         (S.make_star r p)
+         r)
+      p
 
   let unfold_left_if_star
       (type t)
@@ -147,12 +188,7 @@ struct
       (v:S.t)
     : S.t option =
     Option.map
-      ~f:(fun r' ->
-          S.make_plus
-            S.one
-            (S.make_times
-               r'
-               (S.make_star r')))
+      ~f:(uncurry (unfold_left (module S : Sig with type t = t)))
       (S.separate_star v)
 
   let unfold_right_if_star
@@ -161,12 +197,7 @@ struct
       (v:S.t)
     : S.t option =
     Option.map
-      ~f:(fun r' ->
-          S.make_plus
-            S.one
-            (S.make_times
-               (S.make_star r')
-               r'))
+      ~f:(uncurry (unfold_right (module S : Sig with type t = t)))
       (S.separate_star v)
 
   let left_unfold_all_stars
@@ -209,7 +240,12 @@ module Permutation = struct
     List.fold_left
       ~f:(fun acc (x,y) ->
           if ((IntIntDict.member acc x) || (x >= len) || (x < 0)) then
-            failwith "Not Bijection"
+            failwith ("Not Bijection "
+                      ^ (string_of_list
+                           (string_of_pair
+                              string_of_int
+                              string_of_int)
+                           mapping))
           else
             IntIntDict.insert acc x y)
       ~init:IntIntDict.empty
@@ -430,12 +466,20 @@ struct
       (p:t)
       (ij:int * int)
     : int =
-    let e =
-      List.find_exn
+    let e_option =
+      List.find
         ~f:(fun e -> e.new_index = ij)
         p
     in
-    e.old_index
+    begin match e_option with
+      | None -> failwith
+                  (string_of_int (fst ij)
+                   ^ ","
+                   ^ string_of_int (snd ij)
+                   ^ "\n"
+                   ^ show p)
+      | Some e -> e.old_index
+    end
 
   let sorting
       ~cmp:(cmp:'a comparer)
@@ -468,3 +512,69 @@ struct
     in
     (List.concat unflattened_p,sorted_partitioned_l)
 end
+
+module StarSemiring =
+struct
+  module type Sig =
+  sig
+    type t
+    val apply_at_every_level : (t -> t) -> t -> t
+    val applies_for_every_applicable_level : (t -> t option) -> t -> t list
+    val zero : t
+    val one : t
+    val separate_star : t -> t option
+    val make_plus : t -> t -> t
+    val make_times : t -> t -> t
+    val make_star : t -> t
+  end
+
+  let unfold_left_if_star
+      (type t)
+      (module S : Sig with type t = t)
+      (v:S.t)
+    : S.t option =
+    Option.map
+      ~f:(fun r' ->
+          S.make_plus
+            S.one
+            (S.make_times
+               r'
+               (S.make_star r')))
+      (S.separate_star v)
+
+  let unfold_right_if_star
+      (type t)
+      (module S : Sig with type t = t)
+      (v:S.t)
+    : S.t option =
+    Option.map
+      ~f:(fun r' ->
+          S.make_plus
+            S.one
+            (S.make_times
+               (S.make_star r')
+               r'))
+      (S.separate_star v)
+
+  let left_unfold_all_stars
+      (type t)
+      (module S : Sig with type t = t)
+      (v:S.t)
+    : S.t list =
+    let ssr = (module S : Sig with type t = t) in
+    S.applies_for_every_applicable_level
+      (unfold_left_if_star ssr)
+      v
+
+  let right_unfold_all_stars
+      (type t)
+      (module S : Sig with type t = t)
+      (v:S.t)
+    : S.t list =
+    let ssr = (module S : Sig with type t = t) in
+    S.applies_for_every_applicable_level
+      (unfold_right_if_star ssr)
+      v
+end
+
+

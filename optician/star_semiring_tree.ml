@@ -108,6 +108,13 @@ struct
       ~upward_star:(thunk_of star_f)
       v
 
+  let likelihood_star : float = 0.8
+  let info_content_star_multiplier : float =
+    likelihood_star /. (1. -. likelihood_star)
+  let info_content_star_const : float =
+    -4. *. (Math.log2 likelihood_star)
+    -. (Math.log2 (1. -. likelihood_star))
+
   let information_content
     : t -> float =
     fold
@@ -122,7 +129,7 @@ struct
               ~init:(0,0.)
               nfl
           in
-          (Math.log2 @$ Float.of_int @$ List.length lfl)
+          (Math.log2 @$ Float.of_int @$ n)
           +. (f /. Float.of_int n))
       ~times_f:(fun _ lfl ->
           let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
@@ -131,7 +138,9 @@ struct
                 acc +. (f *. (Float.of_int n)))
             ~init:0.
             nfl)
-      ~star_f:(fun _ _ f -> f)
+      ~star_f:(fun _ _ f ->
+          (info_content_star_multiplier *. f)
+          +. info_content_star_const)
 end
 
 module LabelledPlusTimesStarTreeOf

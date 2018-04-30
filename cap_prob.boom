@@ -39,6 +39,8 @@ let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
   synth LOWERCASE <=> UPPERCASE using {putrex (("v","E"),"V")}
 
+test "hi" = ?
+
 let DIGIT
   : regexp =
   "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
@@ -60,7 +62,7 @@ let NAME : regexp = UPPERCASE . LOWERCASE*
 let UPPERCASENAME : regexp = UPPERCASE . UPPERCASE*  
 
 let capitalize
-  : (lens in UPPERCASENAME <=> NAME) =
+  : (lens in UPPERCASENAME <-> NAME) =
   synth UPPERCASENAME <=> NAME 
 
 test capitalize = ?
@@ -69,11 +71,9 @@ test capitalize.get "JOHN" = "John"
 
 test capitalize.get "DOE" = "Doe"
 
-let remove_last =
+let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
   synth (NAME . " " . NAME) <=> NAME
 
-atomic1 <=> atomic2
-
-atomicName . " " . atomicName <=> atomicName
-
 test remove_last = ?
+
+test remove_last.get "H There" = ?

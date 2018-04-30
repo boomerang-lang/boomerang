@@ -3,7 +3,7 @@ open OUnit2
 open Ounit_general_extensions
 open Ounit_extensions
 open Optician
-open Star_semiring_tree_alignment
+open Star_semiring_alignment_greedy
 open Synth_structs
 open Lang
 open Lenscontext
@@ -590,12 +590,7 @@ let test_get_minimal_alignment_and_cost_easy_times_bijection _ =
              ,1
              ,[(0
                ,0
-               ,IPTSTA.Nonempty.Times
-                   (1
-                   ,1
-                   ,[]
-                   ,[]
-                   ,[]))]
+               ,IPTSTA.Nonempty.Base 1)]
              ,[]
              ,[]))))
     ,0.)
@@ -603,11 +598,11 @@ let test_get_minimal_alignment_and_cost_easy_times_bijection _ =
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (1,[])])))
+             ,[IPTST.Base 3])))
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (1,[])]))))
+             ,[IPTST.Base 3]))))
 
 let test_get_minimal_alignment_and_cost_easy_times_project_left _ =
   assert_alignment_option_cost_equal
@@ -618,26 +613,45 @@ let test_get_minimal_alignment_and_cost_easy_times_project_left _ =
              ,1
              ,[(1
                ,0
-               ,IPTSTA.Nonempty.Times
-                   (1
-                   ,1
-                   ,[]
-                   ,[]
-                   ,[]))]
+               ,IPTSTA.Nonempty.Base 3)]
              ,[0]
              ,[]))))
-    ,2.)
+    ,1. +. (2. /. 3.))
     (IPTSTA.get_minimal_alignment_and_cost
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Base 2;IPTST.Times (1,[])])))
+             ,[IPTST.Base 1;IPTST.Base 3])))
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (1,[])]))))
+             ,[IPTST.Base 9]))))
 
-let test_get_minimal_alignment_and_cost_hard_times_bijection _ =
+let test_get_minimal_alignment_and_cost_easy_times_project_from_space _ =
+  assert_alignment_option_cost_equal
+    ((Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Times
+             (1
+             ,1
+             ,[(0
+               ,0
+               ,IPTSTA.Nonempty.Base
+                   2)]
+             ,[1]
+             ,[]))))
+    ,7.5)
+    (IPTSTA.get_minimal_alignment_and_cost
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Base 7;IPTST.Base 7])))
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Base 14]))))
+
+let test_get_minimal_alignment_and_cost_easy_times_project_left_from_requires_map _ =
   assert_alignment_option_cost_equal
     ((Some
        (IPTSTA.NonemptyTree
@@ -647,17 +661,45 @@ let test_get_minimal_alignment_and_cost_hard_times_bijection _ =
              ,[(1
                ,0
                ,IPTSTA.Nonempty.Times
-                   (2
-                   ,2
+                   (246
+                   ,239
+                   ,[(0,0,IPTSTA.Nonempty.Base 1)]
                    ,[]
-                   ,[]
-                   ,[]))
-              ;(0
+                   ,[]))]
+             ,[0]
+             ,[]))))
+    ,2.)
+    (IPTSTA.get_minimal_alignment_and_cost
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Times (239,[IPTST.Base 2]);IPTST.Times (246,[IPTST.Base 2])])))
+       (IPTST.Nonempty
+          (IPTST.Times
+             (1
+             ,[IPTST.Times (239,[IPTST.Base 2])]))))
+
+let test_get_minimal_alignment_and_cost_hard_times_bijection _ =
+  assert_alignment_option_cost_equal
+    ((Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Times
+             (1
+             ,1
+             ,[(0
                ,1
                ,IPTSTA.Nonempty.Times
                    (1
                    ,1
+                   ,[(0,0,IPTSTA.Nonempty.Base 1)]
                    ,[]
+                   ,[]))
+              ;(1
+               ,0
+               ,IPTSTA.Nonempty.Times
+                   (2
+                   ,2
+                   ,[(0,0,IPTSTA.Nonempty.Base 1)]
                    ,[]
                    ,[]))]
              ,[]
@@ -667,11 +709,11 @@ let test_get_minimal_alignment_and_cost_hard_times_bijection _ =
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (1,[]);IPTST.Times (2,[])])))
+             ,[IPTST.Times (1,[IPTST.Base 4]);IPTST.Times (2,[IPTST.Base 4])])))
        (IPTST.Nonempty
           (IPTST.Times
              (1
-             ,[IPTST.Times (2,[]);IPTST.Times (1,[])]))))
+             ,[IPTST.Times (2,[IPTST.Base 4]);IPTST.Times (1,[IPTST.Base 4])]))))
 
 let test_get_minimal_alignment_and_cost_emptyplus_emptyplus _ =
   assert_alignment_option_cost_equal
@@ -773,6 +815,58 @@ let test_get_minimal_alignment_and_cost_hard_plus_bijection _ =
              (1
              ,[IPTST.Plus (1,[]);IPTST.Plus (0,[]);IPTST.Plus (2,[])]))))
 
+let test_get_minimal_alignment_and_cost_plus_merge_equiv _ =
+  assert_alignment_option_cost_equal
+    ((Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Plus
+             (1
+             ,1
+             ,[(1
+               ,0
+               ,IPTSTA.Nonempty.Base 1)
+              ;(0
+               ,0
+               ,IPTSTA.Nonempty.Base 1)]
+             ,[0;0]
+             ,[1]))))
+    ,1.)
+    (IPTSTA.get_minimal_alignment_and_cost
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Base 2;IPTST.Base 2])))
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Base 2]))))
+
+let test_get_minimal_alignment_and_cost_plus_merge_diff _ =
+  assert_alignment_option_cost_equal
+    ((Some
+       (IPTSTA.NonemptyTree
+          (IPTSTA.Nonempty.Plus
+             (1
+             ,1
+             ,[(1
+               ,0
+               ,IPTSTA.Nonempty.Base 2)
+              ;(0
+               ,0
+               ,IPTSTA.Nonempty.Base 1)]
+             ,[0;0]
+             ,[0]))))
+    ,1.5)
+    (IPTSTA.get_minimal_alignment_and_cost
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Base 2;IPTST.Base 4])))
+       (IPTST.Nonempty
+          (IPTST.Plus
+             (1
+             ,[IPTST.Base 2]))))
+
 let alignment_distance_suite = "Test get_minimal_alignment_and_cost" >:::
   [
     "test_get_minimal_alignment_and_cost_empty" >:: test_get_minimal_alignment_and_cost_empty;
@@ -782,11 +876,15 @@ let alignment_distance_suite = "Test get_minimal_alignment_and_cost" >:::
     "test_get_minimal_alignment_and_cost_times_emptytimes" >:: test_get_minimal_alignment_and_cost_times_emptytimes;
     "test_get_minimal_alignment_and_cost_easy_times_bijection" >:: test_get_minimal_alignment_and_cost_easy_times_bijection;
     "test_get_minimal_alignment_and_cost_easy_times_project_left" >:: test_get_minimal_alignment_and_cost_easy_times_project_left;
+    "test_get_minimal_alignment_and_cost_easy_times_project_from_space" >:: test_get_minimal_alignment_and_cost_easy_times_project_from_space;
+    "test_get_minimal_alignment_and_cost_easy_times_project_left_from_requires_map" >:: test_get_minimal_alignment_and_cost_easy_times_project_left_from_requires_map;
     "test_get_minimal_alignment_and_cost_hard_times_bijection" >:: test_get_minimal_alignment_and_cost_hard_times_bijection;
     "test_get_minimal_alignment_and_cost_emptyplus_emptyplus" >:: test_get_minimal_alignment_and_cost_emptyplus_emptyplus;
     "test_get_minimal_alignment_and_cost_plus_emptyplus" >:: test_get_minimal_alignment_and_cost_plus_emptyplus;
     "test_get_minimal_alignment_and_cost_easy_plus_bijection" >:: test_get_minimal_alignment_and_cost_easy_plus_bijection;
     "test_get_minimal_alignment_and_cost_hard_plus_bijection" >:: test_get_minimal_alignment_and_cost_hard_plus_bijection;
+    "test_get_minimal_alignment_and_cost_plus_merge_equiv" >:: test_get_minimal_alignment_and_cost_plus_merge_equiv;
+    "test_get_minimal_alignment_and_cost_plus_merge_diff" >:: test_get_minimal_alignment_and_cost_plus_merge_diff;
   ]
 
 let _ = run_test_tt_main alignment_distance_suite
@@ -996,7 +1094,7 @@ let test_kinda_rigid_synth_project_lastname _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.make_base "") names "" "")
                 (Lens.make_const "" "")))
-       ,20.8017588726))
+       ,56.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -1034,7 +1132,7 @@ let test_kinda_rigid_synth_project_firstname _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.make_base "") name "" "A")
                 (Lens.make_const "" " ")))
-       ,20.8017588726))
+       ,56.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -1064,7 +1162,7 @@ let test_kinda_rigid_synth_disconnect _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.one) name "" "A")
                 (Lens.make_const "" "")))
-       ,37.6035177451))
+       ,108.447356261))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -1102,7 +1200,7 @@ let test_kinda_rigid_synth_project_last_from_put _ =
              (Lens.make_concat
                 (Lens.make_disconnect name (Regex.make_base "") "A" "")
                 (Lens.make_const "" "")))
-       ,20.8017588726))
+       ,56.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        firstlast
@@ -1140,7 +1238,7 @@ let test_kinda_rigid_synth_project_first_from_put _ =
              (Lens.make_concat
                 (Lens.make_ident name_opened)
                 (Lens.make_const "" "")))
-       ,20.8017588726))
+       ,56.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        firstlast
@@ -1167,8 +1265,8 @@ let test_alignment_to_lens_base _ =
   assert_lens_option_equal
     (Some (Lens.Identity (Regex.make_base "a")))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Base
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
              (Lens.Identity (Regex.make_base "a")))))
 
 let test_alignment_to_lens_star _ =
@@ -1181,11 +1279,11 @@ let test_alignment_to_lens_star _ =
   assert_lens_option_equal
     (Some (Lens.Iterate (Lens.Identity (Regex.make_base "b"))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Star
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Star
              (StarSemiringTreeRep.SD.make ex_data
              ,StarSemiringTreeRep.SD.make ex_data
-             ,StarSemiringTreeRep.Alignment.Nonempty.Base
+             ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                  (Lens.Identity (Regex.make_base "b"))))))
 
 let test_alignment_to_lens_concat_basic _ =
@@ -1198,8 +1296,8 @@ let test_alignment_to_lens_concat_basic _ =
   assert_lens_option_equal
     (Some (Lens.Disconnect (Regex.make_base "a",Regex.make_base "b","a","b")))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Times
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Times
              (StarSemiringTreeRep.TD.make ex_data ["a"] []
              ,StarSemiringTreeRep.TD.make ex_data ["b"] []
              ,[]
@@ -1230,8 +1328,8 @@ let test_alignment_to_lens_concat_onesub _ =
                 "a2"
                 "b2"))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Times
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Times
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2"]
@@ -1242,7 +1340,7 @@ let test_alignment_to_lens_concat_onesub _ =
                  [Regex.make_closed (Regex.make_base "t")]
              ,[(0
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.Identity (Regex.make_closed (Regex.make_base "t"))))]
              ,[]
              ,[]))))
@@ -1272,8 +1370,8 @@ let test_alignment_to_lens_concat_oneproj_left _ =
                    "a2"
                    ""))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Times
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Times
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2"]
@@ -1313,8 +1411,8 @@ let test_alignment_to_lens_concat_oneproj_right _ =
                    ""
                    "b2"))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Times
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Times
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1"]
@@ -1365,8 +1463,8 @@ let test_alignment_to_lens_concat_projs_swap _ =
                     "w")
                  (Lens.make_const "" "b4")])))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Times
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Times
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2";"a3";"a4"]
@@ -1381,11 +1479,11 @@ let test_alignment_to_lens_concat_projs_swap _ =
                  ;Regex.make_closed (Regex.make_base "w")]
              ,[(0
                ,1
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_closed (Regex.make_base "t"))))
               ;(2
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_closed (Regex.make_base "v"))))]
              ,[1]
              ,[2]))))
@@ -1400,13 +1498,13 @@ let test_alignment_to_lens_or_basic _ =
   assert_lens_option_equal
     (Some (Lens.make_ident (Regex.make_base "t")))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Plus
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data
              ,StarSemiringTreeRep.PD.make ex_data
              ,[(0
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "t")))]
              ,[]
              ,[]))))
@@ -1424,17 +1522,17 @@ let test_alignment_to_lens_or_merge_left _ =
           (Lens.make_ident (Regex.make_base "t"))
           (Lens.make_const "u" "t")))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Plus
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data
              ,StarSemiringTreeRep.PD.make ex_data
              ,[(0
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "t")))
               ;(1
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_const "u" "t"))]
              ,[0;0]
              ,[0]))))
@@ -1452,17 +1550,17 @@ let test_alignment_to_lens_or_merge_right _ =
           (Lens.make_ident (Regex.make_base "t"))
           (Lens.make_const "t" "u")))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Plus
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data
              ,StarSemiringTreeRep.PD.make ex_data
              ,[(0
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "t")))
               ;(0
                ,1
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_const "t" "u"))]
              ,[0]
              ,[0;0]))))
@@ -1480,17 +1578,17 @@ let test_alignment_to_lens_or_bijection _ =
           (Lens.make_ident (Regex.make_base "t"))
           (Lens.make_ident (Regex.make_base "u"))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Plus
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data
              ,StarSemiringTreeRep.PD.make ex_data
              ,[(0
                ,1
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "t")))
               ;(1
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "u")))]
              ,[1;0]
              ,[1;0]))))
@@ -1555,25 +1653,25 @@ let test_alignment_to_lens_or_crossing_creates _ =
                    (Lens.make_const "1" "")
                    (Lens.make_ident (Regex.make_base "u")))))))
     (StarSemiringTreeRep.alignment_to_lens
-       (StarSemiringTreeRep.Alignment.NonemptyTree
-          (StarSemiringTreeRep.Alignment.Nonempty.Plus
+       (StarSemiringTreeRep.OptimalAlignment.NonemptyTree
+          (StarSemiringTreeRep.OptimalAlignment.Nonempty.Plus
              (StarSemiringTreeRep.PD.make ex_data
              ,StarSemiringTreeRep.PD.make ex_data
              ,[(0
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "t")))
               ;(0
                ,1
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_const "t" "u"))
               ;(1
                ,0
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_const "u" "t"))
               ;(1
                ,1
-               ,StarSemiringTreeRep.Alignment.Nonempty.Base
+               ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
                    (Lens.make_ident (Regex.make_base "u")))]
              ,[0;1]
              ,[1;0]))))

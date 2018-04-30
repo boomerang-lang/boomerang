@@ -1,7 +1,6 @@
 open MyStdlib
 open Lang
 open Regex_utilities
-open Star_semiring_tree_alignment
 open Normalized_lang
 
 module QueueElement = struct
@@ -82,8 +81,8 @@ end
 module SymmetricQueueElement = struct
   type t = 
     {
-      r1 : Regex.t;
-      r2 : Regex.t;
+      r1 : StochasticRegex.t;
+      r2 : StochasticRegex.t;
       expansion_choices : int list;
       expansions_performed : int;
       expansions_inferred : int;
@@ -93,12 +92,12 @@ module SymmetricQueueElement = struct
 
   let get_r1
       (q:t)
-    : Regex.t =
+    : StochasticRegex.t =
     q.r1
 
   let get_r2
       (q:t)
-    : Regex.t =
+    : StochasticRegex.t =
     q.r2
 
   let get_expansions_choices
@@ -122,8 +121,8 @@ module SymmetricQueueElement = struct
     q.expansions_forced
 
   let init
-      (r1:Regex.t)
-      (r2:Regex.t)
+      (r1:StochasticRegex.t)
+      (r2:StochasticRegex.t)
     : t =
     make
       ~r1:r1
@@ -136,7 +135,7 @@ module SymmetricQueueElement = struct
 
   let nqe_to_tuple
       (q:t)
-    : Regex.t * Regex.t * int list * int * int * int =
+    : StochasticRegex.t * StochasticRegex.t * int list * int * int * int =
     (q.r1,
      q.r2,
      q.expansion_choices,
@@ -149,8 +148,8 @@ module SymmetricQueueElement = struct
       (q2:t)
     : comparison =
     sext_compare
-      Regex.compare
-      Regex.compare
+      StochasticRegex.compare
+      StochasticRegex.compare
       (fun _ _ -> 0)
       (fun _ _ -> 0)
       (fun _ _ -> 0)
@@ -402,7 +401,7 @@ struct
       include Lens
       let hash _ = 1
       let hash_fold_t s _ = s
-      let cost _ = 1.
+      let cost _ = 0.
     end
 
     let get_alignment
@@ -491,8 +490,10 @@ struct
       Regex.information_content v.regex
   end
 
-  module Alignment = PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
-  module Tree = Alignment.Tree
+  module OptimalAlignment = Star_semiring_tree_alignment_optimal.PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
+  module Tree = OptimalAlignment.Tree
+
+  module GreedyAlignment =  Star_semiring_alignment_greedy.PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
 
   let exampled_dnf_regex_to_tree
       (ed:exampled_dnf_regex)
@@ -535,14 +536,14 @@ struct
   module MatchDict = DictOf(PairOf(IntModule)(IntModule))(Lens)
 
   let alignment_to_lens
-      (a:Alignment.t)
+      (a:OptimalAlignment.t)
     : Lens.t option =
     let rec nonempty_alignment_to_lens
-        (a:Alignment.Nonempty.t)
+        (a:OptimalAlignment.Nonempty.t)
       : Lens.t =
       begin match a with
-        | Alignment.Nonempty.Base l -> l
-        | Alignment.Nonempty.Plus (_,_,matches,createls,creaters) ->
+        | OptimalAlignment.Nonempty.Base l -> l
+        | OptimalAlignment.Nonempty.Plus (_,_,matches,createls,creaters) ->
           let cdl =
             CreateDict.from_kvp_list
               (List.mapi ~f:(curry ident) createls)
@@ -679,9 +680,9 @@ struct
               (Lens.make_compose
                  (Lens.make_compose l_l l_m)
                  l_r)
-        | Alignment.Nonempty.Star (_,_,a) ->
+        | OptimalAlignment.Nonempty.Star (_,_,a) ->
           Lens.make_star (nonempty_alignment_to_lens a)
-        | Alignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->
+        | OptimalAlignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->
           let projl = List.sort ~cmp:Int.compare projl in
           let projr = List.sort ~cmp:Int.compare projr in
           let rec combine_scct_and_sub_lenses
@@ -851,6 +852,327 @@ struct
       end
     in
     begin match a with
+      | Empty -> None
+      | NonemptyTree nt -> Some (nonempty_alignment_to_lens nt)
+    end
+
+  let alignment_to_lens_greedy
+      (al:GreedyAlignment.t)
+    : Lens.t option =
+    let rec nonempty_alignment_to_lens
+        (a:GreedyAlignment.Nonempty.t)
+      : Lens.t =
+      begin match a with
+        | GreedyAlignment.Nonempty.Base l -> l
+        | GreedyAlignment.Nonempty.Plus (_,_,matches,createls,creaters) ->
+          let cdl =
+            CreateDict.from_kvp_list
+              (List.mapi ~f:(curry ident) createls)
+          in
+          let cdr =
+            CreateDict.from_kvp_list
+              (List.mapi ~f:(curry ident) creaters)
+          in
+          let md =
+            MatchDict.from_kvp_list
+              (List.map
+                 ~f:(fun (i,j,a) -> ((i,j),nonempty_alignment_to_lens a))
+                 matches)
+          in
+          let (ll,cdl,cdr,md) =
+            fold_until_completion
+              ~f:(fun (ll,cdl,cdr,md) ->
+                  let addable
+                      (cd:CreateDict.t)
+                      (i:int)
+                      (j:int)
+                    : bool =
+                    begin match CreateDict.lookup cd i with
+                      | None -> true
+                      | Some j' -> is_equal (Int.compare j j')
+                    end
+                  in
+                  let first_possible_option =
+                    MatchDict.first
+                      ~f:(fun (i,j) _ ->
+                          addable cdl i j
+                          && addable cdr j i)
+                      md
+                  in
+                  begin match first_possible_option with
+                    | None -> Right (ll,cdl,cdr,md)
+                    | Some ((i,j),l) ->
+                      let cdl = CreateDict.remove cdl i in
+                      let cdr = CreateDict.remove cdr i in
+                      let md = MatchDict.remove md (i,j) in
+                      Left (l::ll,cdl,cdr,md)
+                  end)
+              ([],cdl,cdr,md)
+          in
+          let l_handled =
+            fold_on_head_with_default
+              ~f:Lens.make_or
+              ~default:Lens.zero
+              (List.rev ll)
+          in
+          if MatchDict.is_empty md then
+            l_handled
+          else
+            let mapping_triples =
+              List.map
+                ~f:(fun ((i,j),l) ->
+                    let (stype,vtype) = Typing.type_lens l in
+                    let istring = Int.to_string i in
+                    let jstring = Int.to_string j in
+                    let l_left =
+                      Lens.make_concat
+                        (Lens.make_const "" jstring)
+                        (Lens.make_ident stype)
+                    in
+                    let l_right =
+                      Lens.make_concat
+                        (Lens.make_const istring "")
+                        (Lens.make_ident vtype)
+                    in
+                    let l_middle =
+                      Lens.make_concat
+                        (Lens.make_const (Int.to_string j) (Int.to_string i))
+                        l
+                    in
+                    ((i,j,l_left)
+                    ,l_middle
+                    ,(j,i,l_right)))
+                (MatchDict.as_kvp_list md)
+            in
+            let (lij_list_l,l_list_m,lij_list_r) =
+              List.unzip3
+                mapping_triples
+            in
+            let lens_sort_compare_by_createdict
+                (cd:CreateDict.t)
+                ((i1,j1,_):int * int * Lens.t)
+                ((i2,j2,_):int * int * Lens.t)
+              : int =
+              let c = Int.compare i1 i2 in
+              if is_equal c then
+                let jo = CreateDict.lookup cd i1 in
+                begin match jo with
+                  | None -> 0
+                  | Some j ->
+                    if is_equal (Int.compare j1 j) then
+                      -1
+                    else if is_equal (Int.compare j2 j) then
+                      1
+                    else
+                      0
+                end
+              else
+                c
+            in
+            let lij_list_sorted_l =
+              List.sort
+                ~cmp:(lens_sort_compare_by_createdict cdl)
+                lij_list_l
+            in
+            let lij_list_sorted_r =
+              List.sort
+                ~cmp:(lens_sort_compare_by_createdict cdr)
+                lij_list_r
+            in
+            let l_list_l = List.map ~f:trd3 lij_list_sorted_l in
+            let l_list_r = List.map ~f:trd3 lij_list_sorted_r in
+            let l_l =
+              fold_on_head_exn
+                ~f:Lens.make_or
+                l_list_l
+            in
+            let l_m =
+              fold_on_head_exn
+                ~f:Lens.make_or
+                l_list_m
+            in
+            let l_r =
+              fold_on_head_exn
+                ~f:Lens.make_or
+                l_list_r
+            in
+            Lens.make_or
+              l_handled
+              (Lens.make_compose
+                 (Lens.make_compose l_l l_m)
+                 l_r)
+        | GreedyAlignment.Nonempty.Star (_,_,a) ->
+          Lens.make_star (nonempty_alignment_to_lens a)
+        | GreedyAlignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->
+          let projl = List.sort ~cmp:Int.compare projl in
+          let projr = List.sort ~cmp:Int.compare projr in
+          let rec combine_scct_and_sub_lenses
+              (sub_lenses:Lens.t list)
+              (scct:Permutation.swap_concat_compose_tree)
+            : (Lens.t * Lens.t list) =
+            begin match scct with
+              | SCCTSwap (s1,s2) ->
+                let (l1,remaining_left) =
+                  combine_scct_and_sub_lenses
+                    sub_lenses
+                    s1 in
+                let (l2,remaining_total) =
+                  combine_scct_and_sub_lenses
+                    remaining_left
+                    s2 in
+                (Lens.Swap(l1,l2),remaining_total)
+              | SCCTConcat (s1,s2) ->
+                let (l1,remaining_left) =
+                  combine_scct_and_sub_lenses
+                    sub_lenses
+                    s1 in
+                let (l2,remaining_total) =
+                  combine_scct_and_sub_lenses
+                    remaining_left
+                    s2 in
+                (Lens.Concat(l1,l2),remaining_total)
+              | SCCTCompose _ ->
+                failwith "compose is too ugly, should have failed faster"
+              (*let s2size = size_scct s2 in
+                let identity_copies = duplicate (LensIdentity (RegExBase "TODO")) s2size in
+                let (l1,_) =
+                combine_scct_and_sub_lenses
+                  identity_copies
+                  s1 in
+                let (l2,remaining_total) =
+                combine_scct_and_sub_lenses
+                  sub_lenses
+                  s2 in
+                (LensCompose(l1,l2),remaining_total)*)
+              | SCCTLeaf -> split_by_first_exn sub_lenses
+            end
+          in
+          let left_strings = TD.get_strings tll in
+          let right_strings = TD.get_strings tlr in
+          let left_atoms = TD.get_atoms tll in
+          let right_atoms = TD.get_atoms tlr in
+          let last_index_left = List.length left_atoms in
+          let last_index_right = List.length right_atoms in
+          let (left_string_h,left_strings_t) =
+            split_by_first_exn
+              left_strings
+          in
+          let (right_string_h,right_strings_t) =
+            split_by_first_exn
+              right_strings
+          in
+          let left_projections =
+            List.mapi
+              ~f:(fun right_offset index ->
+                  let rx_left = List.nth_exn left_atoms index in
+                  ((index
+                   ,last_index_right+right_offset)
+                  ,Lens.make_disconnect
+                      rx_left
+                      Regex.one
+                      (Regex.representative_exn rx_left)
+                      ""))
+              projl
+          in
+          let right_projections =
+            List.mapi
+              ~f:(fun left_offset index ->
+                  let rx_right = List.nth_exn right_atoms index in
+                  ((last_index_left+left_offset
+                   ,index)
+                  ,Lens.make_disconnect
+                      (Regex.one)
+                      rx_right
+                      ""
+                      (Regex.representative_exn rx_right)))
+              projr
+          in
+          let left_strings_t_full =
+            left_strings_t
+            @ (List.init
+                 (List.length right_projections)
+                 (fun _ -> ""))
+          in
+          let right_strings_t_full =
+            right_strings_t
+            @ (List.init
+                 (List.length left_projections)
+                 (fun _ -> ""))
+          in
+          let aligns =
+            List.map
+              ~f:(fun (i,j,a) -> ((i,j),nonempty_alignment_to_lens a))
+              aligns
+          in
+          let all_aligns =
+            left_projections
+            @ right_projections
+            @ aligns
+          in
+          let all_aligns_ordered =
+            List.sort
+              ~cmp:(fun ((i1,_),_) ((i2,_),_) -> Int.compare i1 i2)
+              all_aligns
+          in
+          let (index_pairs,alignments) =
+            List.unzip
+              all_aligns_ordered
+          in
+          let perm =
+            Permutation.create_from_pairs
+              index_pairs
+          in
+          let right_strings_t_invperm =
+            Permutation.apply_inverse_to_list_exn
+              perm
+              right_strings_t_full
+          in
+          let string_lss_hd =
+            Lens.make_disconnect
+               (Regex.make_base left_string_h)
+               (Regex.make_base right_string_h)
+               left_string_h
+               right_string_h
+          in
+          let string_tl_combos =
+            List.zip_exn
+              left_strings_t_full
+              right_strings_t_invperm
+          in
+          let aligns_consts_zips =
+            List.zip_exn
+              alignments
+              string_tl_combos
+          in
+          let atom_string_concats =
+            List.map
+              ~f:(fun (x,(s1,s2)) ->
+                  Lens.make_times
+                    x
+                    (Lens.make_const s1 s2))
+              aligns_consts_zips
+          in
+          begin match aligns_consts_zips with
+            | [] -> string_lss_hd
+            | _ ->
+              let permutation_scct =
+                Permutation.to_swap_concat_compose_tree
+                  perm
+              in
+              if Permutation.has_compose permutation_scct then
+                Lens.make_times
+                  string_lss_hd
+                  (Lens.make_permute perm atom_string_concats)
+              else
+                Lens.make_times
+                  string_lss_hd
+                  (fst (combine_scct_and_sub_lenses
+                          atom_string_concats
+                          permutation_scct))
+          end
+      end
+    in
+    begin match al with
       | Empty -> None
       | NonemptyTree nt -> Some (nonempty_alignment_to_lens nt)
     end

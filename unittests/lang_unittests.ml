@@ -3,7 +3,7 @@ open OUnit2
 open Ounit_general_extensions
 open Ounit_extensions
 open Optician
-open Star_semiring_tree_alignment
+open Star_semiring_tree_alignment_optimal
 open Synth_structs
 open Lang
 open Lenscontext
@@ -51,3 +51,52 @@ let regex_compare_suite = "Test Regex compare" >:::
   ]
 
 let _ = run_test_tt_main regex_compare_suite
+
+let test_regex_info_content_base _ =
+  assert_float_equal
+    0.
+    (Regex.information_content (Regex.make_base "a"))
+
+let test_regex_info_content_or _ =
+  assert_float_equal
+    1.0
+    (Regex.information_content (Regex.make_or (Regex.make_base "a") (Regex.make_base "b")))
+
+let test_regex_info_content_concat _ =
+  assert_float_equal
+    2.0
+    (Regex.information_content
+       (Regex.make_concat
+          (Regex.make_or (Regex.make_base "a") (Regex.make_base "b"))
+          (Regex.make_or (Regex.make_base "a") (Regex.make_base "b"))))
+
+let test_regex_info_content_star_contentless_underneath _ =
+  assert_float_equal
+    3.6096404744368
+    (Regex.information_content (Regex.make_star (Regex.make_base "a")))
+
+let test_regex_info_content_star_or_underneath _ =
+  assert_float_equal
+    7.6096404744368
+    (Regex.information_content
+       (Regex.make_star
+          (Regex.make_or (Regex.make_base "a") (Regex.make_base "b"))))
+
+let test_regex_info_content_closed_or_underneath _ =
+  assert_float_equal
+    1.
+    (Regex.information_content
+       (Regex.make_closed
+          (Regex.make_or (Regex.make_base "a") (Regex.make_base "b"))))
+
+let regex_info_content_suite = "Test Regex Information Content" >:::
+  [
+    "test_regex_info_content_base" >:: test_regex_info_content_base;
+    "test_regex_info_content_or" >:: test_regex_info_content_or;
+    "test_regex_info_content_concat" >:: test_regex_info_content_concat;
+    "test_regex_info_content_star_contentless_underneath" >:: test_regex_info_content_star_contentless_underneath;
+    "test_regex_info_content_star_or_underneath" >:: test_regex_info_content_star_or_underneath;
+    "test_regex_info_content_closed_or_underneath" >:: test_regex_info_content_closed_or_underneath;
+  ]
+
+let _ = run_test_tt_main regex_info_content_suite
