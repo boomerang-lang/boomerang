@@ -48,6 +48,8 @@ struct
       expansions_performed : int                        ;
       expansions_inferred  : int                        ;
       expansions_forced    : int                        ;
+      r1                   : Regex.t                    ;
+      r2                   : Regex.t                    ;
     }
 
   let rec gen_atom_zipper (lc:LensContext.t)
@@ -56,7 +58,7 @@ struct
     : atom_lens =
     begin match (atom1,atom2) with
       | (OEAClosed (_,sorig1,_,_),OEAClosed (_,sorig2,_,_)) ->
-        AtomLensVariable (LensContext.shortest_path_exn lc sorig1 sorig2)
+        AtomLensVariable (LensContext.shortest_path_exn lc (StochasticRegex.to_regex sorig1) (StochasticRegex.to_regex sorig2))
       | (OEAStar r1, OEAStar r2) ->
         AtomLensIterate (gen_dnf_lens_zipper_internal lc r1 r2)
       | _ -> failwith "invalid"
@@ -172,23 +174,25 @@ struct
     let exampled_r1_opt =
       regex_to_exampled_dnf_regex
         lc
-        r1
+        (StochasticRegex.from_regex @$ StochasticRegex.to_regex r1)
         left_example_data
     in
     let exampled_r2_opt =
       regex_to_exampled_dnf_regex
         lc
-        r2
+        (StochasticRegex.from_regex @$ StochasticRegex.to_regex r2)
         right_example_data
     in
     begin match (exampled_r1_opt,exampled_r2_opt) with
       | (Some exampled_r1, Some exampled_r2) ->
         let exampled_r1_tree =
           StarSemiringTreeRep.exampled_dnf_regex_to_tree
+            lc
             exampled_r1
         in
         let exampled_r2_tree =
           StarSemiringTreeRep.exampled_dnf_regex_to_tree
+            lc
             exampled_r2
         in
         if !optimal then
@@ -242,8 +246,8 @@ struct
           ~arg2_data:[]
           ~output_data:[]
       in
-      let exampled_r1_opt = regex_to_exampled_dnf_regex lc r1 lexs in
-      let exampled_r2_opt = regex_to_exampled_dnf_regex lc r2 rexs in
+      let exampled_r1_opt = regex_to_exampled_dnf_regex lc (StochasticRegex.from_regex r1) lexs in
+      let exampled_r2_opt = regex_to_exampled_dnf_regex lc (StochasticRegex.from_regex r2) rexs in
       begin match (exampled_r1_opt,exampled_r2_opt) with
         | (Some exampled_r1,Some exampled_r2) ->
           let e_o_r1 = to_ordered_exampled_dnf_regex exampled_r1 in
@@ -258,6 +262,8 @@ struct
                   expansions_performed = (QueueElement.get_expansions_performed qe);
                   expansions_inferred = (QueueElement.get_expansions_inferred qe);
                   expansions_forced = (QueueElement.get_expansions_forced qe);
+                  r1 = r1;
+                  r2 = r2;
                 })
             | _ -> None
           end
@@ -340,9 +346,19 @@ struct
       (r1:Regex.t)
       (r2:Regex.t)
       (exs:create_examples)
-    : dnf_lens option =
+    : Lens.t option =
     Option.map
-      ~f:(fun x -> x.l)
+      ~f:(fun x ->
+          fst @$
+          Option.value_exn
+            (kinda_rigid_synth
+               lc
+               (StochasticRegex.from_regex x.r1)
+               (StochasticRegex.from_regex x.r2)
+               exs
+               []
+               []
+               []))
       (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let expansions_performed_for_gen
@@ -413,7 +429,7 @@ struct
              print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe))));
           let r1 = (SymmetricQueueElement.get_r1 qe) in
           let r2 = (SymmetricQueueElement.get_r2 qe) in
-          if f >=. best_cost then
+          if f >=. best_cost || !attempts > 1000 then
             best
           else
             (* TODO fix *)
@@ -459,10 +475,11 @@ struct
       (r2:Regex.t)
       (exs:create_examples)
     : Lens.t option =
-      let dnf_lens_option = gen_dnf_lens lc r1 r2 exs in
-      Option.map
+    let dnf_lens_option = gen_dnf_lens lc r1 r2 exs in
+    dnf_lens_option
+      (*Option.map
         ~f:dnf_lens_to_lens
-        dnf_lens_option
+        dnf_lens_option*)
 
   let num_possible_choices
       (lc:LensContext.t)

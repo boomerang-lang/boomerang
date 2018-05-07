@@ -372,7 +372,7 @@ struct
       | RegExEmpty -> None
       | RegExClosed r -> representative r
       | RegExBase s -> Some s
-      | RegExStar r -> representative r
+      | RegExStar r -> Some ""
     end
 
   let rec representative_exn
@@ -854,10 +854,7 @@ struct
       | Empty -> None
       | Closed r -> representative r
       | Base s -> Some s
-      | Star (r,_) -> begin match representative r with
-          | None -> Some ""
-          | Some s -> Some s
-        end
+      | Star (r,_) -> Some ""
     end
 
   let rec representative_exn
@@ -1084,6 +1081,11 @@ struct
     : t =
     Permute (p,ls)
 
+  let make_inverse
+      (l:t)
+    : t =
+    Inverse l
+
   let make_closed
       ~rr:rr
       ~rl:rl
@@ -1249,6 +1251,31 @@ struct
       end
     in
     fold_internal l
+
+  let invert
+    : t -> t =
+    fold
+      ~disc_f:(fun r1 r2 s1 s2 -> make_disconnect r2 r1 s2 s1)
+      ~concat_f:(fun l1 l2 -> make_concat l1 l2)
+      ~swap_f:(fun l1 l2 -> make_swap l2 l1)
+      ~union_f:(fun l1 l2 -> make_or l1 l2)
+      ~compose_f:(fun l1 l2 -> make_compose l2 l1)
+      ~iterate_f:(fun l -> make_star l)
+      ~identity_f:(fun r -> make_ident r)
+      ~inverse_f:(fun l -> make_inverse l)
+      ~permute_f:(fun p ls ->
+          let p_inv = Permutation.inverse p in
+          let ls = Permutation.apply_to_list_exn p ls in
+          make_permute p_inv ls)
+      ~closed_f:(fun i fc ->
+          make_closed
+            fc.rl
+            fc.rr
+            fc.createl
+            fc.creater
+            fc.putl
+            fc.putr
+            i)
 end
 
 let lens_semiring = (module Lens : Semiring.Sig with type t = Lens.t)

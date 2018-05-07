@@ -5,6 +5,7 @@ open Star_semiring_tree
 open Star_semiring_alignment_greedy
 open Synth_structs
 open Lang
+open Normalized_lang
 
 module BaseIntModule =
 struct
@@ -95,6 +96,16 @@ let assert_alignment_equal =
     ~printer:StarSemiringTreeRep.OptimalAlignment.show
     ~cmp:StarSemiringTreeRep.OptimalAlignment.compare
 
+let assert_exampled_dnf_regex_equal =
+  assert_equal
+    ~printer:show_exampled_dnf_regex
+    ~cmp:compare_exampled_dnf_regex
+
+let assert_exampled_dnf_regex_option_equal =
+  assert_equal
+    ~printer:(string_of_option show_exampled_dnf_regex)
+    ~cmp:(compare_option compare_exampled_dnf_regex)
+
 let assert_lens_equal =
   assert_equal
     ~printer:Lens.show
@@ -136,3 +147,8 @@ let assert_regex_equal =
   assert_equal
     ~printer:Regex.show
     ~cmp:Regex.compare
+
+let assert_stochastic_regex_equal =
+  assert_equal
+    ~printer:StochasticRegex.show
+    ~cmp:StochasticRegex.compare

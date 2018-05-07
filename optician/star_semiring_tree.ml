@@ -21,7 +21,7 @@ struct
   type t = t_node hash_consed
   and t_node =
     | Base of BD.t
-    | Plus of PD.t * l list
+    | Plus of PD.t * (l * Probability.t) list
     | Times of TD.t * l list
     | Star of SD.t * l
   and l = t * L.t
@@ -45,7 +45,7 @@ struct
       (type b)
       ~init:(init:b)
       ~upward_base:(upward_base:b -> BD.t -> a)
-      ~upward_plus:(upward_plus:b -> PD.t -> (L.t * a) list -> a)
+      ~upward_plus:(upward_plus:b -> PD.t -> (L.t * a * Probability.t) list -> a)
       ~upward_times:(upward_times:b -> TD.t -> (L.t * a) list -> a)
       ~upward_star:(upward_star:b -> SD.t -> L.t -> a -> a)
       ?downward_plus:(downward_plus:b -> PD.t -> L.t -> b = curry3 fst_trip)
@@ -65,10 +65,11 @@ struct
             downward_acc
             pd
             (List.map
-               ~f:(fun (t,l) ->
+               ~f:(fun ((t,l),p) ->
                    let downward_acc' = downward_plus downward_acc pd l in
                    (l
-                   ,fold_downward_upward_internal downward_acc' t))
+                   ,fold_downward_upward_internal downward_acc' t
+                   ,p))
                ts)
         | Times (td,ts) ->
           upward_times
@@ -95,7 +96,7 @@ struct
   let fold
       (type a)
       ~base_f:(base_f:BD.t -> a)
-      ~plus_f:(plus_f:PD.t -> (L.t * a) list -> a)
+      ~plus_f:(plus_f:PD.t -> (L.t * a * Probability.t) list -> a)
       ~times_f:(times_f:TD.t -> (L.t * a) list -> a)
       ~star_f:(star_f:SD.t -> L.t -> a -> a)
       v
@@ -117,10 +118,11 @@ struct
 
   let information_content
     : t -> float =
+    (* TODO *)
     fold
       ~base_f:BD.information_content
       ~plus_f:(fun _ lfl ->
-          let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
+          let nfl = List.map ~f:(fun (l,f,p) -> (L.as_count l,f)) lfl in
           let (n,f) =
             List.fold_left
               ~f:(fun (n_acc,f_acc) (n,f) ->
@@ -180,7 +182,7 @@ module PlusTimesStarTreeOf
 struct
   type nonempty_t =
     | Base of BD.t
-    | Plus of PD.t * nonempty_t list
+    | Plus of PD.t * (nonempty_t * Probability.t) list
     | Times of TD.t * nonempty_t list
     | Star of SD.t * nonempty_t
   [@@deriving ord, show, hash]
@@ -197,7 +199,7 @@ struct
 
   let mk_plus
       (p:PD.t)
-      (ts:nonempty_t list)
+      (ts:(nonempty_t * Probability.t) list)
     : nonempty_t =
     Plus (p,ts)
 
@@ -228,7 +230,7 @@ struct
       ~upward_empty:(upward_empty:'c)
       ~upward_nonempty:(upward_nonempty:'a -> 'c)
       ~upward_base:(upward_base:'b -> BD.t -> 'a)
-      ~upward_plus:(upward_plus:'b -> PD.t -> 'a list -> 'a)
+      ~upward_plus:(upward_plus:'b -> PD.t -> ('a * Probability.t) list -> 'a)
       ~upward_times:(upward_times:'b -> TD.t -> 'a list -> 'a)
       ~upward_star:(upward_star:'b -> SD.t -> 'a -> 'a)
       ?downward_plus:(downward_plus:'b -> PD.t -> 'b = curry fst)
@@ -249,7 +251,7 @@ struct
             downward_acc
             pd
             (List.map
-               ~f:(fold_downward_upward_nonempty_internal downward_acc')
+               ~f:(fun (l,p) -> (fold_downward_upward_nonempty_internal downward_acc' l,p))
                ts)
         | Times (td,ts) ->
           let downward_acc' = downward_times downward_acc td in
@@ -280,7 +282,7 @@ struct
       ~empty_f:(empty_f:'c)
       ~nonempty_f:(nonempty_f:'a -> 'c)
       ~base_f:(base_f:BD.t -> 'a)
-      ~plus_f:(plus_f:PD.t -> 'a list -> 'a)
+      ~plus_f:(plus_f:PD.t -> ('a * Probability.t) list -> 'a)
       ~times_f:(times_f:TD.t -> 'a list -> 'a)
       ~star_f:(star_f:SD.t -> 'a -> 'a)
       v
@@ -302,7 +304,6 @@ module NormalizedPlusTimesStarTreeOf
     (SD : Data)
     (BD : BaseData) =
 struct
-
   module NormalizationScript =
   struct
     module PD_NormalizationLabel =
@@ -376,27 +377,32 @@ struct
       ~base_f:(fun bl ->
           (Nonempty.mk_base bl
           ,NormalizationScript.Base bl))
-      ~plus_f:(fun p nsnts ->
+      ~plus_f:(fun pl nsntps ->
+          let (nsnts,ps) = List.unzip nsntps in
           let (nts,nss) = List.unzip nsnts in
+          let ntsps = List.zip_exn nts ps in
+          let nssps = List.zip_exn nss ps in
           let (perm,sv) =
             CountedPermutation.sorting
-              ~cmp:(Nonempty.compare)
-              nts
+              ~cmp:(pair_compare Nonempty.compare Probability.compare)
+              ntsps
           in
           let nvs =
             List.map
               ~f:(fun xs ->
-                  (List.hd_exn xs
-                  ,List.length xs))
+                  let hd = List.hd_exn xs in
+                  ((fst hd
+                   ,List.length xs)
+                  ,snd hd))
               sv
           in
           let norm_label =
             NormalizationScript.PD_NormalizationLabel.make
-              ~label:p
+              ~label:pl
               ~perm:perm
           in
-          (Nonempty.mk_plus p nvs
-          ,NormalizationScript.Plus (norm_label,nss)))
+          (Nonempty.mk_plus pl nvs
+          ,NormalizationScript.Plus (norm_label,nssps)))
       ~times_f:(fun t nsnts ->
           let (nts,nss) = List.unzip nsnts in
           let (perm,sv) =

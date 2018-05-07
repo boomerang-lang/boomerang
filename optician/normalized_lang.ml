@@ -3,7 +3,6 @@ open Lang
 
 
 (**** Exampled Regex {{{ *****)
-
 type 'a example_data =
   {
     arg1_data : 'a ;
@@ -59,9 +58,9 @@ type exampled_regex =
   | ERegExEmpty
   | ERegExBase of string * (int list list) example_data
   | ERegExConcat of exampled_regex * exampled_regex * (int list list) example_data
-  | ERegExOr of exampled_regex  * exampled_regex * (int list list) example_data
-  | ERegExStar of exampled_regex * (int list list) example_data
-  | ERegExClosed of Regex.t * example_string_data * (int list list) example_data
+  | ERegExOr of exampled_regex  * exampled_regex * (int list list) example_data * Probability.t
+  | ERegExStar of exampled_regex * (int list list) example_data * Probability.t
+  | ERegExClosed of StochasticRegex.t * example_string_data * (int list list) example_data
 [@@deriving show]
 
 let extract_example_data (er:exampled_regex) : parsing_example_data =
@@ -69,8 +68,8 @@ let extract_example_data (er:exampled_regex) : parsing_example_data =
     | ERegExEmpty -> empty_parsing_example_data
     | ERegExBase (_,pd) -> pd
     | ERegExConcat (_,_,pd) -> pd
-    | ERegExOr (_,_,pd) -> pd
-    | ERegExStar (_,pd) -> pd
+    | ERegExOr (_,_,pd,_) -> pd
+    | ERegExStar (_,pd,_) -> pd
     | ERegExClosed (_,_,pd) -> pd
   end
 
@@ -114,12 +113,12 @@ let rec extract_string
     | ERegExConcat (er1,er2,_) ->
       (extract_string m er1 iteration) ^
       (extract_string m er2 iteration)
-    | ERegExOr (er1,er2,_) ->
+    | ERegExOr (er1,er2,_,_) ->
       if took_regex m er1 iteration then
         extract_string m er1 iteration
       else
         extract_string m er2 iteration
-    | ERegExStar (er',_) ->
+    | ERegExStar (er',_,_) ->
         let valid_iterations =
           List.rev
             (List.filter
@@ -171,21 +170,26 @@ let rec extract_string
 
 type exampled_atom =
   | EAClosed of Regex.t *
-                Regex.t *
+                StochasticRegex.t *
                 Lens.t *
                 (string list) example_data *
                 (int list list) example_data *
                 (string list) example_data
-  | EAStar of exampled_dnf_regex * (int list list) example_data * Regex.t
+  | EAStar of exampled_dnf_regex * (int list list) example_data * StochasticRegex.t
 
-and exampled_clause = (exampled_atom) list * string list * (int list list) example_data
+and exampled_clause =
+  exampled_atom list
+  * string list
+  * (int list list) example_data
 
-and exampled_dnf_regex = exampled_clause list * int list list example_data
+and exampled_dnf_regex =
+  (exampled_clause * Probability.t) list * int list list example_data
+[@@deriving ord, show, hash]
 
-let get_atom_regex (ea:exampled_atom) : Regex.t =
+let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
   begin match ea with
     | EAClosed (_,r,_,_,_,_) ->
-      Regex.make_closed r
+      StochasticRegex.make_closed r
     | EAStar (_,_,r) -> r
   end
 
@@ -229,7 +233,7 @@ and exampled_atom_to_string (a:exampled_atom) : string =
 (***** }}} *****)
 
 type ordered_exampled_atom =
-  | OEAClosed of Regex.t * Regex.t * Lens.t * string list example_data
+  | OEAClosed of Regex.t * StochasticRegex.t * Lens.t * string list example_data
   | OEAStar of ordered_exampled_dnf_regex
 
 and ordered_exampled_clause = ((ordered_exampled_atom * int) list) list * string
@@ -318,7 +322,9 @@ let rec to_ordered_exampled_atom (a:exampled_atom) : ordered_exampled_atom =
   | EAStar (r,_,_) -> OEAStar (to_ordered_exampled_dnf_regex r)
   end
 
-and to_ordered_exampled_clause ((atoms,strings,exnums):exampled_clause) : ordered_exampled_clause =
+and to_ordered_exampled_clause
+    ((atoms,strings,exnums):exampled_clause)
+  : ordered_exampled_clause =
   let ordered_atoms = List.map ~f:to_ordered_exampled_atom atoms in
   let ordered_ordered_atoms =
     sort_and_partition_with_indices
@@ -333,7 +339,7 @@ and to_ordered_exampled_clause ((atoms,strings,exnums):exampled_clause) : ordere
 
 and to_ordered_exampled_dnf_regex ((r,_):exampled_dnf_regex)
         : ordered_exampled_dnf_regex =
-  let ordered_clauses = List.map ~f:to_ordered_exampled_clause r in
+  let ordered_clauses = List.map ~f:(to_ordered_exampled_clause % fst) r in
   sort_and_partition_with_indices
     compare_ordered_exampled_clauses
     ordered_clauses

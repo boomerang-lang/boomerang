@@ -1,8 +1,13 @@
 (jbuild_version 1)
 
 (executables
- ((names (synth_unittests lang_unittests))
+ ((names (synth_unittests lang_unittests util_unittests))
   (libraries (ounit myStdlib optician))))
+
+(alias
+ ((name    runtest)
+  (deps    (util_unittests.exe))
+  (action  (run ${^}))))
 
 (alias
  ((name    runtest)

@@ -9,6 +9,7 @@ open Lang
 open Lenscontext
 open Regex_utilities
 open Normalized_lang
+open Converter
 
 let test_normalize_tree_empty _ =
   assert_normalized_tree_script_equal
@@ -46,7 +47,7 @@ let test_normalize_tree_plus_nodupes _ =
     (IntNormalizedPTST.Nonempty
        (IntNormalizedPTST.Nonempty.mk_plus
           54321
-          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)])
+          [((IntNormalizedPTST.Nonempty.mk_base 12345,1),1.)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -55,19 +56,19 @@ let test_normalize_tree_plus_nodupes _ =
                   CountedPermutation.make_element
                     ~old_index:0
                     ~new_index:(0,0)])
-           ,[IntNormalizedPTST.NormalizationScript.Base 12345])))
+           ,[(IntNormalizedPTST.NormalizationScript.Base 12345,1.)])))
     (IntNormalizedPTST.from_tree
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus
              (54321
-             ,[IntNormalizedPTST.NonNormalizedTree.Base 12345]))))
+             ,[(IntNormalizedPTST.NonNormalizedTree.Base 12345,1.)]))))
 
 let test_normalize_tree_plus_dupes _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
        (IntNormalizedPTST.Nonempty.mk_plus
           54321
-          [(IntNormalizedPTST.Nonempty.mk_base 12345,2)])
+          [((IntNormalizedPTST.Nonempty.mk_base 12345,2),1. /. 2.)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -78,21 +79,21 @@ let test_normalize_tree_plus_dupes _ =
                      ;CountedPermutation.make_element
                          ~old_index:1
                          ~new_index:(0,1)])
-           ,[IntNormalizedPTST.NormalizationScript.Base 12345
-            ;IntNormalizedPTST.NormalizationScript.Base 12345])))
+           ,[(IntNormalizedPTST.NormalizationScript.Base 12345,1. /. 2.)
+            ;(IntNormalizedPTST.NormalizationScript.Base 12345,1. /. 2.)])))
     (IntNormalizedPTST.from_tree
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus
              (54321
-             ,[IntNormalizedPTST.NonNormalizedTree.Base 12345
-              ;IntNormalizedPTST.NonNormalizedTree.Base 12345]))))
+             ,[(IntNormalizedPTST.NonNormalizedTree.Base 12345,1. /. 2.)
+              ;(IntNormalizedPTST.NonNormalizedTree.Base 12345,1. /. 2.)]))))
 
 let test_normalize_tree_plus_many_dupes_with_times _ =
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
        (IntNormalizedPTST.Nonempty.mk_plus
           54321
-          [(IntNormalizedPTST.Nonempty.mk_times 123 [],7)])
+          [((IntNormalizedPTST.Nonempty.mk_times 123 [],7),1. /. 7.)])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -118,46 +119,55 @@ let test_normalize_tree_plus_many_dupes_with_times _ =
                      ;CountedPermutation.make_element
                          ~old_index:6
                          ~new_index:(0,6)])
-           ,[IntNormalizedPTST.NormalizationScript.mk_times
-               (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:123 ~perm:[])
-               []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+           ,[(IntNormalizedPTST.NormalizationScript.mk_times
+                (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:123 ~perm:[])
+                []
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:246 ~perm:[])
                 []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:369 ~perm:[])
                 []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:492 ~perm:[])
                 []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:615 ~perm:[])
                 []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:738 ~perm:[])
                 []
-            ;IntNormalizedPTST.NormalizationScript.mk_times
+             ,1. /. 7.)
+            ;(IntNormalizedPTST.NormalizationScript.mk_times
                 (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make ~label:861 ~perm:[])
-                []])))
+                []
+             ,1. /. 7.)])))
     (IntNormalizedPTST.from_tree
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus
              (54321
-             ,[IntNormalizedPTST.NonNormalizedTree.mk_times 123 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 246 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 369 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 492 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 615 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 738 []
-              ;IntNormalizedPTST.NonNormalizedTree.mk_times 861 []]))))
+             ,[(IntNormalizedPTST.NonNormalizedTree.mk_times 123 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 246 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 369 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 492 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 615 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 738 [],1. /. 7.)
+              ;(IntNormalizedPTST.NonNormalizedTree.mk_times 861 [],1. /. 7.)]))))
 
 let test_normalize_tree_plus_complex_perm _ =
+  let b1 = ((IntNormalizedPTST.Nonempty.mk_base 12346,2),1. /. 3.) in
+  let b2 = ((IntNormalizedPTST.Nonempty.mk_base 12345,1),1. /. 3.) in
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
        (IntNormalizedPTST.Nonempty.mk_plus
           54321
-          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)
-          ;(IntNormalizedPTST.Nonempty.mk_base 12346,2)])
+          [b2
+          ;b1])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Plus
            (IntNormalizedPTST.NormalizationScript.PD_NormalizationLabel.make
@@ -171,16 +181,16 @@ let test_normalize_tree_plus_complex_perm _ =
                      ;CountedPermutation.make_element
                          ~old_index:2
                          ~new_index:(1,1)])
-           ,[IntNormalizedPTST.NormalizationScript.Base 12346
-            ;IntNormalizedPTST.NormalizationScript.Base 12345
-            ;IntNormalizedPTST.NormalizationScript.Base 12346])))
+           ,[(IntNormalizedPTST.NormalizationScript.Base 12346,1. /. 3.)
+            ;(IntNormalizedPTST.NormalizationScript.Base 12345,1. /. 3.)
+            ;(IntNormalizedPTST.NormalizationScript.Base 12346,1. /. 3.)])))
     (IntNormalizedPTST.from_tree
        (IntNormalizedPTST.NonNormalizedTree.Nonempty
           (IntNormalizedPTST.NonNormalizedTree.Plus
              (54321
-             ,[IntNormalizedPTST.NonNormalizedTree.Base 12346
-              ;IntNormalizedPTST.NonNormalizedTree.Base 12345
-              ;IntNormalizedPTST.NonNormalizedTree.Base 12346]))))
+             ,[(IntNormalizedPTST.NonNormalizedTree.Base 12346,1. /. 3.)
+              ;(IntNormalizedPTST.NonNormalizedTree.Base 12345,1. /. 3.)
+              ;(IntNormalizedPTST.NonNormalizedTree.Base 12346,1. /. 3.)]))))
 
 let test_normalize_tree_times_nodupes _ =
   assert_normalized_tree_script_equal
@@ -229,12 +239,14 @@ let test_normalize_tree_times_dupes _ =
               ;IntNormalizedPTST.NonNormalizedTree.Base 12345]))))
 
 let test_normalize_tree_times_complex_perm _ =
+  let b2 = (IntNormalizedPTST.Nonempty.mk_base 12345,1) in
+  let b1 = (IntNormalizedPTST.Nonempty.mk_base 12346,2) in
   assert_normalized_tree_script_equal
     (IntNormalizedPTST.Nonempty
        (IntNormalizedPTST.Nonempty.mk_times
           54321
-          [(IntNormalizedPTST.Nonempty.mk_base 12345,1)
-          ;(IntNormalizedPTST.Nonempty.mk_base 12346,2)])
+          [b2
+          ;b1])
     ,IntNormalizedPTST.NormalizationScript.Nonempty
         (IntNormalizedPTST.NormalizationScript.Times
            (IntNormalizedPTST.NormalizationScript.TD_NormalizationLabel.make
@@ -739,7 +751,7 @@ let test_get_minimal_alignment_and_cost_plus_emptyplus _ =
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Plus (1,[])])))
+             ,[(IPTST.Plus (1,[]),1.)])))
        (IPTST.Nonempty
           (IPTST.Plus (1,[]))))
 
@@ -765,11 +777,11 @@ let test_get_minimal_alignment_and_cost_easy_plus_bijection _ =
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Plus (1,[])])))
+             ,[(IPTST.Plus (1,[]),1.)])))
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Plus (1,[])]))))
+             ,[(IPTST.Plus (1,[]),1.)]))))
 
 let test_get_minimal_alignment_and_cost_hard_plus_bijection _ =
   assert_alignment_option_cost_equal
@@ -809,11 +821,15 @@ let test_get_minimal_alignment_and_cost_hard_plus_bijection _ =
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Plus (1,[]);IPTST.Plus (2,[]);IPTST.Plus (0,[])])))
+             ,[(IPTST.Plus (1,[]),1. /. 3.)
+              ;(IPTST.Plus (2,[]),1. /. 3.)
+              ;(IPTST.Plus (0,[]),1. /. 3.)])))
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Plus (1,[]);IPTST.Plus (0,[]);IPTST.Plus (2,[])]))))
+             ,[(IPTST.Plus (1,[]),1. /. 3.)
+              ;(IPTST.Plus (0,[]),1. /. 3.)
+              ;(IPTST.Plus (2,[]),1. /. 3.)]))))
 
 let test_get_minimal_alignment_and_cost_plus_merge_equiv _ =
   assert_alignment_option_cost_equal
@@ -835,25 +851,24 @@ let test_get_minimal_alignment_and_cost_plus_merge_equiv _ =
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Base 2;IPTST.Base 2])))
+             ,[(IPTST.Base 2,1. /. 2.)
+              ;(IPTST.Base 2,1. /. 2.)])))
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Base 2]))))
+             ,[(IPTST.Base 2,1.)]))))
 
 let test_get_minimal_alignment_and_cost_plus_merge_diff _ =
+  let b2 = (0,0,IPTSTA.Nonempty.Base 1) in
+  let b1 = (1,0,IPTSTA.Nonempty.Base 2) in
   assert_alignment_option_cost_equal
     ((Some
        (IPTSTA.NonemptyTree
           (IPTSTA.Nonempty.Plus
              (1
              ,1
-             ,[(1
-               ,0
-               ,IPTSTA.Nonempty.Base 2)
-              ;(0
-               ,0
-               ,IPTSTA.Nonempty.Base 1)]
+             ,[b1
+              ;b2]
              ,[0;0]
              ,[0]))))
     ,1.5)
@@ -861,11 +876,12 @@ let test_get_minimal_alignment_and_cost_plus_merge_diff _ =
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Base 2;IPTST.Base 4])))
+             ,[(IPTST.Base 2,1. /. 2.)
+              ;(IPTST.Base 4,1. /. 2.)])))
        (IPTST.Nonempty
           (IPTST.Plus
              (1
-             ,[IPTST.Base 2]))))
+             ,[(IPTST.Base 2,1.)]))))
 
 let alignment_distance_suite = "Test get_minimal_alignment_and_cost" >:::
   [
@@ -899,6 +915,7 @@ let test_exampled_dnf_regex_to_tree_empty _ =
                 ~arg2_data:[]
                 ~output_data:[]),[])))
     (StarSemiringTreeRep.exampled_dnf_regex_to_tree
+       LensContext.empty
        ([],(make_example_data
               ~arg1_data:[]
               ~arg2_data:[]
@@ -915,11 +932,13 @@ let test_exampled_dnf_regex_to_tree_epsilon _ =
     (StarSemiringTreeRep.Tree.Nonempty
        (StarSemiringTreeRep.Tree.Plus
           (StarSemiringTreeRep.PD.make ex_data
-          ,[StarSemiringTreeRep.Tree.Times
-              (StarSemiringTreeRep.TD.make ex_data [""] []
-              ,[])])))
+          ,[(StarSemiringTreeRep.Tree.Times
+               (StarSemiringTreeRep.TD.make ex_data [""] []
+               ,[])
+            ,1.)])))
     (StarSemiringTreeRep.exampled_dnf_regex_to_tree
-       ([([],[""],ex_data)],ex_data))
+       LensContext.empty
+       ([(([],[""],ex_data),1.)],ex_data))
 
 let test_exampled_dnf_regex_to_tree_epsilon _ =
   let ex_data =
@@ -932,11 +951,13 @@ let test_exampled_dnf_regex_to_tree_epsilon _ =
     (StarSemiringTreeRep.Tree.Nonempty
        (StarSemiringTreeRep.Tree.Plus
           (StarSemiringTreeRep.PD.make ex_data
-          ,[StarSemiringTreeRep.Tree.Times
-              (StarSemiringTreeRep.TD.make ex_data [""] []
-              ,[])])))
+          ,[(StarSemiringTreeRep.Tree.Times
+               (StarSemiringTreeRep.TD.make ex_data [""] []
+               ,[])
+            ,1.)])))
     (StarSemiringTreeRep.exampled_dnf_regex_to_tree
-       ([([],[""],ex_data)],ex_data))
+       LensContext.empty
+       ([(([],[""],ex_data),1.)],ex_data))
 
 let test_exampled_dnf_regex_to_tree_base _ =
   let ex_data =
@@ -961,27 +982,33 @@ let test_exampled_dnf_regex_to_tree_base _ =
     (StarSemiringTreeRep.Tree.Nonempty
        (StarSemiringTreeRep.Tree.Plus
           (StarSemiringTreeRep.PD.make ex_data
-          ,[StarSemiringTreeRep.Tree.Times
-              (StarSemiringTreeRep.TD.make ex_data ["a";"b"] [Regex.make_closed (Regex.make_base "wa")]
-              ,[StarSemiringTreeRep.Tree.Base
-                  (StarSemiringTreeRep.BD.make
-                     (Regex.make_base "aw")
-                     ex_data
-                     str_data_post)])])))
+          ,[(StarSemiringTreeRep.Tree.Times
+               (StarSemiringTreeRep.TD.make ex_data ["a";"b"]
+                  [StochasticRegex.make_closed (StochasticRegex.make_base "wa")]
+               ,[StarSemiringTreeRep.Tree.Base
+                   (StarSemiringTreeRep.BD.make
+                      (Regex.make_base "aw")
+                      (StochasticRegex.make_base "aw")
+                      ex_data
+                      str_data_post
+                      LensContext.empty)])
+            ,1.)])))
     (StarSemiringTreeRep.exampled_dnf_regex_to_tree
-       ([([EAClosed
-             (Regex.make_base "aw"
-             ,Regex.make_base "wa"
-             ,Lens.Disconnect
-                 (Regex.make_base "aw"
-                 ,Regex.make_base "wa"
-                 ,"aw"
-                 ,"wa")
-             ,str_data_pre
-             ,ex_data
-             ,str_data_post)]
-         ,["a";"b"]
-         ,ex_data)]
+       LensContext.empty
+       ([(([EAClosed
+              (Regex.make_base "aw"
+              ,StochasticRegex.make_base "wa"
+              ,Lens.Disconnect
+                  (Regex.make_base "aw"
+                  ,Regex.make_base "wa"
+                  ,"aw"
+                  ,"wa")
+              ,str_data_pre
+              ,ex_data
+              ,str_data_post)]
+          ,["a";"b"]
+          ,ex_data)
+         ,1.)]
        ,ex_data))
 
 let test_exampled_dnf_regex_to_tree_star _ =
@@ -1001,85 +1028,142 @@ let test_exampled_dnf_regex_to_tree_star _ =
     (StarSemiringTreeRep.Tree.Nonempty
        (StarSemiringTreeRep.Tree.Plus
           (StarSemiringTreeRep.PD.make ex_data
-          ,[StarSemiringTreeRep.Tree.Times
-              (StarSemiringTreeRep.TD.make ex_data ["a";"b"] [Regex.make_star (Regex.make_base "c")]
-              ,[StarSemiringTreeRep.Tree.Star
-                  ((StarSemiringTreeRep.SD.make
-                      ex_data)
-                  ,(StarSemiringTreeRep.Tree.Plus
-                      (StarSemiringTreeRep.PD.make ex_data_inside
-                      ,[StarSemiringTreeRep.Tree.Times
-                          (StarSemiringTreeRep.TD.make ex_data_inside ["c"] []
-                          ,[])])))])])))
+          ,[(StarSemiringTreeRep.Tree.Times
+               (StarSemiringTreeRep.TD.make
+                  ex_data
+                  ["a";"b"]
+                  [StochasticRegex.make_star
+                     (StochasticRegex.make_base "c")
+                     0.8]
+               ,[StarSemiringTreeRep.Tree.Star
+                   ((StarSemiringTreeRep.SD.make
+                       ex_data)
+                   ,(StarSemiringTreeRep.Tree.Plus
+                       (StarSemiringTreeRep.PD.make ex_data_inside
+                       ,[(StarSemiringTreeRep.Tree.Times
+                            (StarSemiringTreeRep.TD.make ex_data_inside ["c"] []
+                            ,[])
+                         ,1.)])))])
+            ,1.)])))
     (StarSemiringTreeRep.exampled_dnf_regex_to_tree
-       ([([EAStar
-             (([([]
-                ,["c"]
-                ,ex_data_inside)]
-              ,ex_data_inside)
-             ,ex_data
-             ,Regex.make_star (Regex.make_base "c"))
-          ]
-         ,["a";"b"]
-         ,ex_data)]
+       LensContext.empty
+       ([(([EAStar
+              (([(([]
+                  ,["c"]
+                  ,ex_data_inside)
+                 ,1.)]
+               ,ex_data_inside)
+              ,ex_data
+              ,StochasticRegex.make_star (StochasticRegex.make_base "c") 0.8)
+           ]
+          ,["a";"b"]
+          ,ex_data)
+         ,1.)]
        ,ex_data))
 
 let exampled_dnf_regex_to_tree_suite = "Test exampled_dnf_regex_to_tree" >:::
-                                       [
-                                         "test_exampled_dnf_regex_to_tree_empty" >:: test_exampled_dnf_regex_to_tree_empty;
-                                         "test_exampled_dnf_regex_to_tree_epsilon" >:: test_exampled_dnf_regex_to_tree_epsilon;
-                                         "test_exampled_dnf_regex_to_tree_base" >:: test_exampled_dnf_regex_to_tree_base;
-                                         "test_exampled_dnf_regex_to_tree_star" >:: test_exampled_dnf_regex_to_tree_star;
+  [
+    "test_exampled_dnf_regex_to_tree_empty" >:: test_exampled_dnf_regex_to_tree_empty;
+    "test_exampled_dnf_regex_to_tree_epsilon" >:: test_exampled_dnf_regex_to_tree_epsilon;
+    "test_exampled_dnf_regex_to_tree_base" >:: test_exampled_dnf_regex_to_tree_base;
+    "test_exampled_dnf_regex_to_tree_star" >:: test_exampled_dnf_regex_to_tree_star;
   ]
 
 let _ = run_test_tt_main exampled_dnf_regex_to_tree_suite
 
-let exampled_dnf_regex_to_tree_suite = "Test exampled_dnf_regex_to_tree" >:::
+
+let test_regex_to_exampled_dnf_regex_or _ =
+  assert_exampled_dnf_regex_option_equal
+    (Some
+       ([(([], ["a"], empty_parsing_example_data),
+          0.5);
+         (([], ["b"], empty_parsing_example_data),
+          0.5)],
+        empty_parsing_example_data))
+    (regex_to_exampled_dnf_regex
+       LensContext.empty
+       (StochasticRegex.make_or
+          (StochasticRegex.make_base "a")
+          (StochasticRegex.make_base "b")
+          0.5)
+       empty_parsing_example_data)
+
+let test_regex_to_exampled_dnf_regex_multi_or _ =
+  assert_exampled_dnf_regex_option_equal
+    (Some
+       ([(([], ["a"], empty_parsing_example_data),
+          0.16666666666666667);
+         (([], ["b"], empty_parsing_example_data),
+          0.16666666666666667);
+         (([], ["c"], empty_parsing_example_data),
+          0.16666666666666667);
+         (([], ["d"], empty_parsing_example_data),
+          0.16666666666666667);
+         (([], ["e"], empty_parsing_example_data),
+          0.16666666666666667);
+         (([], ["f"], empty_parsing_example_data),
+          0.16666666666666667)],
+        empty_parsing_example_data))
+    (regex_to_exampled_dnf_regex
+       LensContext.empty
+       (StochasticRegex.make_or
+          (StochasticRegex.make_or
+             (StochasticRegex.make_or
+                (StochasticRegex.make_base "a")
+                (StochasticRegex.make_base "b")
+                0.5)
+             (StochasticRegex.make_base "c")
+             (2. /. 3.))
+          (StochasticRegex.make_or
+             (StochasticRegex.make_or
+                (StochasticRegex.make_base "d")
+                (StochasticRegex.make_base "e")
+                0.5)
+             (StochasticRegex.make_base "f")
+             (2. /. 3.))
+          0.5)
+       empty_parsing_example_data)
+
+let test_to_exampled_dnf_regex_suite = "Test regex_to_exampled_dnf_regex" >:::
   [
-    "test_exampled_dnf_regex_to_tree_empty" >:: test_exampled_dnf_regex_to_tree_empty;
-    "test_exampled_dnf_regex_to_tree_epsilon" >:: test_exampled_dnf_regex_to_tree_epsilon;
-    "test_exampled_dnf_regex_to_tree_base" >:: test_exampled_dnf_regex_to_tree_base;
-    "test_exampled_dnf_regex_to_tree_star" >:: test_exampled_dnf_regex_to_tree_star;
+    "test_regex_to_exampled_dnf_regex_multi_or" >:: test_regex_to_exampled_dnf_regex_multi_or;
+    "test_regex_to_exampled_dnf_regex_or" >:: test_regex_to_exampled_dnf_regex_or;
   ]
 
-let exampled_dnf_regex_to_tree_suite = "Test exampled_dnf_regex_to_tree" >:::
-  [
-    "test_exampled_dnf_regex_to_tree_empty" >:: test_exampled_dnf_regex_to_tree_empty;
-    "test_exampled_dnf_regex_to_tree_epsilon" >:: test_exampled_dnf_regex_to_tree_epsilon;
-    "test_exampled_dnf_regex_to_tree_base" >:: test_exampled_dnf_regex_to_tree_base;
-    "test_exampled_dnf_regex_to_tree_star" >:: test_exampled_dnf_regex_to_tree_star;
-  ]
+let _ = run_test_tt_main test_to_exampled_dnf_regex_suite
 
 let test_kinda_rigid_synth_empty _ =
   assert_lens_float_option_equal
     (Some (Lens.zero,0.))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       Regex.empty
-       Regex.empty
+       StochasticRegex.empty
+       StochasticRegex.empty
        []
        []
        []
        [])
 
-let test_kinda_rigid_synth_project_lastname _ =
+let test_kinda_rigid_synth_project_lastnames _ =
   let uppercase = (Regex.from_char_set [(65,90)]) in
   let lowercases = Regex.make_star (Regex.from_char_set [(97,122)]) in
   let name =
+    StochasticRegex.from_regex @$
     iteratively_deepen
       (Regex.make_concat
          uppercase
          lowercases)
   in
-  let name_opened = Option.value_exn (Regex.separate_closed name) in
+  let name_opened = Option.value_exn (StochasticRegex.separate_closed name) in
   let names =
-    Regex.make_star
-      (Regex.make_concat
-         (Regex.make_base " ")
+    StochasticRegex.make_star
+      (StochasticRegex.make_concat
+         (StochasticRegex.make_base " ")
          name)
+      0.8
   in
   let firstlast =
-    Regex.make_concat
+    StochasticRegex.make_concat
       name
       names
   in
@@ -1089,12 +1173,12 @@ let test_kinda_rigid_synth_project_lastname _ =
           (Lens.make_const "" "")
           (Lens.make_concat
              (Lens.make_concat
-                (Lens.make_ident name_opened)
+                (Lens.make_ident (StochasticRegex.to_regex name_opened))
                 (Lens.make_const "" ""))
              (Lens.make_concat
-                (Lens.make_disconnect (Regex.make_base "") names "" "")
+                (Lens.make_disconnect (Regex.make_base "") (StochasticRegex.to_regex names) "" "")
                 (Lens.make_const "" "")))
-       ,56.2236781303))
+       ,224.11399347))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
        name
@@ -1132,11 +1216,11 @@ let test_kinda_rigid_synth_project_firstname _ =
              (Lens.make_concat
                 (Lens.make_disconnect (Regex.make_base "") name "" "A")
                 (Lens.make_const "" " ")))
-       ,56.2236781303))
+       ,54.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       name
-       firstlast
+       (StochasticRegex.from_regex name)
+       (StochasticRegex.from_regex firstlast)
        [("Miltner","Anders Miltner")]
        []
        []
@@ -1165,8 +1249,8 @@ let test_kinda_rigid_synth_disconnect _ =
        ,108.447356261))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       name
-       name
+       (StochasticRegex.from_regex name)
+       (StochasticRegex.from_regex name)
        [("Anders","Anders")]
        []
        [("Anders","Miltner","Miltner")]
@@ -1200,11 +1284,11 @@ let test_kinda_rigid_synth_project_last_from_put _ =
              (Lens.make_concat
                 (Lens.make_disconnect name (Regex.make_base "") "A" "")
                 (Lens.make_const "" "")))
-       ,56.2236781303))
+       ,54.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       firstlast
-       name
+       (StochasticRegex.from_regex firstlast)
+       (StochasticRegex.from_regex name)
        []
        []
        []
@@ -1227,6 +1311,8 @@ let test_kinda_rigid_synth_project_first_from_put _ =
          (Regex.make_base " ")
          name)
   in
+  print_endline "SUP";
+  print_endline @$ Float.to_string (StochasticRegex.information_content (StochasticRegex.from_regex name));
   assert_lens_float_option_equal
     (Some
        (Lens.make_concat
@@ -1238,11 +1324,11 @@ let test_kinda_rigid_synth_project_first_from_put _ =
              (Lens.make_concat
                 (Lens.make_ident name_opened)
                 (Lens.make_const "" "")))
-       ,56.2236781303))
+       ,54.2236781303))
     (Gen.DNFSynth.kinda_rigid_synth
        LensContext.empty
-       firstlast
-       name
+       (StochasticRegex.from_regex firstlast)
+       (StochasticRegex.from_regex name)
        []
        []
        []
@@ -1251,7 +1337,7 @@ let test_kinda_rigid_synth_project_first_from_put _ =
 let kinda_rigid_synth_suite = "Test kinda_rigid_synth" >:::
   [
     "test_kinda_rigid_synth_empty" >:: test_kinda_rigid_synth_empty;
-    "test_kinda_rigid_synth_project_lastname" >:: test_kinda_rigid_synth_project_lastname;
+    "test_kinda_rigid_synth_project_lastnames" >:: test_kinda_rigid_synth_project_lastnames;
     "test_kinda_rigid_synth_project_firstname" >:: test_kinda_rigid_synth_project_firstname;
     "test_kinda_rigid_synth_disconnect" >:: test_kinda_rigid_synth_disconnect;
     "test_kinda_rigid_synth_project_last_from_put" >:: test_kinda_rigid_synth_project_last_from_put;
@@ -1333,11 +1419,11 @@ let test_alignment_to_lens_concat_onesub _ =
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2"]
-                [Regex.make_closed (Regex.make_base "t")]
+                [StochasticRegex.make_closed (StochasticRegex.make_base "t")]
              ,StarSemiringTreeRep.TD.make
                  ex_data
                  ["b1";"b2"]
-                 [Regex.make_closed (Regex.make_base "t")]
+                 [StochasticRegex.make_closed (StochasticRegex.make_base "t")]
              ,[(0
                ,0
                ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base
@@ -1375,7 +1461,7 @@ let test_alignment_to_lens_concat_oneproj_left _ =
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2"]
-                [Regex.make_closed (Regex.make_base "t")]
+                [StochasticRegex.make_closed (StochasticRegex.make_base "t")]
              ,StarSemiringTreeRep.TD.make
                  ex_data
                  ["b1"]
@@ -1420,7 +1506,7 @@ let test_alignment_to_lens_concat_oneproj_right _ =
              ,StarSemiringTreeRep.TD.make
                  ex_data
                  ["b1";"b2"]
-                 [Regex.make_closed (Regex.make_base "u")]
+                 [StochasticRegex.make_closed (StochasticRegex.make_base "u")]
              ,[]
              ,[]
              ,[0]))))
@@ -1468,15 +1554,15 @@ let test_alignment_to_lens_concat_projs_swap _ =
              (StarSemiringTreeRep.TD.make
                 ex_data
                 ["a1";"a2";"a3";"a4"]
-                [Regex.make_closed (Regex.make_base "t")
-                ;Regex.make_closed (Regex.make_base "u")
-                ;Regex.make_closed (Regex.make_base "v")]
+                [StochasticRegex.make_closed (StochasticRegex.make_base "t")
+                ;StochasticRegex.make_closed (StochasticRegex.make_base "u")
+                ;StochasticRegex.make_closed (StochasticRegex.make_base "v")]
              ,StarSemiringTreeRep.TD.make
                  ex_data
                  ["b1";"b2";"b3";"b4"]
-                 [Regex.make_closed (Regex.make_base "v")
-                 ;Regex.make_closed (Regex.make_base "t")
-                 ;Regex.make_closed (Regex.make_base "w")]
+                 [StochasticRegex.make_closed (StochasticRegex.make_base "v")
+                 ;StochasticRegex.make_closed (StochasticRegex.make_base "t")
+                 ;StochasticRegex.make_closed (StochasticRegex.make_base "w")]
              ,[(0
                ,1
                ,StarSemiringTreeRep.OptimalAlignment.Nonempty.Base

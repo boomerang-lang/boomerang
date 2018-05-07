@@ -36,7 +36,7 @@ let undelimit_commas : string -> string =
 let string_of_option (inner_converter:'a -> string) (ao:'a option) : string =
   begin match ao with
     | None -> "None"
-    | Some a -> inner_converter a
+    | Some a -> "Some " ^ inner_converter a
   end
 
 let string_of_either

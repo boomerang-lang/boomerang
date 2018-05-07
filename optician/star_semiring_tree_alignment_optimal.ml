@@ -103,7 +103,7 @@ struct
     begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
-        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
       | Times (td,nts) ->
         TD.requires_mapping td
         || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
@@ -992,6 +992,8 @@ struct
       begin match (t1.node,t2.node) with
         | (NormalizedTree.Nonempty.Plus (pl1,pts1),
            NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
+          let pts1 = List.map ~f:fst pts1 in
+          let pts2 = List.map ~f:fst pts2 in
           get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
         | (NormalizedTree.Nonempty.Times (tl1,tts1),
            NormalizedTree.Nonempty.Times (tl2,tts2)) ->
@@ -1021,6 +1023,8 @@ struct
         begin match (t1.node,t2.node) with
           | (NormalizedTree.Nonempty.Plus (pl1,pts1),
              NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
+            let pts1 = List.map ~f:fst pts1 in
+            let pts2 = List.map ~f:fst pts2 in
             get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
           | (NormalizedTree.Nonempty.Times (tl1,tts1),
              NormalizedTree.Nonempty.Times (tl2,tts2)) ->
@@ -1104,11 +1108,13 @@ struct
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
                       let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
+                        fst @$
                         List.nth_exn
                           nsl1
                           i1
                       in
                       let ns2 =
+                        fst @$
                         List.nth_exn
                           nsl2
                           i2

@@ -103,7 +103,7 @@ struct
     begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
-        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
       | Times (td,nts) ->
         TD.requires_mapping td
         || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
@@ -383,8 +383,9 @@ struct
 
     type t =
       {
-        node : t_node        ;
-        mutable cost : float option [@hash.ignore];
+        node                    : t_node                      ;
+        mutable left_right_cost : float option [@hash.ignore] ;
+        mutable right_left_cost : float option [@hash.ignore] ;
       }
     and t_node =
       | Plus of PD.t * PD.t * MappingDict.t * CreateDict.t * CreateDict.t
@@ -402,8 +403,9 @@ struct
         (tn:t_node)
       : t =
       {
-        node = tn ;
-        cost = None   ;
+        node            = tn   ;
+        left_right_cost = None ;
+        right_left_cost = None ;
       }
 
     let mk_plus
@@ -455,15 +457,15 @@ struct
     let mk_base (b:BD.Alignment.t) : t =
       mk_t (Base b)
 
-    let rec cost
+    let rec right_left_cost
         (nt:t)
       : float =
-      begin match nt.cost with
+      begin match nt.right_left_cost with
         | Some c -> c
         | None ->
           let c =
             begin match nt.node with
-              | Plus (_,_,md,cdl,cdr) ->
+              | Plus (_,_,md,_,_) ->
                 let position_cost
                     (iam:MappingDict.IndirectAlignmentMapping.t)
                     (p:position)
@@ -474,7 +476,74 @@ struct
                          iam
                          p)
                   in
-                  let edge_costs = List.map ~f:cost associated_edges in
+                  let edge_costs = List.map ~f:right_left_cost associated_edges in
+                  let average_edge_cost = FloatList.average edge_costs in
+                  let edge_count = List.length associated_edges in
+                  let choice_cost = Math.log2 (Float.of_int edge_count) in
+                  average_edge_cost +. choice_cost
+                in
+                let side_cost
+                    (iam:MappingDict.IndirectAlignmentMapping.t)
+                  : float =
+                  let positions =
+                    MappingDict.IndirectAlignmentMapping.key_list
+                      iam
+                  in
+                  let positions_cost =
+                    List.map
+                      ~f:(position_cost iam)
+                      positions
+                  in
+                  if List.is_empty positions_cost then
+                    0.
+                  else
+                    FloatList.average positions_cost
+                in
+                let right_cost =
+                  side_cost
+                    (MappingDict.indirect_mapping_right md)
+                in
+                right_cost
+              | Times (_,_,als,_,pright) ->
+                let recursive_costs =
+                  List.map
+                    ~f:(fun (_,_,a) -> right_left_cost a)
+                    als
+                in
+                let projected_costs = List.map ~f:snd pright in
+                let merge_costs = List.fold_left ~f:(+.) ~init:0. in
+                (merge_costs recursive_costs)
+                +. (merge_costs projected_costs)
+              | Star (_,_,a) ->
+                right_left_cost a
+              | Base (a) ->
+                BD.Alignment.cost a
+            end
+          in
+          nt.right_left_cost <- Some c;
+          c
+      end
+
+    let rec left_right_cost
+        (nt:t)
+      : float =
+      begin match nt.left_right_cost with
+        | Some c -> c
+        | None ->
+          let c =
+            begin match nt.node with
+              | Plus (_,_,md,_,_) ->
+                let position_cost
+                    (iam:MappingDict.IndirectAlignmentMapping.t)
+                    (p:position)
+                  : float =
+                  let associated_edges =
+                    MappingDict.SingleAlignmentMapping.value_list
+                      (MappingDict.IndirectAlignmentMapping.lookup_exn
+                         iam
+                         p)
+                  in
+                  let edge_costs = List.map ~f:left_right_cost associated_edges in
                   let average_edge_cost = FloatList.average edge_costs in
                   let edge_count = List.length associated_edges in
                   let choice_cost = Math.log2 (Float.of_int edge_count) in
@@ -501,32 +570,31 @@ struct
                   side_cost
                     (MappingDict.indirect_mapping_left md)
                 in
-                let right_cost =
-                  side_cost
-                    (MappingDict.indirect_mapping_right md)
-                in
-                left_cost +. right_cost
-              | Times (_,_,als,pleft,pright) ->
+                left_cost
+              | Times (_,_,als,pleft,_) ->
                 let recursive_costs =
                   List.map
-                    ~f:(fun (_,_,a) -> cost a)
+                    ~f:(fun (_,_,a) -> left_right_cost a)
                     als
                 in
-                let left_costs = List.map ~f:snd pleft in
-                let right_costs = List.map ~f:snd pright in
+                let projected_costs = List.map ~f:snd pleft in
                 let merge_costs = List.fold_left ~f:(+.) ~init:0. in
                 (merge_costs recursive_costs)
-                +. (merge_costs left_costs)
-                +. (merge_costs right_costs)
+                +. (merge_costs projected_costs)
               | Star (_,_,a) ->
-                cost a
+                left_right_cost a
               | Base (a) ->
                 BD.Alignment.cost a
             end
           in
-          nt.cost <- Some c;
+          nt.left_right_cost <- Some c;
           c
       end
+
+    let rec cost
+        (nt:t)
+      : float =
+      left_right_cost nt +. right_left_cost nt
 
     (* Anders apologizes to whoever reads this code *)
     module GetMinimalAlignmentArg =
@@ -537,18 +605,18 @@ struct
 
     module PlusMappingState =
     struct
-      module Tree = NormalizedTree.Nonempty
+      module TreePair = PairOf(NormalizedTree.Nonempty)(Probability)
 
       module Mappings =
       struct
         include DictOf
-          (PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty))
+          (PairOf(TreePair)(TreePair))
           (PairOf(NonemptyNormalizedPlusStarTreeAlignment)(IntModule))
 
         let insert
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
             (al:normalized_alignment)
             (count:int)
           : t =
@@ -560,8 +628,8 @@ struct
 
         let remove
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
             (count:int)
           : t =
           update
@@ -573,8 +641,8 @@ struct
 
         let lookup_count
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
           : int =
           begin match lookup m (nt1,nt2) with
             | Some (_,count) -> count
@@ -586,21 +654,21 @@ struct
       struct
         type t =
           {
-            tree            : Tree.t ;
-            index           : int    ;
-            processed_count : int    ;
-            total_count     : int    ;
+            tree_pair       : TreePair.t ;
+            index           : int        ;
+            processed_count : int        ;
+            total_count     : int        ;
           }
         [@@deriving ord, show, hash, make]
 
         let init
-            ~tree:(tree:Tree.t)
+            ~tree_pair:(tree_pair:TreePair.t)
             ~index:(index:int)
             ~total_count:(total_count:int)
           : t =
           make
             ~index:index
-            ~tree:tree
+            ~tree_pair:tree_pair
             ~processed_count:0
             ~total_count:total_count
 
@@ -621,18 +689,18 @@ struct
 
       module TreeInfoDict =
       struct
-        include DictOf(Tree)(ProcessedTreeInfo)
+        include DictOf(TreePair)(ProcessedTreeInfo)
 
         let multimap_penalty
             (d:t)
-            (t:Tree.t)
+            (t:TreePair.t)
           : float =
           let info = lookup_exn d t in
           Math.log (Float.of_int (ProcessedTreeInfo.mapped_loop info + 1))
 
         let add_alignments
             (d:t)
-            (t:Tree.t)
+            (t:TreePair.t)
             (count:int)
           : t =
           update
@@ -643,14 +711,14 @@ struct
 
         let add_productive
             (d:t)
-            (t:Tree.t)
+            (t:TreePair.t)
           : bool =
           let info = lookup_exn d t in
           ProcessedTreeInfo.mapped_loop info = 0
 
         let available_count
             (d:t)
-            (t:Tree.t)
+            (t:TreePair.t)
           : int =
           let info = lookup_exn d t in
           info.total_count - (info.processed_count mod info.total_count)
@@ -672,8 +740,8 @@ struct
       module PrioritiedRemainingElements =
       struct
         include QuadrupleOf
-            (Tree)
-            (Tree)
+            (TreePair)
+            (TreePair)
             (NonemptyNormalizedPlusStarTreeAlignment)
             (FloatModule)
         module Priority = FloatModule
@@ -696,8 +764,8 @@ struct
 
       let add_productive
           (s:t)
-          (t_l:Tree.t)
-          (t_r:Tree.t)
+          (t_l:TreePair.t)
+          (t_r:TreePair.t)
         : bool =
         let productive_l = TreeInfoDict.add_productive s.info_dict_l t_l in
         let productive_r = TreeInfoDict.add_productive s.info_dict_r t_r in
@@ -705,20 +773,20 @@ struct
 
       let available_count_left
           (s:t)
-          (t:Tree.t)
+          (t:TreePair.t)
         : int =
         TreeInfoDict.available_count s.info_dict_l t
 
       let available_count_right
           (s:t)
-          (t:Tree.t)
+          (t:TreePair.t)
         : int =
         TreeInfoDict.available_count s.info_dict_r t
 
       let add_alignments
           (s:t)
-          (t_l:Tree.t)
-          (t_r:Tree.t)
+          (t_l:TreePair.t)
+          (t_r:TreePair.t)
           (al:normalized_alignment)
           (count:int)
         : t =
@@ -732,8 +800,8 @@ struct
 
       let pop
           (s:t)
-        : (Tree.t
-           * Tree.t
+        : (TreePair.t
+           * TreePair.t
            * normalized_alignment
            * float
            * t) option =
@@ -750,8 +818,8 @@ struct
 
       let push
           (s:t)
-          (t1:NormalizedTree.Nonempty.t)
-          (t2:NormalizedTree.Nonempty.t)
+          (t1:TreePair.t)
+          (t2:TreePair.t)
           (al:normalized_alignment)
           (c:float)
         : t =
@@ -763,8 +831,8 @@ struct
 
       let cost
           (s:t)
-          (t_l:Tree.t)
-          (t_r:Tree.t)
+          (t_l:TreePair.t)
+          (t_r:TreePair.t)
           (na:normalized_alignment)
         : float =
         let multimap_penalty_l =
@@ -781,19 +849,19 @@ struct
 
       let init
           (recursive_f:GetMinimalAlignmentArg.t -> normalized_alignment option)
-          ~subtrees_l:(subtrees_l:Tree.l list)
-          ~subtrees_r:(subtrees_r:Tree.l list)
+          ~subtrees_l:(subtrees_l:(NormalizedTree.Nonempty.l * Probability.t) list)
+          ~subtrees_r:(subtrees_r:(NormalizedTree.Nonempty.l * Probability.t) list)
         : t =
         let list_to_dict
-            (ts:Tree.l list)
+            (ts:(NormalizedTree.Nonempty.l * Probability.t) list)
           : TreeInfoDict.t =
           List.foldi
-            ~f:(fun i d (t,c) ->
+            ~f:(fun i d ((t,c),p) ->
                 TreeInfoDict.insert_or_combine
                   ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
-                  t
-                  (ProcessedTreeInfo.init ~tree:t ~index:i ~total_count:c))
+                  (t,p)
+                  (ProcessedTreeInfo.init ~tree_pair:(t,p) ~index:i ~total_count:c))
             ~init:TreeInfoDict.empty
             ts
         in
@@ -805,9 +873,9 @@ struct
         (*TODO: required puts*)
         let relevant_trees =
           (cartesian_filter_map
-             ~f:(fun t1 t2 ->
+             ~f:(fun (t1,p1) (t2,p2) ->
                  let ans_o = recursive_f (GetMinimalAlignmentArg.create t1 t2) in
-                 Option.map ~f:(fun ans -> (t1,t2,ans,pure_cost ans)) ans_o)
+                 Option.map ~f:(fun ans -> ((t1,p1),(t2,p2),ans,pure_cost ans)) ans_o)
              t1_keys
              t2_keys)
         in
@@ -866,11 +934,11 @@ struct
             in
             (ijs,data)
         end
-        include DictOf(Tree)(PositionData)
+        include DictOf(TreePair)(PositionData)
 
         let pop_positions
             (d:t)
-            (t:Tree.t)
+            (t:TreePair.t)
             (count:int)
           : (position list) * t =
           let data = lookup_exn d t in
@@ -1031,7 +1099,6 @@ struct
             | Some (_,count) -> count
             | None -> 0
           end
-
 
         module TreeLocationDict =
           DictOf(NormalizedTree.Nonempty)(IntModule)
@@ -1305,6 +1372,25 @@ struct
           in
           let projections_opt = distribute_option projection_opts in
           Option.map ~f:List.concat projections_opt
+
+        let total_count
+            (d:t)
+          : int =
+          List.fold_left
+            ~f:(fun acc v -> acc + v.total_count)
+            ~init:0
+            (value_list d)
+
+        let all_positions
+            (d:t)
+          : position list =
+          List.concat_map
+            ~f:(fun v ->
+                let i = v.index in
+                List.map
+                  ~f:(fun j -> (i,j))
+                  (range 0 v.total_count))
+            (value_list d)
       end
 
       module PrioritiedRemainingElements =
@@ -1329,6 +1415,14 @@ struct
           remaining : RemainingElementsPQueue.t ;
         }
       [@@deriving show]
+
+        let index
+            (s:t)
+            (tree_l:NormalizedTree.Nonempty.t)
+            (tree_r:NormalizedTree.Nonempty.t)
+          : int * int =
+          (TreeInfoDict.index_exn s.t1_dict tree_l
+          ,TreeInfoDict.index_exn s.t2_dict tree_r)
 
       let remaining_count
           (s:t)
@@ -1538,11 +1632,70 @@ struct
             (s,Some (removed,cost))
         end
 
+      let check_wellformedness
+          (s:t)
+        : unit =
+        let aligns =
+          Mappings.to_aligns
+            s.mappings
+            (TreeInfoDict.index_exn s.t1_dict)
+            (TreeInfoDict.index_exn s.t2_dict)
+        in
+        let pleft_opt = TreeInfoDict.get_projections s.t1_dict in
+        let pright_opt = TreeInfoDict.get_projections s.t2_dict in
+        begin match (pleft_opt,pright_opt) with
+          | (Some pleft,Some pright) ->
+            let positions_l =
+              List.sort
+                ~cmp:compare_position
+                (TreeInfoDict.all_positions s.t1_dict)
+            in
+            let positions_r =
+              List.sort
+                ~cmp:compare_position
+                (TreeInfoDict.all_positions s.t2_dict)
+            in
+            let returned_positions_l =
+              List.map ~f:fst3 aligns
+              @ List.map ~f:fst pleft
+            in
+            let returned_positions_r =
+              List.map ~f:snd3 aligns
+              @ List.map ~f:fst pright
+            in
+            let symmetric_diff_l =
+              symmetric_set_minus
+                compare_position
+                positions_l
+                returned_positions_l
+            in
+            let symmetric_diff_r =
+              symmetric_set_minus
+                compare_position
+                positions_r
+                returned_positions_r
+            in
+            if not (List.is_empty symmetric_diff_l) then
+              failwith
+                (string_of_list
+                   (string_of_either show_position show_position)
+                   symmetric_diff_l);
+            if not (List.is_empty symmetric_diff_r) then
+              failwith
+                (string_of_list
+                   (string_of_either show_position show_position)
+                   symmetric_diff_r);
+          | _ ->
+            ()
+        end
+
+
       let to_alignment
           (tdl:TD.t)
           (tdr:TD.t)
           (s:t)
         : normalized_alignment option =
+        check_wellformedness s;
         let aligns =
           Mappings.to_aligns
             s.mappings
@@ -1598,8 +1751,8 @@ struct
         (recursive_f:GetMinimalAlignmentArg.t -> t option)
         (pl1:PD.t)
         (pl2:PD.t)
-        (tts1:NormalizedTree.Nonempty.l list)
-        (tts2:NormalizedTree.Nonempty.l list)
+        (tts1:(NormalizedTree.Nonempty.l * Probability.t) list)
+        (tts2:(NormalizedTree.Nonempty.l * Probability.t) list)
       : t option =
       if not (PD.are_compatible pl1 pl2) then
         None
@@ -1939,11 +2092,13 @@ struct
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
                       let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
+                        fst @$
                         List.nth_exn
                           nsl1
                           i1
                       in
                       let ns2 =
+                        fst @$
                         List.nth_exn
                           nsl2
                           i2

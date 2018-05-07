@@ -323,6 +323,12 @@ struct
   sum /. (Float.of_int (List.length l))
 end
 
+module IntList =
+struct
+  type t = int list
+  [@@deriving ord, show, hash]
+end
+
 type ('a,'b) either = 
     Left of 'a
   | Right of 'b
@@ -1016,6 +1022,14 @@ let set_minus_lose_order (cmp:'a -> 'a -> comparison)
   let ordered_l1 = List.dedup_and_sort (List.sort ~cmp:cmp l1) in
   let ordered_l2 = List.dedup_and_sort (List.sort ~cmp:cmp l2) in
   set_minus_ordered ordered_l1 ordered_l2
+
+let symmetric_set_minus
+    (cmp:'a -> 'a -> comparison)
+    (l1:'a list)
+    (l2:'a list)
+  : (('a,'a) either) list =
+  List.map ~f:(fun x -> Left x) (set_minus_lose_order cmp l1 l2)
+  @ List.map ~f:(fun x -> Right x) (set_minus_lose_order cmp l1 l2)
 
 let pairwise_maintain_invariant
         (invariant:'a -> 'a -> bool)

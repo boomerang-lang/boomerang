@@ -2,19 +2,20 @@ open Core
 open Lang
 open Normalized_lang
 
-let rec to_empty_exampled_regex (r:Regex.t) : exampled_regex =
-  begin match r.node with
-  | Regex.RegExEmpty -> ERegExEmpty
-  | Regex.RegExBase s -> ERegExBase (s,empty_parsing_example_data)
-  | Regex.RegExConcat (r1,r2) ->
+let rec to_empty_exampled_regex (r:StochasticRegex.t) : exampled_regex =
+  begin match StochasticRegex.node r with
+  | Empty -> ERegExEmpty
+  | Base s -> ERegExBase (s,empty_parsing_example_data)
+  | Concat (r1,r2) ->
       ERegExConcat (to_empty_exampled_regex r1,to_empty_exampled_regex r2,empty_parsing_example_data)
-  | Regex.RegExOr (r1,r2) ->
+  | Or (r1,r2,p) ->
       ERegExOr
         ((to_empty_exampled_regex r1),
          (to_empty_exampled_regex r2),
-         empty_parsing_example_data)
-  | Regex.RegExStar r' -> ERegExStar (to_empty_exampled_regex r',empty_parsing_example_data)
-  | Regex.RegExClosed r' -> ERegExClosed (r',empty_string_example_data,empty_parsing_example_data)
+         empty_parsing_example_data,
+         p)
+  | Star (r',p) -> ERegExStar (to_empty_exampled_regex r',empty_parsing_example_data,p)
+  | Closed r' -> ERegExClosed (r',empty_string_example_data,empty_parsing_example_data)
   end
 
 type data = run_mode * string * exampled_regex *
@@ -39,14 +40,14 @@ let add_data
 type dfa = (state ref) * (state ref)
 
 let rec regex_to_dfa
-    (r:Regex.t)
+    (r:StochasticRegex.t)
     (inside_var:bool)
   : dfa =
-  begin match r.node with
-  | Regex.RegExEmpty ->
+  begin match StochasticRegex.node r with
+  | Empty ->
       let final = ref QAccept in
       (ref (State (fun _ -> [])), final)
-  | Regex.RegExBase s ->
+  | Base s ->
       let final = ref QAccept in
       (ref (State (fun (m,str,er,recombiners,is,so) ->
         begin match String.chop_prefix ~prefix:s str with
@@ -60,7 +61,7 @@ let rec regex_to_dfa
             else
               [(final,(m,str',er,recombiners,is,so))]
         end)), final)
-  | Regex.RegExConcat (r1,r2) ->
+  | Concat (r1,r2) ->
       let (r1_start_ref,r1_end_ref) = regex_to_dfa r1 inside_var in
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
       let new_start_fun = (fun (m,s,er,rc,is,so) ->
@@ -101,19 +102,19 @@ let rec regex_to_dfa
       in
       r2_end_ref := new_r2_end;
       (ref new_start,new_end_ref)
-  | Regex.RegExOr (r1,r2) ->
+  | Or (r1,r2,p) ->
       let (r1_start_ref,r1_end_ref) = regex_to_dfa r1 inside_var in
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
       let new_start_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
           begin match er with
-          | ERegExOr (er1,er2,il) ->
+          | ERegExOr (er1,er2,il,p) ->
               let rc_left = 
                 (fun _ er1' ->
-                  ERegExOr (er1',er2,add_data m il is)) in
+                  ERegExOr (er1',er2,add_data m il is,p)) in
               let rc_right =
                 (fun _ er2' ->
-                  ERegExOr (er1,er2',add_data m il is)) in
+                  ERegExOr (er1,er2',add_data m il is,p)) in
               [(r1_start_ref, (m,s,er1,rc_left::rc,is,so))
               ;(r2_start_ref, (m,s,er2,rc_right::rc,is,so))]
           | _ -> failwith "bad programming error" 
@@ -138,7 +139,7 @@ let rec regex_to_dfa
       r1_end_ref := new_inner_end;
       r2_end_ref := new_inner_end;
       (ref new_start,new_end_ref)
-  | Regex.RegExStar (inner_r) ->
+  | Star (inner_r,p) ->
       let (inner_start_ref,inner_end_ref) = regex_to_dfa inner_r inside_var in
       let new_end_ref = ref QAccept in
       let new_inner_end_fun =
@@ -157,10 +158,10 @@ let rec regex_to_dfa
         if not inside_var then
           (fun (m,s,er,rc,is,so) ->
             begin match er with
-            | ERegExStar (er',il) ->
+            | ERegExStar (er',il,p) ->
               let rc_add_star =
                 (fun _ er'' ->
-                  ERegExStar (er'',add_data m il is)) in
+                  ERegExStar (er'',add_data m il is,p)) in
                 [(inner_end_ref,(m,s,er',rc_add_star::rc,-1::is,so))]
             | _ -> failwith "error between keyboard and chair"
             end)
@@ -169,7 +170,7 @@ let rec regex_to_dfa
       in
       let new_start = State new_start_fun in
       (ref new_start, new_end_ref)
-  | Regex.RegExClosed r' ->
+  | Closed r' ->
       let (inner_start_ref,inner_end_ref) = regex_to_dfa r' true in
       let new_end_ref = ref QAccept in
       let new_start_fun =
@@ -220,7 +221,7 @@ let rec eval_dfa (st:state) ((m,s,er,recombiners,is,so):data) :
         None
   end
 
-let fast_eval (r:Regex.t) (s:string) : bool =
+let fast_eval (r:StochasticRegex.t) (s:string) : bool =
   let (dfa_start,_) = regex_to_dfa r false in
   not
     (Option.is_empty
@@ -229,7 +230,7 @@ let fast_eval (r:Regex.t) (s:string) : bool =
           (Arg1,s,(to_empty_exampled_regex r),[],[0],None)))
 
 let regex_to_exampled_regex
-    (r:Regex.t)
+    (r:StochasticRegex.t)
     (s_ex_data:(int * string) list example_data)
   : exampled_regex option =
   let (dfa_start,_) = regex_to_dfa r false in

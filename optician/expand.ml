@@ -363,6 +363,7 @@ let fix_problem_elts
       expand_once
         qe
     | h::_ ->
+      print_endline @$ string_of_either HCRegexInt.show HCRegexInt.show h;
       let new_problems =
         begin match h with
           | Left d ->
@@ -377,6 +378,7 @@ let fix_problem_elts
             List.map ~f:(fun (e,exp) -> (e,QueueElement.get_r2 qe,exp)) exposes
         end
       in
+      print_endline @$ string_of_int @$ List.length problem_elements;
       List.map
         ~f:(fun (r1,r2,exp) ->
             QueueElement.make

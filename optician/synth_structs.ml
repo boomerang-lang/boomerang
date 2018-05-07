@@ -2,6 +2,8 @@ open MyStdlib
 open Lang
 open Regex_utilities
 open Normalized_lang
+open Lenscontext
+open Lens_put
 
 module QueueElement = struct
   type t =
@@ -181,7 +183,8 @@ module SymmetricQueueElement = struct
         ~f:information_content_of_choice
         qe.expansion_choices
     in
-    List.fold_left
+    Float.of_int qe.expansions_performed
+    +. List.fold_left
       ~f:( +. )
       ~init:0.
       ps_of_choices
@@ -244,16 +247,27 @@ struct
     type t =
       {
         parsings : int list list example_data ;
-        strings  : string list   ;
-        atoms    : Regex.t list  ;
+        strings  : string list                ;
+        atoms    : StochasticRegex.t list     ;
       }
-    [@@deriving show, hash]
+    [@@deriving hash]
 
     let compare
         (td1:t)
         (td2:t)
       : int =
       compare_parsing_example_data td1.parsings td2.parsings
+
+    let pp
+        (f:Format.formatter)
+        (td:t)
+      : unit =
+      pp_parsing_example_data f td.parsings
+
+    let show
+        (x:t)
+      : string
+      = pp Format.str_formatter x; Format.flush_str_formatter ()
 
     let hash_fold_t
         (s:Base__Hash.state)
@@ -269,7 +283,7 @@ struct
     let make
         (parsings:int list list example_data)
         (strings:string list)
-        (atoms:Regex.t list)
+        (atoms:StochasticRegex.t list)
       : t =
       {
         parsings = parsings ;
@@ -284,7 +298,7 @@ struct
 
     let get_atoms
         (v:t)
-      : Regex.t list =
+      : StochasticRegex.t list =
       v.atoms
 
     let are_compatible
@@ -377,23 +391,92 @@ struct
 
   module BD =
   struct
-    type t =
-      {
-        parsings : int list list example_data ;
-        strings  : string list example_data   ;
-        regex    : Regex.t                    ;
-      }
+    type parsings_strings_example_data =
+      (int list * string) list example_data
     [@@deriving ord, show, hash]
 
+    let merge_parsings_strings_example_data
+        (parsings:int list list example_data)
+        (strings:string list example_data)
+      : (int list * string) list example_data =
+      let combine_parsings_strings
+          (parsings:int list list)
+          (strings:string list)
+        : (int list * string) list =
+        List.zip_exn
+          parsings
+          strings
+      in
+      make_example_data
+        ~arg1_data:(combine_parsings_strings
+                      parsings.arg1_data
+                      strings.arg1_data)
+        ~arg2_data:(combine_parsings_strings
+                      parsings.arg2_data
+                      strings.arg2_data)
+        ~output_data:(combine_parsings_strings
+                        parsings.output_data
+                        strings.output_data)
+
+    type hashable_t = parsings_strings_example_data * StochasticRegex.t
+    [@@deriving hash,show]
+
+    type t =
+      {
+        parsings_strings : parsings_strings_example_data ;
+        regex_rep        : Regex.t                       ;
+        stochastic_regex : StochasticRegex.t             ;
+        lc               : LensContext.t                 ;
+      }
+
+    let to_hashable_t
+        (v:t)
+      : hashable_t =
+      (v.parsings_strings,v.stochastic_regex)
+
+    let hash_fold_t
+        (s:Base__Hash.state)
+        (v:t)
+      = hash_fold_hashable_t s (to_hashable_t v)
+
+    let pp
+        (f:Format.formatter)
+        (x:t)
+      : unit =
+      pp_parsings_strings_example_data f x.parsings_strings
+
+    let show
+        (x:t)
+      : string
+      = pp Format.str_formatter x; Format.flush_str_formatter ()
+
+
+    let hash : t -> int = Base__Hash.run hash_fold_t
+
+    let compare
+        (bd1:t)
+        (bd2:t)
+      : int =
+      let bt1 = (bd1.parsings_strings,bd1.stochastic_regex) in
+      let bt2 = (bd2.parsings_strings,bd2.stochastic_regex) in
+      pair_compare
+        compare_parsings_strings_example_data
+        StochasticRegex.compare
+        bt1
+        bt2
+
     let make
-        (r:Regex.t)
+        (rep_regex:Regex.t)
+        (stochastic_regex:StochasticRegex.t)
         (ill:int list list example_data)
         (ss:string list example_data)
+        (lc:LensContext.t)
       : t =
       {
-        parsings = ill ;
-        strings  = ss  ;
-        regex    = r   ;
+        parsings_strings = merge_parsings_strings_example_data ill ss ;
+        regex_rep        = rep_regex                                  ;
+        stochastic_regex = stochastic_regex                           ;
+        lc               = lc                                         ;
       }
 
     module Alignment =
@@ -409,45 +492,100 @@ struct
         (v2:t)
       : Lens.t option =
       (*TODO contextual lenses*)
-      if Regex.compare v1.regex v2.regex <> 0 then
+      if Regex.compare v1.regex_rep v2.regex_rep <> 0 then
         None
       else
-        let creater_args_parsings = v1.parsings.arg1_data in
-        let creater_results_parsings = v2.parsings.output_data in
-        let createl_args_parsings = v2.parsings.arg1_data in
-        let createl_results_parsings = v1.parsings.output_data in
-        let creater_args_strings = v1.strings.arg1_data in
-        let creater_results_strings = v2.strings.output_data in
-        let createl_args_strings = v2.strings.arg1_data in
-        let createl_results_strings = v1.strings.output_data in
-        let is_eq_creater =
-          is_equal
-            (compare_list
-               ~cmp:(compare_list ~cmp:Int.compare)
-               creater_args_parsings
-               creater_results_parsings)
-          &&
-          is_equal
-            (compare_list
-               ~cmp:(String.compare)
-               creater_args_strings
-               creater_results_strings)
+        let lc = v1.lc in
+        let path =
+          LensContext.shortest_path_exn
+            lc
+            (StochasticRegex.to_regex v1.stochastic_regex)
+            (StochasticRegex.to_regex v2.stochastic_regex)
         in
-        let is_eq_createl =
-          is_equal
-            (compare_list
-               ~cmp:(compare_list ~cmp:Int.compare)
-               createl_args_parsings
-               createl_results_parsings)
-          &&
-          is_equal
-            (compare_list
-               ~cmp:(String.compare)
-               createl_args_strings
-               createl_results_strings)
+        let compatible_with_fun
+            (put_fun:string -> string option -> string)
+            (psed1:parsings_strings_example_data)
+            (psed2:parsings_strings_example_data)
+          : bool =
+          let merged_arg_result_parsings_o =
+            option_bind
+              ~f:(fun merged_arg_result_parsings ->
+                  distribute_option
+                    (List.map
+                       ~f:(fun ((arg1parse,arg1str),(outputparse,outputstr)) ->
+                           if IntList.compare arg1parse outputparse = 0 then
+                             Some (arg1parse,arg1str,outputstr)
+                           else
+                             None)
+                       merged_arg_result_parsings))
+              (List.zip
+                 psed1.arg1_data
+                 psed2.output_data)
+          in
+          let rec merge_ordered_examples
+              (l1:(int list * string * string) list)
+              (l2:(int list * string) list)
+            : (string * string option * string) list =
+            begin match (l1,l2) with
+              | (_,[]) ->
+                List.map
+                  ~f:(fun (il,s,o) -> (s,None,o))
+                  l1
+              | ([],_) -> failwith "shouldn't happen"
+              | ((il1,sin1,sout)::t1,(il2,sin2)::t2) ->
+                begin match make_matchable (IntList.compare il1 il2) with
+                  | EQ -> (sin1,Some sin2,sout)::(merge_ordered_examples t1 t2)
+                  | LT -> (sin1,None,sout)::(merge_ordered_examples t1 l2)
+                  | GT -> failwith "shouldn't happen"
+                end
+            end
+          in
+          begin match merged_arg_result_parsings_o with
+            | None -> false
+            | Some merged_arg_result_parsings ->
+              let ordered_l1 =
+                List.sort
+                  ~cmp:(fun (il1,_,_) (il2,_,_) -> IntList.compare il1 il2)
+                  merged_arg_result_parsings
+              in
+              let ordered_l2 =
+                List.sort
+                  ~cmp:(fun (il1,_) (il2,_) -> IntList.compare il1 il2)
+                  v2.parsings_strings.arg2_data
+              in
+              let ssosl =
+                merge_ordered_examples
+                  ordered_l1
+                  ordered_l2
+              in
+              (*print_endline
+              @$
+              (string_of_list
+                 (string_of_triple
+                    ident
+                    (string_of_option ident)
+                    ident)
+                 ssosl);*)
+              List.for_all
+                ~f:(fun (sin,soin,sout) ->
+                    is_equal (String.compare (put_fun sin soin) sout))
+                ssosl
+          end
         in
-        if is_eq_creater && is_eq_createl then
-          Some (Lens.make_ident v1.regex)
+        let lr_compat =
+          compatible_with_fun
+            (lens_putr_or_creater path)
+            v1.parsings_strings
+            v2.parsings_strings
+        in
+        let rl_compat =
+          compatible_with_fun
+            (lens_putl_or_createl path)
+            v2.parsings_strings
+            v1.parsings_strings
+        in
+        if lr_compat && rl_compat then
+          Some path
         else
           None
 
@@ -459,16 +597,6 @@ struct
     let requires_mapping
         (v:t)
       : bool =
-      let arg2_parsings_strings =
-        List.zip_exn
-          v.parsings.arg2_data
-          v.strings.arg2_data
-      in
-      let output_parsings_strings =
-        List.zip_exn
-          v.parsings.output_data
-          v.strings.output_data
-      in
       not
         (List.for_all
            ~f:(fun p ->
@@ -477,9 +605,9 @@ struct
                          %% (pair_compare
                                (compare_list ~cmp:Int.compare)
                                String.compare))
-                 output_parsings_strings
+                 v.parsings_strings.output_data
                  p)
-           arg2_parsings_strings)
+           v.parsings_strings.arg2_data)
 
     module Default = IntModule
     let extract_default _ = failwith "ah"
@@ -487,7 +615,7 @@ struct
     let information_content
         (v:t)
       : float =
-      Regex.information_content v.regex
+      StochasticRegex.information_content v.stochastic_regex
   end
 
   module OptimalAlignment = Star_semiring_tree_alignment_optimal.PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
@@ -496,6 +624,7 @@ struct
   module GreedyAlignment =  Star_semiring_alignment_greedy.PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
 
   let exampled_dnf_regex_to_tree
+      (lc:LensContext.t)
       (ed:exampled_dnf_regex)
     : Tree.t =
     let rec exampled_dnf_regex_to_nonempty_tree
@@ -503,7 +632,7 @@ struct
       : Tree.nonempty_t =
       let children =
         List.map
-          ~f:exampled_clause_to_nonempty_tree
+          ~f:(fun (c,p) -> (exampled_clause_to_nonempty_tree c,p))
           cs
       in
       Tree.mk_plus (PD.make ill) children
@@ -523,8 +652,8 @@ struct
         (a:exampled_atom)
       : Tree.nonempty_t =
       begin match a with
-        | EAClosed (r,_,_,_,ill,ss) ->
-          Tree.mk_base (BD.make r ill ss)
+        | EAClosed (r,rs,_,_,ill,ss) ->
+          Tree.mk_base (BD.make r rs ill ss lc)
         | EAStar (d,ill,_) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in
           Tree.mk_star (SD.make ill) child
@@ -747,9 +876,9 @@ struct
                   ((index
                    ,last_index_right+right_offset)
                   ,Lens.make_disconnect
-                      rx_left
+                      (StochasticRegex.to_regex rx_left)
                       Regex.one
-                      (Regex.representative_exn rx_left)
+                      (StochasticRegex.representative_exn rx_left)
                       ""))
               projl
           in
@@ -761,9 +890,9 @@ struct
                    ,index)
                   ,Lens.make_disconnect
                       (Regex.one)
-                      rx_right
+                      (StochasticRegex.to_regex rx_right)
                       ""
-                      (Regex.representative_exn rx_right)))
+                      (StochasticRegex.representative_exn rx_right)))
               projr
           in
           let left_strings_t_full =
@@ -1068,9 +1197,9 @@ struct
                   ((index
                    ,last_index_right+right_offset)
                   ,Lens.make_disconnect
-                      rx_left
+                      (StochasticRegex.to_regex rx_left)
                       Regex.one
-                      (Regex.representative_exn rx_left)
+                      (StochasticRegex.representative_exn rx_left)
                       ""))
               projl
           in
@@ -1082,9 +1211,9 @@ struct
                    ,index)
                   ,Lens.make_disconnect
                       (Regex.one)
-                      rx_right
+                      (StochasticRegex.to_regex rx_right)
                       ""
-                      (Regex.representative_exn rx_right)))
+                      (StochasticRegex.representative_exn rx_right)))
               projr
           in
           let left_strings_t_full =

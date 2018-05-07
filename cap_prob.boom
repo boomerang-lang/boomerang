@@ -37,7 +37,7 @@ let UPPERCASE
 
 let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
-  synth LOWERCASE <=> UPPERCASE using {putrex (("v","E"),"V")}
+  synth LOWERCASE <=> UPPERCASE using {putrex (("v","A"),"V")}
 
 test "hi" = ?
 
@@ -73,6 +73,7 @@ test capitalize.get "DOE" = "Doe"
 
 let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
   synth (NAME . " " . NAME) <=> NAME
+  (*using { createrex ("Anders Miltner","Anders") } *)
 
 test remove_last = ?
 

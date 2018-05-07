@@ -78,10 +78,9 @@ let star_depth_regex_fold
 
 (**** GetSets {{{ *****)
 module IntSet = HCSetOf(IntModule)
-
-module RegexIntSet = SetOf(PairOf(Regex)(IntModule))
-
-module RegexToIntSetDict = DictOf(Regex)(IntSet)
+module HCRegexInt = HashConsOf(PairOf(Regex)(IntModule))
+module RegexIntSet = HCSetOf(HCRegexInt)
+module RegexToIntSetDict = HCDictOf(Regex)(IntSet)
 
 let get_current_set
     (lc:LensContext.t)
@@ -101,7 +100,7 @@ let get_current_set
     ~star_f:(fun _ s -> s)
     ~closed_f:(fun i r' _ ->
         let r'' = get_rep_var lc r' in
-        RegexIntSet.singleton (r'',i))
+        RegexIntSet.singleton (HCRegexInt.hashcons (r'',i)))
     (StochasticRegex.to_regex sr)
 
 let rec get_transitive_set
@@ -186,7 +185,7 @@ let reachables_set_minus
           ~f:(fun (acc:RegexIntSet.t) ((k,s):(Regex.t * IntSet.t)) ->
               IntSet.fold
                 ~f:(fun (i:int) (acc:RegexIntSet.t) ->
-                    RegexIntSet.insert (k,i) acc)
+                    RegexIntSet.add (HCRegexInt.hashcons (k,i)) acc)
                 ~init:acc
                 s
             )
@@ -219,7 +218,7 @@ let force_expand
     ~closed_f:(fun star_depth r (r_expanded,e) ->
         if RegexIntSet.member
             problem_elts
-            (get_rep_var lc (StochasticRegex.to_regex r),star_depth)
+            (HCRegexInt.hashcons (get_rep_var lc (StochasticRegex.to_regex r),star_depth))
         then
           (r_expanded,e+1)
         else
@@ -418,11 +417,13 @@ let fix_problem_elts
     | h::_ ->
       let new_problems =
         begin match h with
-          | Left (v,star_depth) ->
+          | Left d ->
+            let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r2 qe) in
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (SymmetricQueueElement.get_r1 qe,e,exp)) exposes
-          | Right (v,star_depth) ->
+          | Right d ->
+            let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r1 qe) in
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (e,SymmetricQueueElement.get_r2 qe,exp)) exposes

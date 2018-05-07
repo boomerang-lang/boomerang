@@ -9,6 +9,36 @@ struct
   type t = Float.t
   [@@deriving ord, show, hash]
 
+  (* not transitive *)
+  (* http://floating-point-gui.de/errors/comparison/ *)
+  let equal
+      (f1:t)
+      (f2:t)
+    : bool =
+    let abs1 = Float.abs f1 in
+    let abs2 = Float.abs f2 in
+    let diff = Float.abs (f1 -. f2) in
+    let min_normal = 0.00000000000000000000001 in
+    let epsilon = 0.000001 in
+    if Float.equal f1 f2 then
+      true
+    else if (Float.equal f1 0.)
+         || (Float.equal f1 0.)
+         || diff <. min_normal then
+      diff <. (epsilon *. min_normal)
+    else
+      diff /. (Float.min (abs1 +. abs2) Float.max_finite_value) <. epsilon
+
+  (* not transitive *)
+  let compare
+      (f1:t)
+      (f2:t)
+    : int =
+    if equal f1 f2 then
+      0
+    else
+      compare f1 f2
+
   let not
       (p:t)
     : t =
