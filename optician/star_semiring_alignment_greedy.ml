@@ -1,5 +1,8 @@
 open MyStdlib
 open Star_semiring_tree
+open Lenscontext
+
+let lc : LensContext.t ref = ref LensContext.empty
 
 module type DefaultData = Data
 
@@ -23,7 +26,7 @@ sig
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
-  val get_alignment : t -> t -> Alignment.t option
+  val get_alignment : LensContext.t -> t -> t -> Alignment.t option
   val requires_mapping : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
@@ -174,6 +177,8 @@ struct
       NormalizedTree.NormalizationScript.nonempty_t ->
       NormalizedTree.NormalizationScript.nonempty_t ->
       Nonempty.t * float
+
+    val clear_dict : unit -> unit
   end
 
   module rec NonemptyNormalizedPlusStarTreeAlignment : NonemptyNormalizedPlusStarTreeAlignmentType =
@@ -1544,6 +1549,26 @@ struct
         : int =
         TreeInfoDict.remaining_count_exn s.t2_dict nt
 
+      let total_remaining_left
+          (s:t)
+        : int =
+        List.fold_left
+          ~f:(+)
+          ~init:0
+          (List.map
+             ~f:(fun nt -> remaining_count_left s nt)
+             (TreeInfoDict.key_list s.t1_dict))
+
+      let total_remaining_right
+          (s:t)
+        : int =
+        List.fold_left
+          ~f:(+)
+          ~init:0
+          (List.map
+             ~f:(fun nt -> remaining_count_right s nt)
+             (TreeInfoDict.key_list s.t2_dict))
+
       let remove_left_up_to
           (s:t)
           (nt1:NormalizedTree.Nonempty.t)
@@ -1839,6 +1864,17 @@ struct
             tts1
             tts2
         in
+        (*print_endline "REMAINING LEFT";
+        print_endline @$ string_of_int @$ TimesMappingState.total_remaining_left s;
+        print_endline "REMAINING RIGHT";
+        print_endline @$ string_of_int @$ TimesMappingState.total_remaining_right s;
+        print_endline "POSSIBLE MAPS";
+        print_endline @$ string_of_int @$ TimesMappingState.remaining_count s;
+        print_endline "FOLD BEGIN";
+        if TimesMappingState.remaining_count s < TimesMappingState.total_remaining_left s then
+             print_endline (string_of_list NormalizedTree.Nonempty.show_l tts1);
+        if TimesMappingState.remaining_count s < TimesMappingState.total_remaining_right s then
+             print_endline (string_of_list NormalizedTree.Nonempty.show_l tts2);*)
         let s =
           fold_until_completion
             ~f:(fun s ->
@@ -1972,31 +2008,6 @@ struct
           (TimesMappingState.to_alignment tl1 tl2)
           s
 
-    let get_minimal_alignment_internal
-        (recursive_f:GetMinimalAlignmentArg.t -> t option)
-        (arg:GetMinimalAlignmentArg.t)
-      : t option =
-      let (t1,t2) = arg.node in
-      begin match (t1.node,t2.node) with
-        | (NormalizedTree.Nonempty.Plus (pl1,pts1),
-           NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
-          get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
-        | (NormalizedTree.Nonempty.Times (tl1,tts1),
-           NormalizedTree.Nonempty.Times (tl2,tts2)) ->
-          get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
-        | (NormalizedTree.Nonempty.Star (sl1,(sts1,_)),
-           NormalizedTree.Nonempty.Star (sl2,(sts2,_))) ->
-          if not (SD.are_compatible sl1 sl2) then
-            None
-          else
-            Option.map
-              ~f:(fun a -> mk_star sl1 sl2 a)
-              (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
-        | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
-          Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
-        | _ -> None
-      end
-
     module UnfixedGetMinimalAlignment =
     struct
       module Arg = GetMinimalAlignmentArg
@@ -2022,7 +2033,7 @@ struct
                 ~f:(fun a -> mk_star sl1 sl2 a)
                 (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
           | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
-            Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
+            Option.map ~f:(fun a -> mk_base a) (BD.get_alignment !lc bd1 bd2)
           | _ -> None
         end
     end
@@ -2034,6 +2045,8 @@ struct
         (sts2:NormalizedTree.Nonempty.t)
       : t option =
       Memo.evaluate (GetMinimalAlignmentArg.create sts1 sts2)
+
+    let clear_dict = Memo.clear
 
     let rec to_nonempty_and_cost
         (nta:NonemptyNormalizedPlusStarTreeAlignment.t)

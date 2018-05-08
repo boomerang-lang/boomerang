@@ -123,6 +123,11 @@ struct
       (putr_exs:put_examples)
       (putl_exs:put_examples)
     : (Lens.t * float) option =
+    (*print_endline "wait this should happen";
+    if (LensContext.size lc = 4) then
+      (print_endline "R1:"; print_endline @$ Regex.show @$ StochasticRegex.to_regex r1;
+       print_endline "R2:"; print_endline @$ Regex.show @$ StochasticRegex.to_regex r2;
+       print_endline "\n\n\n");*)
     let (i,creater_exs) =
       List.fold_left
         ~f:(fun (i,exs) (lex,rex) ->
@@ -341,26 +346,6 @@ struct
            ])
 
 
-  let gen_dnf_lens
-      (lc:LensContext.t)
-      (r1:Regex.t)
-      (r2:Regex.t)
-      (exs:create_examples)
-    : Lens.t option =
-    Option.map
-      ~f:(fun x ->
-          fst @$
-          Option.value_exn
-            (kinda_rigid_synth
-               lc
-               (StochasticRegex.from_regex x.r1)
-               (StochasticRegex.from_regex x.r2)
-               exs
-               []
-               []
-               []))
-      (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
-
   let expansions_performed_for_gen
       (lc:LensContext.t)
       (r1:Regex.t)
@@ -429,15 +414,15 @@ struct
              print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe))));
           let r1 = (SymmetricQueueElement.get_r1 qe) in
           let r2 = (SymmetricQueueElement.get_r2 qe) in
-          if f >=. best_cost || !attempts > 1000 then
+          if (f >=. best_cost && !attempts <> 4) || !attempts > 1000 || !attempts = 5 then
             best
           else
             (* TODO fix *)
             let lco =
               kinda_rigid_synth
                 lc
-                r1
-                r2
+                (StochasticRegex.from_regex @$ StochasticRegex.to_regex r1)
+                (StochasticRegex.from_regex @$ StochasticRegex.to_regex r2)
                 creater_exs
                 createl_exs
                 putr_exs
@@ -469,6 +454,16 @@ struct
       None
       Float.max_finite_value
 
+  let gen_dnf_lens
+      (lc:LensContext.t)
+      (r1:Regex.t)
+      (r2:Regex.t)
+      (exs:create_examples)
+    : dnf_lens option =
+    Option.map
+      ~f:(fun si -> si.l)
+      (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
+
   let gen_lens
       (lc:LensContext.t)
       (r1:Regex.t)
@@ -476,10 +471,9 @@ struct
       (exs:create_examples)
     : Lens.t option =
     let dnf_lens_option = gen_dnf_lens lc r1 r2 exs in
-    dnf_lens_option
-      (*Option.map
-        ~f:dnf_lens_to_lens
-        dnf_lens_option*)
+    Option.map
+      ~f:dnf_lens_to_lens
+      dnf_lens_option
 
   let num_possible_choices
       (lc:LensContext.t)
@@ -542,6 +536,11 @@ let gen_symmetric_lens
       existing_lenses
   in
   let lc = LensContext.insert_list LensContext.empty existing_lenses in
+  Star_semiring_alignment_greedy.lc := lc;
+  Star_semiring_tree_alignment_optimal.lc := lc;
+  StarSemiringTreeRep.clear_alignments ();
+  (*print_endline "lenscontext!";
+  print_endline @$ LensContext.show lc;*)
   let r1 = iteratively_deepen r1 in
   let r2 = iteratively_deepen r2 in
   let r1 = StochasticRegex.from_regex r1 in

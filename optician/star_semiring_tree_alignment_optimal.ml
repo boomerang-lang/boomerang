@@ -1,5 +1,8 @@
 open MyStdlib
 open Star_semiring_tree
+open Lenscontext
+
+let lc : LensContext.t ref = ref LensContext.empty
 
 module type DefaultData = Data
 
@@ -23,7 +26,7 @@ sig
   val compare : t comparer
   val hash : t hasher
   val hash_fold_t : t hash_folder
-  val get_alignment : t -> t -> Alignment.t option
+  val get_alignment : LensContext.t -> t -> t -> Alignment.t option
   val requires_mapping : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
@@ -168,6 +171,9 @@ struct
 
     val get_minimal_alignment :
       NormalizedTree.Nonempty.t -> NormalizedTree.Nonempty.t -> t option
+
+    val clear_dict :
+      unit -> unit
 
     val to_nonempty_and_cost :
       t ->
@@ -1007,7 +1013,7 @@ struct
               ~f:(fun a -> mk_star sl1 sl2 a)
               (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
         | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
-          Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
+          Option.map ~f:(fun a -> mk_base a) (BD.get_alignment !lc bd1 bd2)
         | _ -> None
       end
 
@@ -1038,7 +1044,7 @@ struct
                 ~f:(fun a -> mk_star sl1 sl2 a)
                 (recursive_f (GetMinimalAlignmentArg.create sts1 sts2))
           | (NormalizedTree.Nonempty.Base bd1, NormalizedTree.Nonempty.Base bd2) ->
-            Option.map ~f:(fun a -> mk_base a) (BD.get_alignment bd1 bd2)
+            Option.map ~f:(fun a -> mk_base a) (BD.get_alignment !lc bd1 bd2)
           | _ -> None
         end
     end
@@ -1050,6 +1056,8 @@ struct
         (sts2:NormalizedTree.Nonempty.t)
       : t option =
       Memo.evaluate (GetMinimalAlignmentArg.create sts1 sts2)
+
+    let clear_dict = Memo.clear
 
     let rec to_nonempty_and_cost
         (nta:NonemptyNormalizedPlusStarTreeAlignment.t)

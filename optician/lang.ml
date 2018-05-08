@@ -41,7 +41,7 @@ struct
     | RegExClosed of t
   [@@deriving ord, show, hash]
 
-  let table = HashConsTable.create 10000
+  let table = HashConsTable.create 100000
   let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
 
   let uid (r:t) = r.tag

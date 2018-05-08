@@ -94,7 +94,7 @@ struct
       | Leaf -> 0
       | Node(lh,es,rh,_) -> (List.length es) + (size lh) + (size rh)
     end
-    
+
   let push (h:t) (e:element)
     : t =
     merge h (singleton e)

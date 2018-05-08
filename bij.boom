@@ -1,0 +1,2458 @@
+Synthesis Start
+popped
+count: 1
+
+
+
+priority: 0.
+
+
+
+
+
+
+
+popped
+count: 2
+
+
+
+priority: 50.
+
+
+
+
+
+
+
+Synthesis End
+Test result:
+"hi"
+Synthesis Start
+popped
+count: 1
+
+
+
+priority: 0.
+
+
+
+
+
+
+
+popped
+count: 2
+
+
+
+priority: 30.
+
+
+
+
+
+
+
+Synthesis End
+Test result:
+"hi"
+Synthesis Start
+popped
+count: 1
+
+
+
+priority: 0.
+
+
+
+
+
+
+
+popped
+count: 2
+
+
+
+priority: 3.
+
+
+
+
+
+
+
+Synthesis End
+Test result:
+"hi"
+Synthesis Start
+popped
+count: 1
+
+
+
+priority: 0.
+
+
+
+
+
+
+
+popped
+count: 2
+
+
+
+priority: 3.
+
+
+
+
+
+
+
+Synthesis End
+Test result:
+"hi"
+Synthesis Start
+popped
+count: 1
+
+
+
+priority: 0.
+
+
+
+
+
+
+
+popped
+count: 2
+
+
+
+priority: 16.
+
+
+
+
+
+
+
+Right({ My_hash_cons.HashConsContainer.hkey = 624081119; tag = 16188;
+  node =
+  ({ My_hash_cons.HashConsContainer.hkey = 951681337; tag = 4976;
+     node =
+     (Lang.Regex.RegExConcat (
+        { My_hash_cons.HashConsContainer.hkey = 1045299429; tag = 4970;
+          node = (Lang.Regex.RegExBase "jo - ") },
+        { My_hash_cons.HashConsContainer.hkey = 977097266; tag = 4001;
+          node =
+          (Lang.Regex.RegExClosed
+             { My_hash_cons.HashConsContainer.hkey = 381599885; tag = 4000;
+               node =
+               (Lang.Regex.RegExConcat (
+                  { My_hash_cons.HashConsContainer.hkey = 1026258774;
+                    tag = 1058;
+                    node =
+                    (Lang.Regex.RegExClosed
+                       { My_hash_cons.HashConsContainer.hkey = 387079406;
+                         tag = 1057;
+                         node =
+                         (Lang.Regex.RegExConcat (
+                            { My_hash_cons.HashConsContainer.hkey = 85713370;
+                              tag = 1012;
+                              node =
+                              (Lang.Regex.RegExClosed
+                                 { My_hash_cons.HashConsContainer.hkey =
+                                   527647768; tag = 1011;
+                                   node =
+                                   (Lang.Regex.RegExOr (
+                                      { My_hash_cons.HashConsContainer.hkey =
+                                        372281344; tag = 991;
+                                        node =
+                                        (Lang.Regex.RegExClosed
+                                           { My_hash_cons.HashConsContainer.hkey =
+                                             510954524; tag = 990;
+                                             node =
+                                             (Lang.Regex.RegExOr (
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  449339729; tag = 980;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       807866930; tag = 979;
+                                                       node =
+                                                       (Lang.Regex.RegExOr (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            797538377;
+                                                            tag = 975;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 974960931;
+                                                                 tag = 974;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    874609961;
+                                                                    tag = 110;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "A") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    394283293;
+                                                                    tag = 973;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    492160878;
+                                                                    tag = 906;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    421847990;
+                                                                    tag = 108;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "B") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    509503912;
+                                                                    tag = 107;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "C") }))
+                                                                    }) }))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            627238325;
+                                                            tag = 978;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 755552127;
+                                                                 tag = 977;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    206789318;
+                                                                    tag = 105;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "D") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    608430143;
+                                                                    tag = 976;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    753877988;
+                                                                    tag = 904;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    335668410;
+                                                                    tag = 103;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "E") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    897494133;
+                                                                    tag = 102;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "F") }))
+                                                                    }) }))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  },
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  756796080; tag = 989;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       510797143; tag = 988;
+                                                       node =
+                                                       (Lang.Regex.RegExOr (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            831196663;
+                                                            tag = 983;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 314503015;
+                                                                 tag = 982;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    100502601;
+                                                                    tag = 99;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "G") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1003468810;
+                                                                    tag = 981;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    149542163;
+                                                                    tag = 901;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    462716708;
+                                                                    tag = 97;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "H") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    2773856;
+                                                                    tag = 96;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "I") }))
+                                                                    }) }))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            388416321;
+                                                            tag = 987;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 790235823;
+                                                                 tag = 986;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    246859471;
+                                                                    tag = 984;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    602594814;
+                                                                    tag = 899;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    277383010;
+                                                                    tag = 93;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "J") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    688508577;
+                                                                    tag = 92;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "K") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    717584480;
+                                                                    tag = 985;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    971878212;
+                                                                    tag = 898;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    178200127;
+                                                                    tag = 90;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "L") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    430961760;
+                                                                    tag = 89;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "M") }))
+                                                                    }) }))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  }
+                                                ))
+                                             })
+                                        },
+                                      { My_hash_cons.HashConsContainer.hkey =
+                                        132071610; tag = 1010;
+                                        node =
+                                        (Lang.Regex.RegExClosed
+                                           { My_hash_cons.HashConsContainer.hkey =
+                                             284537338; tag = 1009;
+                                             node =
+                                             (Lang.Regex.RegExOr (
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  787865394; tag = 999;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       937802820; tag = 998;
+                                                       node =
+                                                       (Lang.Regex.RegExOr (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            974206083;
+                                                            tag = 994;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 652715519;
+                                                                 tag = 993;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    503905337;
+                                                                    tag = 85;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "N") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    130215484;
+                                                                    tag = 992;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    81790220;
+                                                                    tag = 894;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    65664754;
+                                                                    tag = 83;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "O") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    197700218;
+                                                                    tag = 82;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "P") }))
+                                                                    }) }))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            720356082;
+                                                            tag = 997;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 53996805;
+                                                                 tag = 996;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    776765509;
+                                                                    tag = 80;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Q") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    798631305;
+                                                                    tag = 995;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    261974287;
+                                                                    tag = 892;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    964582127;
+                                                                    tag = 78;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "R") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    470029808;
+                                                                    tag = 77;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "S") }))
+                                                                    }) }))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  },
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  645948199; tag = 1008;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       2646532; tag = 1007;
+                                                       node =
+                                                       (Lang.Regex.RegExOr (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            951014521;
+                                                            tag = 1002;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 498440093;
+                                                                 tag = 1001;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    33585021;
+                                                                    tag = 74;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "T") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    86301193;
+                                                                    tag =
+                                                                    1000;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    300606552;
+                                                                    tag = 889;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    983479554;
+                                                                    tag = 72;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "U") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    60966174;
+                                                                    tag = 71;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "V") }))
+                                                                    }) }))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            251086908;
+                                                            tag = 1006;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 496325911;
+                                                                 tag = 1005;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    765596008;
+                                                                    tag =
+                                                                    1003;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    827137963;
+                                                                    tag = 887;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    245296690;
+                                                                    tag = 68;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "W") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    993419816;
+                                                                    tag = 67;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "X") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    192948443;
+                                                                    tag =
+                                                                    1004;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    12739031;
+                                                                    tag = 886;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    419705480;
+                                                                    tag = 65;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Y") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    626838185;
+                                                                    tag = 64;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Z") }))
+                                                                    }) }))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  }
+                                                ))
+                                             })
+                                        }
+                                      ))
+                                   })
+                              },
+                            { My_hash_cons.HashConsContainer.hkey = 101000723;
+                              tag = 1056;
+                              node =
+                              (Lang.Regex.RegExClosed
+                                 { My_hash_cons.HashConsContainer.hkey =
+                                   283260856; tag = 1055;
+                                   node =
+                                   (Lang.Regex.RegExConcat (
+                                      { My_hash_cons.HashConsContainer.hkey =
+                                        129913994; tag = 2;
+                                        node = (Lang.Regex.RegExBase "") },
+                                      { My_hash_cons.HashConsContainer.hkey =
+                                        746020605; tag = 1054;
+                                        node =
+                                        (Lang.Regex.RegExClosed
+                                           { My_hash_cons.HashConsContainer.hkey =
+                                             74726623; tag = 1053;
+                                             node =
+                                             (Lang.Regex.RegExStar
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  112784048; tag = 1052;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       571589579; tag = 1051;
+                                                       node =
+                                                       (Lang.Regex.RegExOr (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            546601490;
+                                                            tag = 1031;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 686477483;
+                                                                 tag = 1030;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    7519738;
+                                                                    tag =
+                                                                    1020;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    427565150;
+                                                                    tag =
+                                                                    1019;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    982399408;
+                                                                    tag =
+                                                                    1015;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    446421710;
+                                                                    tag =
+                                                                    1014;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    770916335;
+                                                                    tag = 59;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "a") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    884495832;
+                                                                    tag =
+                                                                    1013;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    542712850;
+                                                                    tag = 931;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    751023323;
+                                                                    tag = 57;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "b") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    477352313;
+                                                                    tag = 56;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "c") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    291734408;
+                                                                    tag =
+                                                                    1018;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    403244398;
+                                                                    tag =
+                                                                    1017;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    487556986;
+                                                                    tag = 54;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "d") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    3495768;
+                                                                    tag =
+                                                                    1016;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1039054173;
+                                                                    tag = 929;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    488042423;
+                                                                    tag = 52;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "e") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    527425117;
+                                                                    tag = 51;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "f") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    737823950;
+                                                                    tag =
+                                                                    1029;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    600786504;
+                                                                    tag =
+                                                                    1028;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    221334724;
+                                                                    tag =
+                                                                    1023;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    443327229;
+                                                                    tag =
+                                                                    1022;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    415131289;
+                                                                    tag = 48;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "g") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1037114974;
+                                                                    tag =
+                                                                    1021;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    585960999;
+                                                                    tag = 926;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    120743665;
+                                                                    tag = 46;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "h") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    331164731;
+                                                                    tag = 45;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "i") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    418651757;
+                                                                    tag =
+                                                                    1027;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    859337466;
+                                                                    tag =
+                                                                    1026;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    518924038;
+                                                                    tag =
+                                                                    1024;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    653920494;
+                                                                    tag = 924;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    423982687;
+                                                                    tag = 42;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "j") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    784579087;
+                                                                    tag = 41;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "k") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    92631597;
+                                                                    tag =
+                                                                    1025;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    306114383;
+                                                                    tag = 923;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    453148629;
+                                                                    tag = 39;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "l") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    284952795;
+                                                                    tag = 38;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "m") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    ))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            339290727;
+                                                            tag = 1050;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 328913783;
+                                                                 tag = 1049;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    212080794;
+                                                                    tag =
+                                                                    1039;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    946299439;
+                                                                    tag =
+                                                                    1038;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    780414164;
+                                                                    tag =
+                                                                    1034;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    120432272;
+                                                                    tag =
+                                                                    1033;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    923375263;
+                                                                    tag = 34;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "n") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    529535907;
+                                                                    tag =
+                                                                    1032;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    570417949;
+                                                                    tag = 919;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    872686745;
+                                                                    tag = 32;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "o") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    582067016;
+                                                                    tag = 31;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "p") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    631865496;
+                                                                    tag =
+                                                                    1037;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    343041599;
+                                                                    tag =
+                                                                    1036;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    87146463;
+                                                                    tag = 29;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "q") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    499059452;
+                                                                    tag =
+                                                                    1035;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    479930657;
+                                                                    tag = 917;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    640103160;
+                                                                    tag = 27;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "r") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    526644;
+                                                                    tag = 26;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "s") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    816718524;
+                                                                    tag =
+                                                                    1048;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    959958676;
+                                                                    tag =
+                                                                    1047;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    181057447;
+                                                                    tag =
+                                                                    1042;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    565856988;
+                                                                    tag =
+                                                                    1041;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    875972339;
+                                                                    tag = 23;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "t") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    338798763;
+                                                                    tag =
+                                                                    1040;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    599532079;
+                                                                    tag = 914;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    226242972;
+                                                                    tag = 21;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "u") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    343989322;
+                                                                    tag = 20;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "v") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    198907375;
+                                                                    tag =
+                                                                    1046;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    478188434;
+                                                                    tag =
+                                                                    1045;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    802465417;
+                                                                    tag =
+                                                                    1043;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    57021;
+                                                                    tag = 912;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    673629084;
+                                                                    tag = 17;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "w") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1021233822;
+                                                                    tag = 16;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "x") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    440098283;
+                                                                    tag =
+                                                                    1044;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1065865824;
+                                                                    tag = 911;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    154297280;
+                                                                    tag = 14;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "y") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    53507604;
+                                                                    tag = 13;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "z") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    ))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  })
+                                             })
+                                        }
+                                      ))
+                                   })
+                              }
+                            ))
+                         })
+                    },
+                  { My_hash_cons.HashConsContainer.hkey = 380663092;
+                    tag = 1073;
+                    node =
+                    (Lang.Regex.RegExClosed
+                       { My_hash_cons.HashConsContainer.hkey = 1031480800;
+                         tag = 1072;
+                         node =
+                         (Lang.Regex.RegExConcat (
+                            { My_hash_cons.HashConsContainer.hkey = 129913994;
+                              tag = 2; node = (Lang.Regex.RegExBase "") },
+                            { My_hash_cons.HashConsContainer.hkey = 605344424;
+                              tag = 1071;
+                              node =
+                              (Lang.Regex.RegExClosed
+                                 { My_hash_cons.HashConsContainer.hkey =
+                                   83490171; tag = 1070;
+                                   node =
+                                   (Lang.Regex.RegExStar
+                                      { My_hash_cons.HashConsContainer.hkey =
+                                        883278933; tag = 1069;
+                                        node =
+                                        (Lang.Regex.RegExClosed
+                                           { My_hash_cons.HashConsContainer.hkey =
+                                             108467831; tag = 1068;
+                                             node =
+                                             (Lang.Regex.RegExConcat (
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  653234517; tag = 1067;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       127734518; tag = 1066;
+                                                       node =
+                                                       (Lang.Regex.RegExConcat (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            129913994;
+                                                            tag = 2;
+                                                            node =
+                                                            (Lang.Regex.RegExBase
+                                                               "")
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            452152557;
+                                                            tag = 1065;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 222001121;
+                                                                 tag = 1064;
+                                                                 node =
+                                                                 (Lang.Regex.RegExStar
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    693261676;
+                                                                    tag =
+                                                                    1063;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    880188801;
+                                                                    tag =
+                                                                    1062;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    978725655;
+                                                                    tag = 943;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    " ") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    153575501;
+                                                                    tag =
+                                                                    1061;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    367522636;
+                                                                    tag = 942;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    965946700;
+                                                                    tag = 941;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "\n") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    900600799;
+                                                                    tag = 940;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "\t") }))
+                                                                    }) })) })
+                                                                    })
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  },
+                                                { My_hash_cons.HashConsContainer.hkey =
+                                                  1026258774; tag = 1058;
+                                                  node =
+                                                  (Lang.Regex.RegExClosed
+                                                     { My_hash_cons.HashConsContainer.hkey =
+                                                       387079406; tag = 1057;
+                                                       node =
+                                                       (Lang.Regex.RegExConcat (
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            85713370;
+                                                            tag = 1012;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 527647768;
+                                                                 tag = 1011;
+                                                                 node =
+                                                                 (Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    372281344;
+                                                                    tag = 991;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    510954524;
+                                                                    tag = 990;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    449339729;
+                                                                    tag = 980;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    807866930;
+                                                                    tag = 979;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    797538377;
+                                                                    tag = 975;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    974960931;
+                                                                    tag = 974;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    874609961;
+                                                                    tag = 110;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "A") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    394283293;
+                                                                    tag = 973;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    492160878;
+                                                                    tag = 906;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    421847990;
+                                                                    tag = 108;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "B") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    509503912;
+                                                                    tag = 107;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "C") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    627238325;
+                                                                    tag = 978;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    755552127;
+                                                                    tag = 977;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    206789318;
+                                                                    tag = 105;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "D") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    608430143;
+                                                                    tag = 976;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    753877988;
+                                                                    tag = 904;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    335668410;
+                                                                    tag = 103;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "E") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    897494133;
+                                                                    tag = 102;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "F") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    756796080;
+                                                                    tag = 989;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    510797143;
+                                                                    tag = 988;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    831196663;
+                                                                    tag = 983;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    314503015;
+                                                                    tag = 982;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    100502601;
+                                                                    tag = 99;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "G") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1003468810;
+                                                                    tag = 981;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    149542163;
+                                                                    tag = 901;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    462716708;
+                                                                    tag = 97;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "H") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    2773856;
+                                                                    tag = 96;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "I") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    388416321;
+                                                                    tag = 987;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    790235823;
+                                                                    tag = 986;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    246859471;
+                                                                    tag = 984;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    602594814;
+                                                                    tag = 899;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    277383010;
+                                                                    tag = 93;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "J") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    688508577;
+                                                                    tag = 92;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "K") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    717584480;
+                                                                    tag = 985;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    971878212;
+                                                                    tag = 898;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    178200127;
+                                                                    tag = 90;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "L") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    430961760;
+                                                                    tag = 89;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "M") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    )) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    132071610;
+                                                                    tag =
+                                                                    1010;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    284537338;
+                                                                    tag =
+                                                                    1009;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    787865394;
+                                                                    tag = 999;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    937802820;
+                                                                    tag = 998;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    974206083;
+                                                                    tag = 994;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    652715519;
+                                                                    tag = 993;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    503905337;
+                                                                    tag = 85;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "N") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    130215484;
+                                                                    tag = 992;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    81790220;
+                                                                    tag = 894;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    65664754;
+                                                                    tag = 83;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "O") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    197700218;
+                                                                    tag = 82;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "P") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    720356082;
+                                                                    tag = 997;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    53996805;
+                                                                    tag = 996;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    776765509;
+                                                                    tag = 80;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Q") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    798631305;
+                                                                    tag = 995;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    261974287;
+                                                                    tag = 892;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    964582127;
+                                                                    tag = 78;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "R") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    470029808;
+                                                                    tag = 77;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "S") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    645948199;
+                                                                    tag =
+                                                                    1008;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    2646532;
+                                                                    tag =
+                                                                    1007;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    951014521;
+                                                                    tag =
+                                                                    1002;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    498440093;
+                                                                    tag =
+                                                                    1001;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    33585021;
+                                                                    tag = 74;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "T") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    86301193;
+                                                                    tag =
+                                                                    1000;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    300606552;
+                                                                    tag = 889;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    983479554;
+                                                                    tag = 72;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "U") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    60966174;
+                                                                    tag = 71;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "V") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    251086908;
+                                                                    tag =
+                                                                    1006;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    496325911;
+                                                                    tag =
+                                                                    1005;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    765596008;
+                                                                    tag =
+                                                                    1003;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    827137963;
+                                                                    tag = 887;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    245296690;
+                                                                    tag = 68;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "W") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    993419816;
+                                                                    tag = 67;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "X") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    192948443;
+                                                                    tag =
+                                                                    1004;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    12739031;
+                                                                    tag = 886;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    419705480;
+                                                                    tag = 65;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Y") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    626838185;
+                                                                    tag = 64;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "Z") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    )) }) }))
+                                                                 })
+                                                            },
+                                                          { My_hash_cons.HashConsContainer.hkey =
+                                                            101000723;
+                                                            tag = 1056;
+                                                            node =
+                                                            (Lang.Regex.RegExClosed
+                                                               { My_hash_cons.HashConsContainer.hkey =
+                                                                 283260856;
+                                                                 tag = 1055;
+                                                                 node =
+                                                                 (Lang.Regex.RegExConcat (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    129913994;
+                                                                    tag = 2;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    746020605;
+                                                                    tag =
+                                                                    1054;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    74726623;
+                                                                    tag =
+                                                                    1053;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExStar
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    112784048;
+                                                                    tag =
+                                                                    1052;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    571589579;
+                                                                    tag =
+                                                                    1051;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    546601490;
+                                                                    tag =
+                                                                    1031;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    686477483;
+                                                                    tag =
+                                                                    1030;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    7519738;
+                                                                    tag =
+                                                                    1020;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    427565150;
+                                                                    tag =
+                                                                    1019;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    982399408;
+                                                                    tag =
+                                                                    1015;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    446421710;
+                                                                    tag =
+                                                                    1014;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    770916335;
+                                                                    tag = 59;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "a") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    884495832;
+                                                                    tag =
+                                                                    1013;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    542712850;
+                                                                    tag = 931;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    751023323;
+                                                                    tag = 57;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "b") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    477352313;
+                                                                    tag = 56;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "c") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    291734408;
+                                                                    tag =
+                                                                    1018;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    403244398;
+                                                                    tag =
+                                                                    1017;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    487556986;
+                                                                    tag = 54;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "d") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    3495768;
+                                                                    tag =
+                                                                    1016;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1039054173;
+                                                                    tag = 929;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    488042423;
+                                                                    tag = 52;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "e") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    527425117;
+                                                                    tag = 51;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "f") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    737823950;
+                                                                    tag =
+                                                                    1029;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    600786504;
+                                                                    tag =
+                                                                    1028;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    221334724;
+                                                                    tag =
+                                                                    1023;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    443327229;
+                                                                    tag =
+                                                                    1022;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    415131289;
+                                                                    tag = 48;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "g") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1037114974;
+                                                                    tag =
+                                                                    1021;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    585960999;
+                                                                    tag = 926;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    120743665;
+                                                                    tag = 46;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "h") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    331164731;
+                                                                    tag = 45;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "i") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    418651757;
+                                                                    tag =
+                                                                    1027;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    859337466;
+                                                                    tag =
+                                                                    1026;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    518924038;
+                                                                    tag =
+                                                                    1024;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    653920494;
+                                                                    tag = 924;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    423982687;
+                                                                    tag = 42;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "j") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    784579087;
+                                                                    tag = 41;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "k") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    92631597;
+                                                                    tag =
+                                                                    1025;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    306114383;
+                                                                    tag = 923;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    453148629;
+                                                                    tag = 39;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "l") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    284952795;
+                                                                    tag = 38;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "m") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    )) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    339290727;
+                                                                    tag =
+                                                                    1050;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    328913783;
+                                                                    tag =
+                                                                    1049;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    212080794;
+                                                                    tag =
+                                                                    1039;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    946299439;
+                                                                    tag =
+                                                                    1038;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    780414164;
+                                                                    tag =
+                                                                    1034;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    120432272;
+                                                                    tag =
+                                                                    1033;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    923375263;
+                                                                    tag = 34;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "n") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    529535907;
+                                                                    tag =
+                                                                    1032;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    570417949;
+                                                                    tag = 919;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    872686745;
+                                                                    tag = 32;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "o") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    582067016;
+                                                                    tag = 31;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "p") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    631865496;
+                                                                    tag =
+                                                                    1037;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    343041599;
+                                                                    tag =
+                                                                    1036;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    87146463;
+                                                                    tag = 29;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "q") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    499059452;
+                                                                    tag =
+                                                                    1035;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    479930657;
+                                                                    tag = 917;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    640103160;
+                                                                    tag = 27;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "r") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    526644;
+                                                                    tag = 26;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "s") }))
+                                                                    }) })) })
+                                                                    })) }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    816718524;
+                                                                    tag =
+                                                                    1048;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    959958676;
+                                                                    tag =
+                                                                    1047;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    181057447;
+                                                                    tag =
+                                                                    1042;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    565856988;
+                                                                    tag =
+                                                                    1041;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    875972339;
+                                                                    tag = 23;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "t") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    338798763;
+                                                                    tag =
+                                                                    1040;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    599532079;
+                                                                    tag = 914;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    226242972;
+                                                                    tag = 21;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "u") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    343989322;
+                                                                    tag = 20;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "v") }))
+                                                                    }) })) })
+                                                                    },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    198907375;
+                                                                    tag =
+                                                                    1046;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    478188434;
+                                                                    tag =
+                                                                    1045;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    802465417;
+                                                                    tag =
+                                                                    1043;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    57021;
+                                                                    tag = 912;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    673629084;
+                                                                    tag = 17;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "w") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1021233822;
+                                                                    tag = 16;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "x") }))
+                                                                    }) },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    440098283;
+                                                                    tag =
+                                                                    1044;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExClosed
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    1065865824;
+                                                                    tag = 911;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExOr (
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    154297280;
+                                                                    tag = 14;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "y") },
+                                                                    { My_hash_cons.HashConsContainer.hkey =
+                                                                    53507604;
+                                                                    tag = 13;
+                                                                    node =
+                                                                    (
+                                                                    Lang.Regex.RegExBase
+                                                                    "z") }))
+                                                                    }) })) })
+                                                                    })) }) }
+                                                                    )) }) }))
+                                                                    }) }) })
+                                                                    }))
+                                                                 })
+                                                            }
+                                                          ))
+                                                       })
+                                                  }
+                                                ))
+                                             })
+                                        })
+                                   })
+                              }
+                            ))
+                         })
+                    }
+                  ))
+               })
+          }
+        ))
+     },
+   0)
+  })
+3
+YES BIJ HOORAY
+popped
+count: 4
+
+
+
+priority: 17.
+
+
+
+
+
+
+
+Synthesis End
+Test result:
+"hi"

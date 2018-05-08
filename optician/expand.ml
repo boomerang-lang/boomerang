@@ -358,27 +358,28 @@ let fix_problem_elts
        ~f:(fun e -> Right e)
        (RegexIntSet.as_list (RegexIntSet.diff s2 s1)))
   in
+  let problem_elements = List.sort ~cmp:(either_compare HCRegexInt.compare HCRegexInt.compare) problem_elements in
   begin match problem_elements with
     | [] ->
       expand_once
         qe
     | h::_ ->
-      print_endline @$ string_of_either HCRegexInt.show HCRegexInt.show h;
       let new_problems =
         begin match h with
           | Left d ->
             let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (QueueElement.get_r2 qe) in
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ exposes;*)
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (QueueElement.get_r1 qe,e,exp)) exposes
           | Right d ->
             let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (QueueElement.get_r1 qe) in
             assert (not (List.is_empty exposes));
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ exposes;*)
             List.map ~f:(fun (e,exp) -> (e,QueueElement.get_r2 qe,exp)) exposes
         end
       in
-      print_endline @$ string_of_int @$ List.length problem_elements;
       List.map
         ~f:(fun (r1,r2,exp) ->
             QueueElement.make

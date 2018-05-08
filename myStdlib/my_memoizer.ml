@@ -37,6 +37,8 @@ module FixHCMemoizerOf(F:UnfixedHCDataFunction) = struct
 
   let result_storage : ResultDict.t ref = ref ResultDict.empty
 
+  let clear () : unit = result_storage := ResultDict.empty
+
   let rec evaluate
       (x:F.Arg.t)
     : F.Result.t =

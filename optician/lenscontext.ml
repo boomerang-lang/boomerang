@@ -113,6 +113,21 @@ module LensContext = struct
     let rep_element = DS.find_representative lc.equivs r in
     let shortest_path = shortest_path_exn lc r rep_element in
     (rep_element,shortest_path)
+
+  let rep_elt
+      (lc:t)
+      (r:Regex.t)
+    : Regex.t =
+    DS.find_representative lc.equivs r
+
+  let size
+      (lc:t)
+    : int =
+    (List.fold_left
+       ~f:(+)
+       ~init:0
+       (List.map ~f:List.length (OutgoingD.value_list lc.outgoing)))
+    / 2
 end
 
 (***** }}} *****)

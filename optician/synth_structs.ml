@@ -424,9 +424,7 @@ struct
     type t =
       {
         parsings_strings : parsings_strings_example_data ;
-        regex_rep        : Regex.t                       ;
         stochastic_regex : StochasticRegex.t             ;
-        lc               : LensContext.t                 ;
       }
 
     let to_hashable_t
@@ -443,7 +441,8 @@ struct
         (f:Format.formatter)
         (x:t)
       : unit =
-      pp_parsings_strings_example_data f x.parsings_strings
+      pp_parsings_strings_example_data f x.parsings_strings;
+      Format.fprintf f "%s" (StochasticRegex.representative_exn x.stochastic_regex)
 
     let show
         (x:t)
@@ -466,17 +465,13 @@ struct
         bt2
 
     let make
-        (rep_regex:Regex.t)
         (stochastic_regex:StochasticRegex.t)
         (ill:int list list example_data)
         (ss:string list example_data)
-        (lc:LensContext.t)
       : t =
       {
         parsings_strings = merge_parsings_strings_example_data ill ss ;
-        regex_rep        = rep_regex                                  ;
         stochastic_regex = stochastic_regex                           ;
-        lc               = lc                                         ;
       }
 
     module Alignment =
@@ -488,14 +483,16 @@ struct
     end
 
     let get_alignment
+        (lc:LensContext.t)
         (v1:t)
         (v2:t)
       : Lens.t option =
       (*TODO contextual lenses*)
-      if Regex.compare v1.regex_rep v2.regex_rep <> 0 then
+      let rep_v1 = LensContext.rep_elt lc (StochasticRegex.to_regex v1.stochastic_regex) in
+      let rep_v2 = LensContext.rep_elt lc (StochasticRegex.to_regex v2.stochastic_regex) in
+      if Regex.compare rep_v1 rep_v2 <> 0 then
         None
       else
-        let lc = v1.lc in
         let path =
           LensContext.shortest_path_exn
             lc
@@ -572,6 +569,10 @@ struct
                 ssosl
           end
         in
+        (*print_endline (StochasticRegex.representative_exn v1.stochastic_regex);
+        print_endline (StochasticRegex.representative_exn v2.stochastic_regex);
+        print_endline (string_of_int (StochasticRegex.to_regex v1.stochastic_regex).tag);
+        print_endline (string_of_int (StochasticRegex.to_regex v2.stochastic_regex).tag);*)
         let lr_compat =
           compatible_with_fun
             (lens_putr_or_creater path)
@@ -584,6 +585,7 @@ struct
             v2.parsings_strings
             v1.parsings_strings
         in
+        (*print_endline (string_of_bool (lr_compat && rl_compat));*)
         if lr_compat && rl_compat then
           Some path
         else
@@ -623,6 +625,10 @@ struct
 
   module GreedyAlignment =  Star_semiring_alignment_greedy.PlusTimesStarTreeAlignmentOf(PD)(TD)(SD)(BD)
 
+  let clear_alignments () : unit =
+    GreedyAlignment.NonemptyNormalizedPlusStarTreeAlignment.clear_dict ();
+    OptimalAlignment.NonemptyNormalizedPlusStarTreeAlignment.clear_dict ()
+
   let exampled_dnf_regex_to_tree
       (lc:LensContext.t)
       (ed:exampled_dnf_regex)
@@ -653,7 +659,7 @@ struct
       : Tree.nonempty_t =
       begin match a with
         | EAClosed (r,rs,_,_,ill,ss) ->
-          Tree.mk_base (BD.make r rs ill ss lc)
+          Tree.mk_base (BD.make rs ill ss)
         | EAStar (d,ill,_) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in
           Tree.mk_star (SD.make ill) child

@@ -77,86 +77,86 @@ let star_depth_regex_fold
 (***** }}} *****)
 
 (**** GetSets {{{ *****)
-module IntSet = HCSetOf(IntModule)
+(*module IntSet = HCSetOf(IntModule)
 module HCRegexInt = HashConsOf(PairOf(Regex)(IntModule))
 module RegexIntSet = HCSetOf(HCRegexInt)
-module RegexToIntSetDict = HCDictOf(Regex)(IntSet)
+module RegexToIntSetDict = HCDictOf(Regex)(IntSet)*)
 
 let get_current_set
     (lc:LensContext.t)
     (sr:StochasticRegex.t)
-  : RegexIntSet.t =
+  : Expand.RegexIntSet.t =
   star_depth_regex_fold
-    ~empty_f:(fun _ -> RegexIntSet.empty)
-    ~base_f:(fun _ _ -> RegexIntSet.empty)
+    ~empty_f:(fun _ -> Expand.RegexIntSet.empty)
+    ~base_f:(fun _ _ -> Expand.RegexIntSet.empty)
     ~concat_f:(fun _ s1 s2 ->
-        RegexIntSet.union
+        Expand.RegexIntSet.union
           s1
           s2)
     ~or_f:(fun _ s1 s2 ->
-        RegexIntSet.union
+        Expand.RegexIntSet.union
           s1
           s2)
     ~star_f:(fun _ s -> s)
     ~closed_f:(fun i r' _ ->
         let r'' = get_rep_var lc r' in
-        RegexIntSet.singleton (HCRegexInt.hashcons (r'',i)))
+        Expand.RegexIntSet.singleton (Expand.HCRegexInt.hashcons (r'',i)))
     (StochasticRegex.to_regex sr)
 
 let rec get_transitive_set
     (lc:LensContext.t)
-  : Regex.t -> RegexToIntSetDict.t =
+  : Regex.t -> Expand.RegexToIntSetDict.t =
   star_depth_regex_fold
-    ~empty_f:(fun _ -> RegexToIntSetDict.empty)
-    ~base_f:(fun _ _ -> RegexToIntSetDict.empty)
+    ~empty_f:(fun _ -> Expand.RegexToIntSetDict.empty)
+    ~base_f:(fun _ _ -> Expand.RegexToIntSetDict.empty)
     ~concat_f:(fun _ s1 s2 ->
-        RegexToIntSetDict.merge_to_dict
-          ~combiner:IntSet.union
+        Expand.RegexToIntSetDict.merge_to_dict
+          ~combiner:Expand.IntSet.union
           s1
           s2)
     ~or_f:(fun _ s1 s2 ->
-        RegexToIntSetDict.merge_to_dict
-          ~combiner:IntSet.union
+        Expand.RegexToIntSetDict.merge_to_dict
+          ~combiner:Expand.IntSet.union
           s1
           s2)
     ~star_f:(fun _ -> ident)
     ~closed_f:(fun star_depth r s ->
-        RegexToIntSetDict.insert_or_combine
-          ~combiner:IntSet.union
+        Expand.RegexToIntSetDict.insert_or_combine
+          ~combiner:Expand.IntSet.union
           s
           (get_rep_var lc r)
-          (IntSet.singleton star_depth))
+          (Expand.IntSet.singleton star_depth))
 
 let reachables_set_minus
-    (set1:RegexToIntSetDict.t)
-    (set2:RegexToIntSetDict.t)
-  : RegexIntSet.t * RegexIntSet.t =
+    (set1:Expand.RegexToIntSetDict.t)
+    (set2:Expand.RegexToIntSetDict.t)
+  : Expand.RegexIntSet.t * Expand.RegexIntSet.t =
   let set_combiner
-      (s1:IntSet.t)
-      (s2:IntSet.t)
-    : ((IntSet.t,IntSet.t) either) option =
-    let max_s1 = IntSet.max_exn s1 in
-    let max_s2 = IntSet.max_exn s2 in
+      (s1:Expand.IntSet.t)
+      (s2:Expand.IntSet.t)
+    : ((Expand.IntSet.t,Expand.IntSet.t) either) option =
+    let max_s1 = Expand.IntSet.max_exn s1 in
+    let max_s2 = Expand.IntSet.max_exn s2 in
     let c = Int.compare max_s1 max_s2 in
     if is_equal c then
       None
     else if is_lt c then
       Some
         (Right
-           (IntSet.filter
+           (Expand.IntSet.filter
               ~f:(fun x ->
                   is_gt (Int.compare x max_s1))
               s2))
     else
       Some
         (Left
-           (IntSet.filter
+           (Expand.IntSet.filter
               ~f:(fun x ->
                   is_gt (Int.compare x max_s2))
               s1))
   in
   let problem_elts_options_list =
-    RegexToIntSetDict.merge
+    Expand.RegexToIntSetDict.merge
       ~combiner:set_combiner
       ~only_d1_fn:(fun s -> Some (Left s))
       ~only_d2_fn:(fun s -> Some (Right s))
@@ -180,16 +180,16 @@ let reachables_set_minus
       problem_elts_list
   in
   pair_apply
-    ~f:(fun (kss:(Regex.t * IntSet.t) list) ->
+    ~f:(fun (kss:(Regex.t * Expand.IntSet.t) list) ->
         List.fold_left
-          ~f:(fun (acc:RegexIntSet.t) ((k,s):(Regex.t * IntSet.t)) ->
-              IntSet.fold
-                ~f:(fun (i:int) (acc:RegexIntSet.t) ->
-                    RegexIntSet.add (HCRegexInt.hashcons (k,i)) acc)
+          ~f:(fun (acc:Expand.RegexIntSet.t) ((k,s):(Regex.t * Expand.IntSet.t)) ->
+              Expand.IntSet.fold
+                ~f:(fun (i:int) (acc:Expand.RegexIntSet.t) ->
+                    Expand.RegexIntSet.add (Expand.HCRegexInt.hashcons (k,i)) acc)
                 ~init:acc
                 s
             )
-          ~init:RegexIntSet.empty
+          ~init:Expand.RegexIntSet.empty
           kss)
     lr_problem_elts
 
@@ -203,7 +203,7 @@ let reachables_set_minus
 (**** ForceExpand {{{ *****)
 let force_expand
     (lc:LensContext.t)
-    (problem_elts:RegexIntSet.t)
+    (problem_elts:Expand.RegexIntSet.t)
     (r:StochasticRegex.t)
   : (StochasticRegex.t * int) =
   stochastic_star_depth_regex_fold
@@ -216,9 +216,9 @@ let force_expand
     ~star_f:(fun _ p (r,e) ->
         (StochasticRegex.make_star r p, e))
     ~closed_f:(fun star_depth r (r_expanded,e) ->
-        if RegexIntSet.member
+        if Expand.RegexIntSet.member
             problem_elts
-            (HCRegexInt.hashcons (get_rep_var lc (StochasticRegex.to_regex r),star_depth))
+            (Expand.HCRegexInt.hashcons (get_rep_var lc (StochasticRegex.to_regex r),star_depth))
         then
           (r_expanded,e+1)
         else
@@ -239,7 +239,7 @@ let rec reveal
   begin match StochasticRegex.node r with
     | StochasticRegex.Closed r' ->
       let r'_base = StochasticRegex.to_regex r' in
-      if get_rep_var lc r'_base = reveal_ident && star_depth = 0 then
+      if is_equal @$ Regex.compare (get_rep_var lc r'_base) (reveal_ident) && star_depth = 0 then
         [(StochasticRegex.make_closed r',0)]
       else
         List.map
@@ -404,12 +404,13 @@ let fix_problem_elts
   let problem_elements =
     (List.map
        ~f:(fun e -> Left e)
-       (RegexIntSet.as_list (RegexIntSet.diff s1 s2)))
+       (Expand.RegexIntSet.as_list (Expand.RegexIntSet.diff s1 s2)))
     @
     (List.map
        ~f:(fun e -> Right e)
-       (RegexIntSet.as_list (RegexIntSet.diff s2 s1)))
+       (Expand.RegexIntSet.as_list (Expand.RegexIntSet.diff s2 s1)))
   in
+  let problem_elements = List.sort ~cmp:(either_compare Expand.HCRegexInt.compare Expand.HCRegexInt.compare) problem_elements in
   begin match problem_elements with
     | [] ->
       expand_once
@@ -420,11 +421,13 @@ let fix_problem_elts
           | Left d ->
             let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r2 qe) in
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (SymmetricQueueElement.get_r1 qe,e,exp)) exposes
           | Right d ->
             let (v,star_depth) = d.node in
             let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r1 qe) in
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
             assert (not (List.is_empty exposes));
             List.map ~f:(fun (e,exp) -> (e,SymmetricQueueElement.get_r2 qe,exp)) exposes
         end
