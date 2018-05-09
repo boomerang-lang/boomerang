@@ -35,10 +35,6 @@ let UPPERCASE
     | "N"
     | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
 
-let to_upper_or_lower
-  : (lens in LOWERCASE <=> UPPERCASE) =
-  synth LOWERCASE <=> UPPERCASE 
-
 let DIGIT
   : regexp =
   "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
@@ -129,7 +125,7 @@ let STARLESS_DELIMITED_STRING
 
 let starless_string_to_delimited
   : (lens in STARLESS_STRING <=> STARLESS_DELIMITED_STRING) =
-  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING 
+  synth STARLESS_STRING <=> STARLESS_DELIMITED_STRING
 
 let COMMENT : regexp = "# " . STRING 
 
@@ -225,4 +221,6 @@ let ANACRON_DICT
 
 let afs_cellalias
   : (lens in ANACRON_CONF <=> ANACRON_DICT) =
-  synth ANACRON_CONF <=> ANACRON_DICT using {createrex ("# comment\nPATH=/path to/fOlder\n\n@monthly\t15\tcron.monthly\tnice run-parts --report /etc/cron.monthly\n","{\"#comment\"=\"comment\"}{\"PATH\"=\"/path to/fOlder\"}{}{\"entry\"=\"nice run-parts --report /etc/cron.monthly\"{\"period_name\"=\"monthly\"}{\"delay\"=\"15\"}{\"job-identifier\"=\"cron.monthly\"}}")} 
+  synth ANACRON_CONF <=> ANACRON_DICT using {createrex ("# comment\nPATH=/path to/fOlder\n\n@monthly\t15\tcron.monthly\tnice run-parts --report /etc/cron.monthly\n","{\"#comment\"=\"comment\"}{\"PATH\"=\"/path to/fOlder\"}{}{\"entry\"=\"nice run-parts --report /etc/cron.monthly\"{\"period_name\"=\"monthly\"}{\"delay\"=\"15\"}{\"job-identifier\"=\"cron.monthly\"}}")}
+
+test afs_cellalias = ?

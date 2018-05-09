@@ -414,7 +414,7 @@ struct
              print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe))));
           let r1 = (SymmetricQueueElement.get_r1 qe) in
           let r2 = (SymmetricQueueElement.get_r2 qe) in
-          if (f >=. best_cost && !attempts <> 4) || !attempts > 1000 || !attempts = 5 then
+          if (f >=. best_cost && !attempts <> 4) then
             best
           else
             (* TODO fix *)

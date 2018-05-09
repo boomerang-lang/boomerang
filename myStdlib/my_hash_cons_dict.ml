@@ -28,19 +28,15 @@ module HCDictOf(K:UIDData)(V:Data) = struct
 
   module CompareDict = My_dict.DictOf(K)(V)
 
-  type t = t_node hash_consed
-  and t_node =
+  type t =
     | Empty
     | Leaf of key * value
     | Branch of int * int * t * t
   [@@deriving ord, show, hash]
 
-  let table = HashConsTable.create 100
-  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
+  let empty = Empty
 
-  let empty = hashcons Empty
-
-  let mk_leaf k v = hashcons (Leaf (k,v))
+  let mk_leaf k v = Leaf (k,v)
 
   let mk_branch
       (i:int)
@@ -48,16 +44,16 @@ module HCDictOf(K:UIDData)(V:Data) = struct
       (l:t)
       (r:t)
     : t =
-    begin match (l.node,r.node) with
+    begin match (l,r) with
       | (Empty,t) -> r
       | (t,Empty) -> l
-      | (_,_)   -> hashcons (Branch (i,j,l,r))
+      | (_,_)   -> Branch (i,j,l,r)
     end
 
   let zero_bit k m = phys_equal (k land m) 0
 
   let rec contains_key d k =
-    begin match d.node with
+    begin match d with
     | Empty -> false
     | Leaf (j,_) -> phys_equal (K.uid k) (K.uid j)
     | Branch (_, m, l, r) ->
@@ -65,7 +61,7 @@ module HCDictOf(K:UIDData)(V:Data) = struct
     end
 
   let rec lookup d k =
-    begin match d.node with
+    begin match d with
     | Empty -> None
     | Leaf (j,x) ->
       if K.uid k = K.uid j then Some x else None
@@ -95,7 +91,7 @@ module HCDictOf(K:UIDData)(V:Data) = struct
       k
       x =
     let rec ins d =
-      begin match d.node with
+      begin match d with
         | Empty -> mk_leaf k x
         | Leaf (j,y) ->
 	        if phys_equal (K.uid j) (K.uid k) then
@@ -118,7 +114,7 @@ module HCDictOf(K:UIDData)(V:Data) = struct
 
   let remove k t =
     let rec rmv d =
-      begin match d.node with
+      begin match d with
       | Empty -> empty
       | Leaf (j,_) -> if phys_equal (K.uid k) (K.uid j) then empty else d
       | Branch (p,m,t0,t1) ->
@@ -135,7 +131,7 @@ module HCDictOf(K:UIDData)(V:Data) = struct
 
   let as_kvp_list s =
     let rec as_kvp_list_internal acc t =
-      match t.node with
+      match t with
       | Empty -> acc
       | Leaf (k,v) -> (k,v) :: acc
       | Branch (_,_,l,r) -> as_kvp_list_internal (as_kvp_list_internal acc r) l
@@ -147,7 +143,7 @@ module HCDictOf(K:UIDData)(V:Data) = struct
       (s:t)
       (t:t)
       : t =
-    match (s.node,t.node) with
+    match (s,t) with
     | Empty, _  -> t
     | _, Empty  -> s
     | Leaf (k,v), _ -> insert_or_combine ~combiner:combiner t k v
@@ -233,27 +229,27 @@ module HCDictOf(K:UIDData)(V:Data) = struct
     (merge_ordered_lists ordered_d1_kvp_list ordered_d2_kvp_list)
 
   let rec iter ~f:f d =
-    begin match d.node with
+    begin match d with
     | Empty -> ()
     | Leaf (k,x) -> f k x
     | Branch (_,_,t0,t1) -> iter f t0; iter f t1
     end
 
   let rec map ~f:f d =
-    begin match d.node with
+    begin match d with
       | Empty -> empty
       | Leaf (k,x) -> mk_leaf k (f x)
       | Branch (p,m,t0,t1) -> mk_branch p m (map f t0) (map f t1)
     end
 
   let rec mapi ~f:f d =
-    begin match d.node with
+    begin match d with
       | Empty -> empty
       | Leaf (k,x) -> mk_leaf k (f k x)
       | Branch (p,m,t0,t1) -> mk_branch p m (mapi f t0) (mapi f t1)
     end
 
-  let rec fold f s accu = match s.node with
+  let rec fold f s accu = match s with
     | Empty -> accu
     | Leaf (k,x) -> f k x accu
     | Branch (_,_,t0,t1) -> fold f t0 (fold f t1 accu)
