@@ -51,6 +51,7 @@ struct
       r1                   : Regex.t                    ;
       r2                   : Regex.t                    ;
     }
+    [@@deriving show]
 
   let rec gen_atom_zipper (lc:LensContext.t)
       (atom1:ordered_exampled_atom)
@@ -255,8 +256,8 @@ struct
       let exampled_r2_opt = regex_to_exampled_dnf_regex lc (StochasticRegex.from_regex r2) rexs in
       begin match (exampled_r1_opt,exampled_r2_opt) with
         | (Some exampled_r1,Some exampled_r2) ->
-          let e_o_r1 = to_ordered_exampled_dnf_regex exampled_r1 in
-          let e_o_r2 = to_ordered_exampled_dnf_regex exampled_r2 in
+          let e_o_r1 = to_ordered_exampled_dnf_regex lc exampled_r1 in
+          let e_o_r2 = to_ordered_exampled_dnf_regex lc exampled_r2 in
           begin match make_matchable (compare_ordered_exampled_dnf_regexs e_o_r1 e_o_r2) with
             | EQ ->
               Some (
@@ -393,53 +394,70 @@ struct
         (best:Lens.t option)
         (best_cost:float)
       : Lens.t option =
-      begin match SPQ.pop pq with
-        | Some (qe,f,pq) ->
+      begin match SPQ.pop_until_new_priority pq with
+        | Some (f,qes,pq) ->
           if !verbose then
             (print_endline "popped";
+             attempts := !attempts+List.length qes;
              print_endline ("attempt #" ^ (string_of_int !attempts));
-             attempts := !attempts+1;
-             print_endline ("r1: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r1 qe));
+             (*print_endline ("r1: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r1 qe));
              print_endline "\n\n";
              print_endline ("r2: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r2 qe));
-             print_endline "\n\n";
+             print_endline "\n\n";*)
              print_endline ("priority: " ^ (SymmetricQueueElement.Priority.show f));
              print_endline "\n\n";
              print_endline ("bestpriority: " ^ (SymmetricQueueElement.Priority.show best_cost));
              print_endline "\n\n";
-             print_endline ("exps_perfed: " ^ (string_of_int (SymmetricQueueElement.get_expansions_performed qe)));
+             (*print_endline ("exps_perfed: " ^ (string_of_int (SymmetricQueueElement.get_expansions_performed qe)));
              print_endline "\n\n";
              print_endline ("exps_inferred: " ^ (string_of_int (SymmetricQueueElement.get_expansions_inferred qe)));
              print_endline "\n\n";
-             print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe))));
-          let r1 = (SymmetricQueueElement.get_r1 qe) in
-          let r2 = (SymmetricQueueElement.get_r2 qe) in
-          if (f >=. best_cost && !attempts <> 4) then
+               print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe)))*));
+          let sorted_qes =
+            List.sort
+              ~cmp:(fun qe1 qe2 ->
+                  Int.compare
+                    (SymmetricQueueElement.dnf_distance qe1)
+                    (SymmetricQueueElement.dnf_distance qe2))
+              qes
+          in
+          print_endline "END IT";
+          let (best,best_cost) =
+            List.fold_left
+              ~f:(fun (best,best_cost) qe ->
+                  if f >= best_cost then
+                    (best,best_cost)
+                  else
+                    let lco =
+                      kinda_rigid_synth
+                        lc
+                        qe.r1
+                        qe.r2
+                        creater_exs
+                        createl_exs
+                        putr_exs
+                        putl_exs
+                    in
+                    begin match lco with
+                      | None -> (best,best_cost)
+                      | Some (l,c) ->
+                        let cost = c +. f in
+                        if cost <=. best_cost then
+                          (Some l,cost)
+                        else
+                          (best,best_cost)
+                    end)
+              ~init:(best,best_cost)
+              sorted_qes
+          in
+          if f >=. best_cost then
             best
           else
-            (* TODO fix *)
-            let lco =
-              kinda_rigid_synth
-                lc
-                (StochasticRegex.from_regex @$ StochasticRegex.to_regex r1)
-                (StochasticRegex.from_regex @$ StochasticRegex.to_regex r2)
-                creater_exs
-                createl_exs
-                putr_exs
-                putl_exs
+            let new_elements =
+              List.concat_map
+                ~f:(fun qe -> Symmetric_expand.expand lc qe)
+                qes
             in
-            let (best,best_cost) =
-              begin match lco with
-                | None -> (best,best_cost)
-                | Some (l,c) ->
-                  let cost = c +. f in
-                  if cost <=. best_cost then
-                    (Some l,cost)
-                  else
-                    (best,best_cost)
-              end
-            in
-            let new_elements = Symmetric_expand.expand lc qe in
             let pq = SPQ.push_all pq new_elements in
             gen_symmetric_lens_queuing
               pq
@@ -461,7 +479,12 @@ struct
       (exs:create_examples)
     : dnf_lens option =
     Option.map
-      ~f:(fun si -> si.l)
+      ~f:(fun si ->
+          if !verbose then
+            print_endline @$
+            show_synthesis_info
+              { si with oedr1 = []; l = ([],Permutation.create_from_pairs []); r1 = Regex.empty; r2 = Regex.empty };
+          si.l)
       (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let gen_lens

@@ -1,5 +1,8 @@
 open MyStdlib
 open Lang
+open Lenscontext
+open Consts
+open Lens_put
 
 
 (**** Exampled Regex {{{ *****)
@@ -54,44 +57,98 @@ let empty_string_example_data =
     ~arg2_data:[]
     ~output_data:[]
 
-
-type exampled_regex =
-  | ERegExEmpty
-  | ERegExBase of string * (int list list) example_data
-  | ERegExConcat of exampled_regex * exampled_regex * (int list list) example_data
-  | ERegExOr of exampled_regex  * exampled_regex * (int list list) example_data * Probability.t
-  | ERegExStar of exampled_regex * (int list list) example_data * Probability.t
-  | ERegExClosed of StochasticRegex.t * example_string_data * (int list list) example_data
-[@@deriving show]
-
-let extract_example_data (er:exampled_regex) : parsing_example_data =
-  begin match er with
-    | ERegExEmpty -> empty_parsing_example_data
-    | ERegExBase (_,pd) -> pd
-    | ERegExConcat (_,_,pd) -> pd
-    | ERegExOr (_,_,pd,_) -> pd
-    | ERegExStar (_,pd,_) -> pd
-    | ERegExClosed (_,_,pd) -> pd
-  end
-
 type run_mode = Arg1 | Arg2 | Output
 
-let extract_iterations_consumed
-    (m:run_mode)
-    (er:exampled_regex)
-  : int list list =
-  begin match m with
-    | Arg1 -> (extract_example_data er).arg1_data
-    | Arg2 -> (extract_example_data er).arg2_data
-    | Output -> (extract_example_data er).output_data
-  end
+module ExampledRegex =
+struct
+  type t = t_node hash_consed
+  and t_node =
+    | ERegExEmpty
+    | ERegExBase of string * (int list list) example_data
+    | ERegExConcat of t * t * (int list list) example_data
+    | ERegExOr of t * t * (int list list) example_data * Probability.t
+    | ERegExStar of t * (int list list) example_data * Probability.t
+    | ERegExClosed of StochasticRegex.t * example_string_data * (int list list) example_data
+  [@@deriving show, ord, hash]
 
-let took_regex
-    (m:run_mode)
-    (er:exampled_regex)
-    (iteration:int list) : bool =
-  let ill = extract_iterations_consumed m er in
-  List.mem ~equal:(=) ill iteration
+  let table = HashConsTable.create 100000
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
+  let make_t = hashcons
+
+  let empty = make_t ERegExEmpty
+
+  let mk_base
+      (s:string)
+      (ill:(int list list) example_data)
+    : t =
+    make_t (ERegExBase (s,ill))
+
+  let mk_concat
+      (er1:t)
+      (er2:t)
+      (ill:(int list list) example_data)
+    : t =
+    make_t (ERegExConcat (er1,er2,ill))
+
+  let mk_or
+      (er1:t)
+      (er2:t)
+      (ill:(int list list) example_data)
+      (p:Probability.t)
+    : t =
+    make_t (ERegExOr (er1,er2,ill,p))
+
+  let mk_star
+      (er:t)
+      (ill:(int list list) example_data)
+      (p:Probability.t)
+    : t =
+    make_t (ERegExStar (er,ill,p))
+
+  let mk_closed
+      (sr:StochasticRegex.t)
+      (es:example_string_data)
+      (ill:(int list list) example_data)
+    : t =
+    make_t (ERegExClosed (sr,es,ill))
+
+  let uid
+      (er:t)
+    : int =
+    er.tag
+
+  let table = HashConsTable.create 10000
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
+
+  let node er = er.node
+
+  let extract_example_data (er:t) : parsing_example_data =
+    begin match er.node with
+      | ERegExEmpty -> empty_parsing_example_data
+      | ERegExBase (_,pd) -> pd
+      | ERegExConcat (_,_,pd) -> pd
+      | ERegExOr (_,_,pd,_) -> pd
+      | ERegExStar (_,pd,_) -> pd
+      | ERegExClosed (_,_,pd) -> pd
+    end
+
+  let extract_iterations_consumed
+      (m:run_mode)
+      (er:t)
+    : int list list =
+    begin match m with
+      | Arg1 -> (extract_example_data er).arg1_data
+      | Arg2 -> (extract_example_data er).arg2_data
+      | Output -> (extract_example_data er).output_data
+    end
+
+  let took_regex
+      (m:run_mode)
+      (er:t)
+      (iteration:int list) : bool =
+    let ill = extract_iterations_consumed m er in
+    List.mem ~equal:(=) ill iteration
+end
 
 let extract_data
     (m:run_mode)
@@ -105,30 +162,30 @@ let extract_data
 
 let rec extract_string
     (m:run_mode)
-    (er:exampled_regex)
+    (er:ExampledRegex.t)
     (iteration:int list)
   : string =
-  begin match er with
-    | ERegExEmpty -> failwith "no string"
-    | ERegExBase (s,_) -> s
-    | ERegExConcat (er1,er2,_) ->
+  begin match er.node with
+    | ExampledRegex.ERegExEmpty -> failwith "no string"
+    | ExampledRegex.ERegExBase (s,_) -> s
+    | ExampledRegex.ERegExConcat (er1,er2,_) ->
       (extract_string m er1 iteration) ^
       (extract_string m er2 iteration)
-    | ERegExOr (er1,er2,_,_) ->
-      if took_regex m er1 iteration then
+    | ExampledRegex.ERegExOr (er1,er2,_,_) ->
+      if ExampledRegex.took_regex m er1 iteration then
         extract_string m er1 iteration
       else
         extract_string m er2 iteration
-    | ERegExStar (er',_,_) ->
-        let valid_iterations =
-          List.rev
-            (List.filter
-              ~f:(fun it -> List.tl_exn it = iteration)
-              (extract_iterations_consumed m er')) in
-        String.concat
-          (List.map
-            ~f:(extract_string m er')
-            valid_iterations)
+    | ExampledRegex.ERegExStar (er',_,_) ->
+      let valid_iterations =
+        List.rev
+          (List.filter
+             ~f:(fun it -> List.tl_exn it = iteration)
+             (ExampledRegex.extract_iterations_consumed m er')) in
+      String.concat
+        (List.map
+           ~f:(extract_string m er')
+           valid_iterations)
     | ERegExClosed (_,sl,ill) ->
       let dat_opt = List.findi
           ~f:(fun _ il -> il = iteration)
@@ -136,8 +193,8 @@ let rec extract_string
       begin match dat_opt with
         | None -> failwith "im horrible"
         | Some (i,_) ->
-            List.nth_exn (extract_data m sl) i
-        end
+          List.nth_exn (extract_data m sl) i
+      end
   end
 
 (*let rec exampled_regex_to_string (r:exampled_regex) : string =
@@ -169,30 +226,30 @@ let rec extract_string
 
 (**** Exampled DNF Regex {{{ *****)
 
-type exampled_atom =
-  | EAClosed of Regex.t *
-                StochasticRegex.t *
-                Lens.t *
-                (string list) example_data *
-                (int list list) example_data *
-                (string list) example_data
-  | EAStar of exampled_dnf_regex * (int list list) example_data * StochasticRegex.t
+module ExampledDNFRegex =
+struct
+  type exampled_atom =
+    | EAClosed of StochasticRegex.t *
+                  (string list) example_data *
+                  (int list list) example_data
+    | EAStar of t * (int list list) example_data * StochasticRegex.t
 
-and exampled_clause =
-  exampled_atom list
-  * string list
-  * (int list list) example_data
+  and exampled_clause =
+    exampled_atom list
+    * string list
+    * (int list list) example_data
 
-and exampled_dnf_regex =
-  (exampled_clause * Probability.t) list * int list list example_data
-[@@deriving ord, show, hash]
+  and t =
+    (exampled_clause * Probability.t) list * int list list example_data
+  [@@deriving ord, show, hash]
 
-let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
-  begin match ea with
-    | EAClosed (_,r,_,_,_,_) ->
-      StochasticRegex.make_closed r
-    | EAStar (_,_,r) -> r
-  end
+  let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
+    begin match ea with
+      | EAClosed (r,_,_) ->
+        StochasticRegex.make_closed r
+      | EAStar (_,_,r) -> r
+    end
+end
 
 (*let rec exampled_dnf_regex_to_string ((r,ill):exampled_dnf_regex) : string =
   paren ((String.concat
@@ -241,6 +298,8 @@ and ordered_exampled_clause = ((ordered_exampled_atom * int) list) list * string
 list * (int list list) example_data
 
 and ordered_exampled_dnf_regex = (ordered_exampled_clause * int) list list
+
+[@@deriving show]
 
 (*let rec compare_exampled_atoms (a1:exampled_atom) (a2:exampled_atom) :
   comparison =
@@ -317,16 +376,27 @@ and compare_ordered_exampled_dnf_regexs (r1:ordered_exampled_dnf_regex)
         r1
         r2
 
-let rec to_ordered_exampled_atom (a:exampled_atom) : ordered_exampled_atom =
+let rec to_ordered_exampled_atom
+    (lc:LensContext.t)
+    (a:ExampledDNFRegex.exampled_atom) : ordered_exampled_atom =
   begin match a with
-  | EAClosed (s,sorig,lmap,el,_,_) -> OEAClosed (s,sorig,lmap,el)
-  | EAStar (r,_,_) -> OEAStar (to_ordered_exampled_dnf_regex r)
+  | EAStar (r,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
+  | EAClosed (sorig,el,ill) ->
+      if !use_lens_context then
+        let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc (StochasticRegex.to_regex sorig) in
+        let ss = map_example_data (List.map ~f:(lens_creater converter)) el in
+        OEAClosed (rep_type,sorig,converter,ss)
+      else
+        let rorig = StochasticRegex.to_regex sorig in
+        OEAClosed (rorig,sorig,Lens.Identity rorig,el)
+
   end
 
 and to_ordered_exampled_clause
-    ((atoms,strings,exnums):exampled_clause)
+    (lc:LensContext.t)
+    ((atoms,strings,exnums):ExampledDNFRegex.exampled_clause)
   : ordered_exampled_clause =
-  let ordered_atoms = List.map ~f:to_ordered_exampled_atom atoms in
+  let ordered_atoms = List.map ~f:(to_ordered_exampled_atom lc) atoms in
   let ordered_ordered_atoms =
     sort_and_partition_with_indices
       compare_ordered_exampled_atoms
@@ -338,9 +408,11 @@ and to_ordered_exampled_clause
       ~arg2_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.arg2_data)
       ~output_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.output_data))
 
-and to_ordered_exampled_dnf_regex ((r,_):exampled_dnf_regex)
-        : ordered_exampled_dnf_regex =
-  let ordered_clauses = List.map ~f:(to_ordered_exampled_clause % fst) r in
+and to_ordered_exampled_dnf_regex
+    (lc:LensContext.t)
+    ((r,_):ExampledDNFRegex.t)
+  : ordered_exampled_dnf_regex =
+  let ordered_clauses = List.map ~f:((to_ordered_exampled_clause lc) % fst) r in
   sort_and_partition_with_indices
     compare_ordered_exampled_clauses
     ordered_clauses
@@ -355,6 +427,7 @@ type atom_lens =
 and clause_lens = atom_lens list * Permutation.t * string list * string list
 
 and dnf_lens = clause_lens list * Permutation.t
+[@@deriving show]
 
 let rec dnf_lens_to_string ((clause_lenses, permutation):dnf_lens) : string =
   let atom_lens_to_string (a:atom_lens) : string =

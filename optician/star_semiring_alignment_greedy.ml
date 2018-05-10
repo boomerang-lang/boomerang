@@ -549,10 +549,13 @@ struct
                          p)
                   in
                   let edge_costs = List.map ~f:left_right_cost associated_edges in
-                  let average_edge_cost = FloatList.average edge_costs in
                   let edge_count = List.length associated_edges in
-                  let choice_cost = Math.log2 (Float.of_int edge_count) in
-                  average_edge_cost +. choice_cost
+                  if edge_count = 0 then
+                    0.
+                  else
+                    let average_edge_cost = FloatList.average edge_costs in
+                    let choice_cost = Math.log2 (Float.of_int edge_count) in
+                    average_edge_cost +. choice_cost
                 in
                 let side_cost
                     (iam:MappingDict.IndirectAlignmentMapping.t)

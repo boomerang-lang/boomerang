@@ -671,6 +671,32 @@ struct
              (make_closed r', closed_f r' x'))
          r)
 
+  let dnf_size
+      (s:t)
+    : int =
+    let rec dnf_size_internal
+        (s:t)
+      : int * int =
+      begin match (node s) with
+        | Empty -> (0,0)
+        | Base _ -> (0,1)
+        | Concat (r1,r2) ->
+          let (size1,or_size1) = dnf_size_internal r1 in
+          let (size2,or_size2) = dnf_size_internal r2 in
+          (size1*or_size2 + size2*or_size1, or_size1 * or_size2) 
+        | Or (r1,r2,_) ->
+          let (size1,or_size1) = dnf_size_internal r1 in
+          let (size2,or_size2) = dnf_size_internal r2 in
+          (size1+size2,or_size1+or_size2)
+        | Star (r',_) ->
+          let (size,_) = dnf_size_internal r' in
+          (size+1,1)
+        | Closed _ ->
+          (1,1)
+      end
+    in
+    fst (dnf_size_internal s)
+
   let rec apply_at_every_level
       (f:t -> t)
       (r:t)
@@ -763,7 +789,17 @@ struct
          ~empty_f:(0.,empty)
          ~base_f:(fun s -> (1.,make_base s))
          ~concat_f:(fun (i1,r1) (i2,r2) -> (i1 *. i2,make_concat r1 r2))
-         ~or_f:(fun (i1,r1) (i2,r2) -> (i1 +. i2,make_or r1 r2 (i1 /. (i1 +. i2))))
+         ~or_f:(fun (i1,r1) (i2,r2) ->
+             let prob = i1 /. (i1 +. i2) in
+             let prob =
+               if prob = 0. then
+                 Float.min_positive_subnormal_value
+               else if prob = 1. then
+                 1. -. Float.epsilon_float
+               else
+                 prob
+             in
+             (i1 +. i2,make_or r1 r2 prob))
          ~star_f:(fun (_,r) -> (1.,make_star r 0.8))
          ~closed_f:(fun (i,r) -> (i,make_closed r))
          r)
@@ -871,7 +907,7 @@ struct
   let rec information_content
       (r:t)
     : float =
-    begin match node r with
+    let x = begin match node r with
       | Or(r1,r2,p) ->
         let ic1 = information_content r1 in
         let ic2 = information_content r2 in
@@ -892,7 +928,9 @@ struct
         (multiplier *. ic) +.
         (multiplier *. (Probability.information_content p)) +.
         (Probability.information_content not_p)
-    end
+    end in
+    if (Float.compare x Float.nan = 0) then failwith (Regex.show @$ to_regex r);
+    x
 end
 
 let stochastic_regex_star_semiring =

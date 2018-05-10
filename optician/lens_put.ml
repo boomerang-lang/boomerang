@@ -1,7 +1,5 @@
 open MyStdlib
 open Lang
-open Eval
-open Normalized_lang
 open Typing
 
 (*let rec lens_createl_internal

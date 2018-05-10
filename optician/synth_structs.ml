@@ -92,6 +92,13 @@ module SymmetricQueueElement = struct
     }
   [@@deriving ord, show, hash, make]
 
+  let dnf_distance
+      (q:t)
+    : int =
+    IntModule.distance
+      (StochasticRegex.dnf_size q.r1)
+      (StochasticRegex.dnf_size q.r2)
+
   let get_r1
       (q:t)
     : StochasticRegex.t =
@@ -184,10 +191,10 @@ module SymmetricQueueElement = struct
         qe.expansion_choices
     in
     Float.of_int qe.expansions_performed
-    +. List.fold_left
+    (*+. List.fold_left
       ~f:( +. )
       ~init:0.
-      ps_of_choices
+      ps_of_choices*)
 end
 
 
@@ -631,10 +638,10 @@ struct
 
   let exampled_dnf_regex_to_tree
       (lc:LensContext.t)
-      (ed:exampled_dnf_regex)
+      (ed:ExampledDNFRegex.t)
     : Tree.t =
     let rec exampled_dnf_regex_to_nonempty_tree
-        ((cs,ill):exampled_dnf_regex)
+        ((cs,ill):ExampledDNFRegex.t)
       : Tree.nonempty_t =
       let children =
         List.map
@@ -643,22 +650,22 @@ struct
       in
       Tree.mk_plus (PD.make ill) children
     and exampled_clause_to_nonempty_tree
-        ((ats,ss,ill):exampled_clause)
+        ((ats,ss,ill):ExampledDNFRegex.exampled_clause)
       : Tree.nonempty_t =
       let (children,regexps) =
         List.unzip
           (List.map
              ~f:(fun ec ->
                  (exampled_atom_to_nonempty_tree ec
-                 ,get_atom_regex ec))
+                 ,ExampledDNFRegex.get_atom_regex ec))
              ats)
       in
       Tree.mk_times (TD.make ill ss regexps) children
     and exampled_atom_to_nonempty_tree
-        (a:exampled_atom)
+        (a:ExampledDNFRegex.exampled_atom)
       : Tree.nonempty_t =
       begin match a with
-        | EAClosed (r,rs,_,_,ill,ss) ->
+        | EAClosed (rs,ss,ill) ->
           Tree.mk_base (BD.make rs ill ss)
         | EAStar (d,ill,_) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in

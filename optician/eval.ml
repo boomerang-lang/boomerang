@@ -2,24 +2,24 @@ open Core
 open Lang
 open Normalized_lang
 
-let rec to_empty_exampled_regex (r:StochasticRegex.t) : exampled_regex =
+let rec to_empty_exampled_regex (r:StochasticRegex.t) : ExampledRegex.t =
   begin match StochasticRegex.node r with
-  | Empty -> ERegExEmpty
-  | Base s -> ERegExBase (s,empty_parsing_example_data)
+  | Empty -> ExampledRegex.empty
+  | Base s -> ExampledRegex.mk_base s empty_parsing_example_data
   | Concat (r1,r2) ->
-      ERegExConcat (to_empty_exampled_regex r1,to_empty_exampled_regex r2,empty_parsing_example_data)
+      ExampledRegex.mk_concat (to_empty_exampled_regex r1) (to_empty_exampled_regex r2) empty_parsing_example_data
   | Or (r1,r2,p) ->
-      ERegExOr
-        ((to_empty_exampled_regex r1),
-         (to_empty_exampled_regex r2),
-         empty_parsing_example_data,
-         p)
-  | Star (r',p) -> ERegExStar (to_empty_exampled_regex r',empty_parsing_example_data,p)
-  | Closed r' -> ERegExClosed (r',empty_string_example_data,empty_parsing_example_data)
+      ExampledRegex.mk_or
+        (to_empty_exampled_regex r1)
+        (to_empty_exampled_regex r2)
+        empty_parsing_example_data
+        p
+  | Star (r',p) -> ExampledRegex.mk_star (to_empty_exampled_regex r') empty_parsing_example_data p
+  | Closed r' -> ExampledRegex.mk_closed r' empty_string_example_data empty_parsing_example_data
   end
 
-type data = run_mode * string * exampled_regex *
-            (string -> exampled_regex -> exampled_regex) list
+type data = run_mode * string * ExampledRegex.t *
+            (string -> ExampledRegex.t -> ExampledRegex.t) list
             * int list * string option
 
 type state =
@@ -54,8 +54,8 @@ let rec regex_to_dfa
         | None -> []
         | Some str' ->
             if not inside_var then
-              begin match er with
-              | ERegExBase (b,il) -> [(final,(m,str',ERegExBase (b,add_data m il is),recombiners,is,so))]
+              begin match er.node with
+              | ERegExBase (b,il) -> [(final,(m,str',ExampledRegex.mk_base b (add_data m il is),recombiners,is,so))]
               | _ -> failwith "bad";
               end
             else
@@ -66,8 +66,8 @@ let rec regex_to_dfa
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
       let new_start_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
-          begin match er with
-          | ERegExConcat (er1,er2,_) ->
+          begin match (ExampledRegex.node er) with
+          | ExampledRegex.ERegExConcat (er1,er2,_) ->
             let rc_swapsecond = (fun _ _ -> er2) in
             [r1_start_ref, (m,s,er1,rc_swapsecond::rc,is,so)]
           | _ -> failwith "i am a bad programmer"
@@ -78,8 +78,8 @@ let rec regex_to_dfa
       let new_middle_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
           begin match rc with
-          | h::t -> let rc_rememberfirst = (fun _ er' -> ERegExConcat (er,er',
-          extract_example_data er')) in
+          | h::t -> let rc_rememberfirst = (fun _ er' -> ExampledRegex.mk_concat er er'
+          (ExampledRegex.extract_example_data er')) in
             [r2_start_ref, (m,s,h s er,rc_rememberfirst::t,is,so)]
           | [] -> failwith "stupid bad"
           end
@@ -107,14 +107,14 @@ let rec regex_to_dfa
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in
       let new_start_fun = (fun (m,s,er,rc,is,so) ->
         if not inside_var then
-          begin match er with
-          | ERegExOr (er1,er2,il,p) ->
+          begin match (ExampledRegex.node er) with
+          | ExampledRegex.ERegExOr (er1,er2,il,p) ->
               let rc_left = 
                 (fun _ er1' ->
-                  ERegExOr (er1',er2,add_data m il is,p)) in
+                  ExampledRegex.mk_or er1' er2 (add_data m il is) p) in
               let rc_right =
                 (fun _ er2' ->
-                  ERegExOr (er1,er2',add_data m il is,p)) in
+                  ExampledRegex.mk_or er1 er2' (add_data m il is) p) in
               [(r1_start_ref, (m,s,er1,rc_left::rc,is,so))
               ;(r2_start_ref, (m,s,er2,rc_right::rc,is,so))]
           | _ -> failwith "bad programming error" 
@@ -157,11 +157,11 @@ let rec regex_to_dfa
       let new_start_fun = 
         if not inside_var then
           (fun (m,s,er,rc,is,so) ->
-            begin match er with
-            | ERegExStar (er',il,p) ->
+            begin match (ExampledRegex.node er) with
+            | ExampledRegex.ERegExStar (er',il,p) ->
               let rc_add_star =
                 (fun _ er'' ->
-                  ERegExStar (er'',add_data m il is,p)) in
+                  ExampledRegex.mk_star er'' (add_data m il is) p) in
                 [(inner_end_ref,(m,s,er',rc_add_star::rc,-1::is,so))]
             | _ -> failwith "error between keyboard and chair"
             end)
@@ -178,9 +178,9 @@ let rec regex_to_dfa
           (fun ((m,s,er,rc,is,_):data) ->
             [(inner_start_ref,(m,s,er,
               (fun s' er' ->
-                begin match er' with
-                | ERegExClosed (r',l,il) -> ERegExClosed
-                    (r',add_data m l (String.chop_suffix_exn ~suffix:s' s),add_data m il is)
+                begin match (ExampledRegex.node er') with
+                | ExampledRegex.ERegExClosed (r',l,il) -> ExampledRegex.mk_closed
+                    r' (add_data m l (String.chop_suffix_exn ~suffix:s' s)) (add_data m il is)
                 | _ -> failwith "programmer < dumpster"
                 end)::rc,is,Some s))]
           )
@@ -202,7 +202,7 @@ let rec regex_to_dfa
   end
 
 let rec eval_dfa (st:state) ((m,s,er,recombiners,is,so):data) :
-  exampled_regex option =
+  ExampledRegex.t option =
   begin match st with
   | State (f) ->
         let state_string_list = f (m,s,er,recombiners,is,so) in
@@ -232,7 +232,7 @@ let fast_eval (r:StochasticRegex.t) (s:string) : bool =
 let regex_to_exampled_regex
     (r:StochasticRegex.t)
     (s_ex_data:(int * string) list example_data)
-  : exampled_regex option =
+  : ExampledRegex.t option =
   let (dfa_start,_) = regex_to_dfa r false in
   let start_state = !dfa_start in
   List.fold_left

@@ -180,7 +180,18 @@ module IntModule = struct
   type t = int
   [@@deriving ord, show, hash]
 
+  let distance
+      (x:int)
+      (y:int)
+    : int =
+    Int.abs (x - y)
+
   let uid = ident
+end
+
+module StringModule = struct
+  type t = string
+  [@@deriving ord, show, hash]
 end
 
 module BoolModule = struct
