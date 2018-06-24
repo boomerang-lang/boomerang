@@ -421,7 +421,6 @@ struct
                     (SymmetricQueueElement.dnf_distance qe2))
               qes
           in
-          (*print_endline "END IT";*)
           let (best,best_cost) =
             List.fold_left
               ~f:(fun (best,best_cost) qe ->
@@ -451,7 +450,7 @@ struct
               sorted_qes
           in
           if f >=. best_cost then
-            best
+            ((*print_endline @$ string_of_float best_cost;*) best)
           else
             let new_elements =
               List.concat_map

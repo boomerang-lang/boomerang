@@ -959,7 +959,8 @@ struct
       putr:string -> string -> string;
       putl:string -> string -> string;
     }
-  [@@deriving show]
+
+  let pp_function_container _ _ = ()
 
   type t =
     | Disconnect of Regex.t * Regex.t * string * string

@@ -12,50 +12,58 @@ let rec clean_exampledness_atom
     (a:ExampledDNFRegex.exampled_atom)
   : ExampledDNFRegex.exampled_atom =
   begin match a with
-    | EAClosed (sorig,el,cs) ->
-      let orig_choice_zip = merge_example_data List.zip_exn el cs in
+    | EAClosed (sorig,csel) ->
       let actual_choices_orig =
         merge_example_data
           (fun ud ch ->
              List.filter
-               ~f:(fun (_,c) -> List.mem ~equal:(=) ch c)
+               ~f:(fun (c,_) -> List.mem ~equal:(=) ch c)
                ud)
-          orig_choice_zip
+          csel
           choices
       in
-      let (strs_orig,cs) = unzip_example_data (map_example_data List.unzip actual_choices_orig) in
-      EAClosed (sorig,strs_orig,cs)
-    | EAStar (r,cs,r_real) ->
-      let actual_choices =
+      EAClosed (sorig,actual_choices_orig)
+    | EAStar (r,p,cs,r_real) ->
+      let actual_choices_orig =
         merge_example_data
-          (fun cm ch -> List.filter
-             ~f:(fun c -> List.mem ~equal:(=) ch c)
-             cm)
+          (fun ud ch ->
+             List.filter
+               ~f:(fun (c,_) -> List.mem ~equal:(=) ch c)
+               ud)
           cs
           choices
       in
-      
-      EAStar (clean_exampledness_dnf_regex actual_choices r, actual_choices,r_real)
+      let sub_choices =
+        map_example_data
+          (List.map ~f:fst)
+          actual_choices_orig
+      in
+      EAStar
+        (clean_exampledness_dnf_regex sub_choices r
+        ,p
+        ,actual_choices_orig,r_real)
   end
 and clean_exampledness_clause
     (above_choices:int list list example_data)
     (((atoms,strings,current_choices),p):ExampledDNFRegex.exampled_clause * Probability.t)
   : ExampledDNFRegex.exampled_clause * Probability.t =
-  
-  
-  let actual_choices =
+  let actual_strings_choices =
     merge_example_data
       (fun choi abo ->
          List.filter
-           ~f:(fun ch -> List.mem ~equal:(=) abo ch)
+           ~f:(fun (ch,_) -> List.mem ~equal:(=) abo ch)
            choi)
-      above_choices
       current_choices
+      above_choices
   in
-
+  let actual_choices =
+    map_example_data
+      (List.map ~f:fst)
+      actual_strings_choices
+  in
   ((List.map ~f:(clean_exampledness_atom actual_choices) atoms,
     strings,
-    actual_choices)
+    actual_strings_choices)
   ,p)
 
 
@@ -74,9 +82,9 @@ and clean_exampledness_dnf_regex
       | _ -> false
     end
   in
-  let contains_sublist (viable_choices:int list list) (lowerc:int list) 
+  let contains_sublist (viable_choices:int list list) (lowerc:int list * string)
     : bool =
-    List.exists ~f:(is_suplist (List.rev lowerc)) (List.map ~f:List.rev
+    List.exists ~f:(is_suplist (List.rev (fst lowerc))) (List.map ~f:List.rev
                                                      viable_choices)
   in
   
@@ -89,41 +97,106 @@ and clean_exampledness_dnf_regex
       above_choices
       current_choices
   in
-  (List.map ~f:(clean_exampledness_clause viable_choices) clauses,viable_choices)
+  let viable_choices_parsing = map_example_data (List.map ~f:fst) viable_choices in
+  (List.map ~f:(clean_exampledness_clause viable_choices_parsing) clauses,viable_choices)
   
 let concat_exampled_dnf_regexs
-    ((r1,_):ExampledDNFRegex.t)
-    ((r2,_):ExampledDNFRegex.t)
-  : (ExampledDNFRegex.exampled_clause * Probability.t) list =
-  cartesian_map
-    ~f:(fun ((a1s,s1s,c1s),p1) ((a2s,s2s,c2s),p2) ->
-        let choices_taken =
-          merge_example_data
-            (intersect_lose_order_no_dupes
-               (compare_list ~cmp:Int.compare))
-            c1s
-            c2s
-        in
-        ((List.map ~f:(clean_exampledness_atom choices_taken)) (a1s@a2s),
-        weld_lists (^) s1s s2s,
-        choices_taken),p1*.p2)
-    r1
-    r2 (*TODO make test that checks that won't get the information propagated*)
-    
+    ((r1,sill1):ExampledDNFRegex.t)
+    ((r2,sill2):ExampledDNFRegex.t)
+  : ExampledDNFRegex.t =
+  let cs_ps =
+    cartesian_map
+      ~f:(fun ((a1s,s1s,ilss1),p1) ((a2s,s2s,ilss2),p2) ->
+          let parsings_strings =
+            merge_example_data
+              (intersect_map_lose_order_no_dupes
+                 ~cmp:(fun (il1,_) (il2,_) ->
+                     compare_list ~cmp:Int.compare il1 il2)
+                 ~f:(fun (il1,s1) (_,s2) -> (il1,s1^s2)))
+              ilss1
+              ilss2
+          in
+          let choices_taken = extract_parsing parsings_strings in
+          ((List.map
+              ~f:(clean_exampledness_atom choices_taken))
+             (a1s@a2s),
+           weld_lists (^) s1s s2s,
+           parsings_strings),p1*.p2)
+      r1
+      r2
+  in
+  let all_examples =
+    merge_example_data_list
+      (List.concat)
+      (List.map ~f:(fun ((_,_,ilss),_) -> ilss) cs_ps)
+  in
+
+  (*TODO make test that checks that won't get the information propagated*)
+  (cs_ps,all_examples)
+
 let or_exampled_dnf_regexs
-    ((r1,_):ExampledDNFRegex.t)
-    ((r2,_):ExampledDNFRegex.t)
+    ((r1,sils1):ExampledDNFRegex.t)
+    ((r2,sils2):ExampledDNFRegex.t)
     (p:Probability.t)
-  : (ExampledDNFRegex.exampled_clause * Probability.t) list =
+  : ExampledDNFRegex.t =
   let r1 = List.map ~f:(fun (c,p1) -> (c,p1 *. p)) r1 in
   let r2 = List.map ~f:(fun (c,p2) -> (c,p2 *. Probability.not p)) r2 in
-  r1@r2
-  
+  let cs : (ExampledDNFRegex.exampled_clause * Probability.t) list = r1@r2 in
+  let all_examples =
+    merge_example_data
+      (@)
+      sils1
+      sils2
+  in
+  (cs,all_examples)
+
 let exampled_atom_to_exampled_dnf_regex
     (a:ExampledDNFRegex.exampled_atom)
-    (ill:int list list example_data)
   : ExampledDNFRegex.t =
-  ([(([a],["";""],ill),1.)],ill)
+  let sils = ExampledDNFRegex.extract_atom_parsing_data a in
+  ([(([a],["";""],sils),1.)],sils)
+
+let star_exampled_dnf_regex
+    (dr:ExampledDNFRegex.t)
+    (p:Probability.t)
+    (s:StochasticRegex.t)
+  : ExampledDNFRegex.t =
+  let (cs,sils) = dr in
+  let keyed_sils =
+    map_example_data
+      (List.map
+         ~f:(fun (il,s) ->
+             let (ih,itl) = split_by_first_exn il in
+             (itl,(ih,s))))
+      sils
+  in
+  let keygroup_sils =
+    map_example_data
+      (group_by_keys
+         ~is_eq:(comparison_to_equality
+                 %% (compare_list ~cmp:Int.compare)))
+      keyed_sils
+  in
+  let new_sils =
+    map_example_data
+      (List.map
+         ~f:(fun (il,isl) ->
+             let sorted_isl =
+               List.sort
+                 ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+                 isl
+             in
+             (il
+             ,List.fold_left
+                ~f:(fun accs (_,s) ->
+                    accs ^ s)
+                ~init:""
+                sorted_isl)))
+      keygroup_sils
+  in
+  exampled_atom_to_exampled_dnf_regex
+    (ExampledDNFRegex.EAStar
+       (dr,p,new_sils,s))
 
 let rec exampled_regex_to_regex
     (er:ExampledRegex.t)
@@ -184,28 +257,39 @@ struct
     : ExampledDNFRegex.t =
     begin match r.node with
         | ERegExEmpty -> ([],empty_parsing_example_data)
-        | ERegExBase (c, ill) -> ([(([],[c],ill),1.)],ill)
-        | ERegExConcat (r1,r2,ill) ->
-          (concat_exampled_dnf_regexs
-             (recursive_f r1)
-             (recursive_f r2),ill)
-        | ERegExOr (r1,r2,ill,p) ->
+        | ERegExBase (c, ill) ->
+          let sill = map_example_data (List.map ~f:(fun il -> (il,c))) ill in
+          ([(([],[c],sill),1.)],sill)
+        | ERegExConcat (r1,r2,_) ->
+          concat_exampled_dnf_regexs
+            (recursive_f r1)
+            (recursive_f r2)
+        | ERegExOr (r1,r2,_,p) ->
           (or_exampled_dnf_regexs
              (recursive_f r1)
              (recursive_f r2)
-             p,ill)
+             p)
         | ERegExStar (r',ill,p) ->
-          exampled_atom_to_exampled_dnf_regex
+          star_exampled_dnf_regex
+            (recursive_f r')
+            p
+            (exampled_regex_to_regex r)
+          (*exampled_atom_to_exampled_dnf_regex
             (EAStar
                (recursive_f r'
+                ,p
                ,ill
-               ,(exampled_regex_to_regex r)))
-            ill
+               ,(exampled_regex_to_regex r)))*)
         | ERegExClosed (s,ss,ill) ->
+          let ilss =
+            merge_example_data
+              List.zip_exn
+              ill
+              ss
+          in
           exampled_atom_to_exampled_dnf_regex
-            (ExampledDNFRegex.EAClosed (s,ss,ill))
-            ill
-      end
+            (EAClosed (s,ilss))
+    end
 end
 
 module Memo = FixHCMemoizerOf(UnfixedExampledRegexToExampledDnfRegex)

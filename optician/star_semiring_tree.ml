@@ -23,7 +23,7 @@ struct
     | Base of BD.t
     | Plus of PD.t * (l * Probability.t) list
     | Times of TD.t * l list
-    | Star of SD.t * l
+    | Star of SD.t * l * Probability.t
   and l = t * L.t
   [@@deriving ord, show, hash]
 
@@ -38,7 +38,7 @@ struct
 
   let mk_times tl ls = hashcons (Times (tl,ls))
 
-  let mk_star sl l = hashcons (Star (sl,l))
+  let mk_star sl l p = hashcons (Star (sl,l,p))
 
   let fold_downward_upward
       (type a)
@@ -47,10 +47,10 @@ struct
       ~upward_base:(upward_base:b -> BD.t -> a)
       ~upward_plus:(upward_plus:b -> PD.t -> (L.t * a * Probability.t) list -> a)
       ~upward_times:(upward_times:b -> TD.t -> (L.t * a) list -> a)
-      ~upward_star:(upward_star:b -> SD.t -> L.t -> a -> a)
+      ~upward_star:(upward_star:b -> SD.t -> Probability.t -> L.t -> a -> a)
       ?downward_plus:(downward_plus:b -> PD.t -> L.t -> b = curry3 fst_trip)
       ?downward_times:(downward_times:b -> TD.t -> L.t -> b = curry3 fst_trip)
-      ?downward_star:(downward_star:b -> SD.t -> L.t -> b = curry3 fst_trip)
+      ?downward_star:(downward_star:b -> SD.t -> Probability.t -> L.t -> b = curry4 fst_quad)
       (ptst:t)
     : a =
     let rec fold_downward_upward_internal
@@ -81,11 +81,12 @@ struct
                    (l
                    ,fold_downward_upward_internal downward_acc' t))
                ts)
-        | Star (sd,(t,l)) ->
-          let downward_acc' = downward_star downward_acc sd l in
+        | Star (sd,(t,l),p) ->
+          let downward_acc' = downward_star downward_acc sd p l in
           upward_star
             downward_acc
             sd
+            p
             l
             (fold_downward_upward_internal downward_acc' t)
       end
@@ -98,7 +99,7 @@ struct
       ~base_f:(base_f:BD.t -> a)
       ~plus_f:(plus_f:PD.t -> (L.t * a * Probability.t) list -> a)
       ~times_f:(times_f:TD.t -> (L.t * a) list -> a)
-      ~star_f:(star_f:SD.t -> L.t -> a -> a)
+      ~star_f:(star_f:SD.t -> Probability.t -> L.t -> a -> a)
       v
     : a =
     fold_downward_upward
@@ -140,9 +141,12 @@ struct
                 acc +. (f *. (Float.of_int n)))
             ~init:0.
             nfl)
-      ~star_f:(fun _ _ f ->
-          (info_content_star_multiplier *. f)
-          +. info_content_star_const)
+      ~star_f:(fun _ p _ ic ->
+          let not_p = Probability.not p in
+          let multiplier = p /. not_p in
+          (multiplier *. ic) +.
+          (multiplier *. (Probability.information_content p)) +.
+          (Probability.information_content not_p))
 end
 
 module LabelledPlusTimesStarTreeOf
@@ -184,7 +188,7 @@ struct
     | Base of BD.t
     | Plus of PD.t * (nonempty_t * Probability.t) list
     | Times of TD.t * nonempty_t list
-    | Star of SD.t * nonempty_t
+    | Star of SD.t * Probability.t * nonempty_t
   [@@deriving ord, show, hash]
 
   type t =
@@ -211,9 +215,10 @@ struct
 
   let mk_star
       (s:SD.t)
+      (p:Probability.t)
       (t:nonempty_t)
     : nonempty_t =
-    Star (s,t)
+    Star (s,p,t)
 
   let mk_nonempty
       (t:nonempty_t)
@@ -232,10 +237,10 @@ struct
       ~upward_base:(upward_base:'b -> BD.t -> 'a)
       ~upward_plus:(upward_plus:'b -> PD.t -> ('a * Probability.t) list -> 'a)
       ~upward_times:(upward_times:'b -> TD.t -> 'a list -> 'a)
-      ~upward_star:(upward_star:'b -> SD.t -> 'a -> 'a)
+      ~upward_star:(upward_star:'b -> SD.t -> Probability.t -> 'a -> 'a)
       ?downward_plus:(downward_plus:'b -> PD.t -> 'b = curry fst)
       ?downward_times:(downward_times:'b -> TD.t -> 'b = curry fst)
-      ?downward_star:(downward_star:'b -> SD.t -> 'b = curry fst)
+      ?downward_star:(downward_star:'b -> SD.t -> Probability.t -> 'b = curry3 fst_trip)
       (ptst:t)
     : 'c =
     let rec fold_downward_upward_nonempty_internal
@@ -261,11 +266,12 @@ struct
             (List.map
                ~f:(fold_downward_upward_nonempty_internal downward_acc')
                ts)
-        | Star (sd,t) ->
-          let downward_acc' = downward_star downward_acc sd in
+        | Star (sd,p,t) ->
+          let downward_acc' = downward_star downward_acc sd p in
           upward_star
             downward_acc
             sd
+            p
             (fold_downward_upward_nonempty_internal downward_acc' t)
       end
 
@@ -284,7 +290,7 @@ struct
       ~base_f:(base_f:BD.t -> 'a)
       ~plus_f:(plus_f:PD.t -> ('a * Probability.t) list -> 'a)
       ~times_f:(times_f:TD.t -> 'a list -> 'a)
-      ~star_f:(star_f:SD.t -> 'a -> 'a)
+      ~star_f:(star_f:SD.t -> Probability.t -> 'a -> 'a)
       v
     : 'c =
     fold_downward_upward
@@ -424,7 +430,7 @@ struct
           in
           (Nonempty.mk_times t nvs
           ,NormalizationScript.Times (norm_label,nss)))
-      ~star_f:(fun s (t,ns) ->
-          (Nonempty.mk_star s (t,1)
-          ,NormalizationScript.Star (s,ns)))
+      ~star_f:(fun s p (t,ns) ->
+          (Nonempty.mk_star s (t,1) p
+          ,NormalizationScript.Star (s,p,ns)))
 end

@@ -45,6 +45,15 @@ let curry3
   : 'd =
   f (x,y,z)
 
+let curry4
+    (f:('a * 'b * 'c * 'd) -> 'e)
+    (w:'a)
+    (x:'b)
+    (y:'c)
+    (z:'d)
+  : 'e =
+  f (w,x,y,z)
+
 let uncurry3
     (f:'a -> 'b -> 'c -> 'd)
     ((x,y,z):'a * 'b * 'c)
@@ -80,6 +89,11 @@ let trd_trip
     ((_,_,z) : ('a*'b*'c))
   : 'c =
   z
+
+let fst_quad
+    ((x,_,_,_) : ('a * 'b * 'c * 'd))
+  : 'a =
+  x
 
 let thunk_of
     (x:'a)
@@ -992,15 +1006,20 @@ let ordered_partition_dictionary_order
         else
           cmp)
 
-let intersect_lose_order_no_dupes (cmp:'a -> 'a -> comparison)
-                                  (l1:'a list) (l2:'a list)
-                                  : 'a list =
-  let rec intersect_ordered (l1:'a list) (l2:'a list) : 'a list =
+let intersect_map_lose_order_no_dupes
+    (type a)
+    (type b)
+    ~f:(f:a -> a -> b)
+    ~cmp:(cmp:a -> a -> comparison)
+    (l1:a list)
+    (l2:a list)
+  : b list =
+  let rec intersect_ordered (l1:a list) (l2:a list) : b list =
     begin match (l1,l2) with
       | (h1::t1,h2::t2) ->
         let cmp = (cmp h1 h2) in
         if is_equal cmp then
-          h1::(intersect_ordered t1 t2)
+          (f h1 h2)::(intersect_ordered t1 t2)
         else if is_lt cmp then
           intersect_ordered t1 l2
         else
@@ -1012,6 +1031,48 @@ let intersect_lose_order_no_dupes (cmp:'a -> 'a -> comparison)
   let ordered_l1 = List.sort ~cmp:cmp l1 in
   let ordered_l2 = List.sort ~cmp:cmp l2 in
   intersect_ordered ordered_l1 ordered_l2
+
+let intersect_lose_order_no_dupes
+    (cmp:'a -> 'a -> comparison)
+    (l1:'a list)
+    (l2:'a list)
+  : 'a list =
+  intersect_map_lose_order_no_dupes ~f:(fun x y -> x) ~cmp:cmp l1 l2
+
+let minus_keys_lose_order
+    (cmp:'a -> 'a -> comparison)
+    (l1:('a * 'b) list)
+    (l2:'a list)
+  : ('a * 'b) list =
+  let rec set_minus_ordered
+      (l1:('a * 'b) list)
+      (l2:'a list)
+    : ('a * 'b) list =
+    begin match (l1,l2) with
+      | ((h1,v1)::t1,h2::t2) ->
+        let cmp = cmp h1 h2 in
+        if (is_equal cmp) then
+          set_minus_ordered t1 l2
+        else if (is_lt cmp) then
+          (h1,v1)::(set_minus_ordered t1 l2)
+        else
+          set_minus_ordered l1 t2
+    | ([],_) -> []
+    | (_,[]) -> l1
+    end
+  in
+  let ordered_l1 =
+    List.sort
+      ~cmp:(fun (k1,_) (k2,_) -> cmp k1 k2)
+      l1
+  in
+  let ordered_l2 =
+    List.dedup_and_sort
+      ~compare:cmp
+      l2
+  in
+  set_minus_ordered ordered_l1 ordered_l2
+
 
 let set_minus_lose_order (cmp:'a -> 'a -> comparison)
                                   (l1:'a list) (l2:'a list)

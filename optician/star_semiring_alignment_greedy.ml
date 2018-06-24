@@ -110,7 +110,7 @@ struct
       | Times (td,nts) ->
         TD.requires_mapping td
         || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
-      | Star (sd,(nt,_)) ->
+      | Star (sd,(nt,_),_) ->
         SD.requires_mapping sd
         || requires_mapping nt
       | Base bd ->
@@ -2027,8 +2027,8 @@ struct
           | (NormalizedTree.Nonempty.Times (tl1,tts1),
              NormalizedTree.Nonempty.Times (tl2,tts2)) ->
             get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
-          | (NormalizedTree.Nonempty.Star (sl1,(sts1,_)),
-             NormalizedTree.Nonempty.Star (sl2,(sts2,_))) ->
+          | (NormalizedTree.Nonempty.Star (sl1,(sts1,_),_),
+             NormalizedTree.Nonempty.Star (sl2,(sts2,_),_)) ->
             if not (SD.are_compatible sl1 sl2) then
               None
             else
@@ -2184,7 +2184,7 @@ struct
                   als
               in
               Times (tl1',tl2',aligns,projs1,projs2)
-          | (Star (sl1,sl2,ns'),Star (sl1',ns1'), Star (sl2',ns2')) ->
+          | (Star (sl1,sl2,ns'),Star (sl1',_,ns1'), Star (sl2',_,ns2')) ->
             if (sl1 <> sl1') || (sl2 <> sl2') then
               failwith "bad application of normalization script"
             else
@@ -2245,6 +2245,7 @@ struct
                 script1
                 script2
             in
+            (*if c >. 0. then print_endline (Nonempty.show na);*)
             (Some (NonemptyTree na),c)
           | None -> (None,1.)
         end

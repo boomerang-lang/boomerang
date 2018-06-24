@@ -37,7 +37,9 @@ let UPPERCASE
 
 let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
-  synth LOWERCASE <=> UPPERCASE using {putrex (("v","A"),"V")}
+  synth LOWERCASE <=> UPPERCASE using
+  {createrex ("v","V")
+  ,createrex ("w","W")}
 
 test "hi" = ?
 

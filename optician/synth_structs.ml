@@ -191,10 +191,10 @@ module SymmetricQueueElement = struct
         qe.expansion_choices
     in
     Float.of_int qe.expansions_performed
-    (*+. List.fold_left
+    +. List.fold_left
       ~f:( +. )
       ~init:0.
-      ps_of_choices*)
+      ps_of_choices
 end
 
 
@@ -205,7 +205,7 @@ struct
   struct
     type t =
       {
-        parsings : int list list example_data ;
+        parsings_strings : (int list * string) list example_data ;
       }
     [@@deriving ord, show, hash, make]
 
@@ -213,10 +213,10 @@ struct
         (v1:t)
         (v2:t)
       : bool =
-      let r_arg1_parsings = v1.parsings.arg1_data in
-      let r_result_parsings = v2.parsings.output_data in
-      let l_arg1_parsings = v2.parsings.arg1_data in
-      let l_result_parsings = v1.parsings.output_data in
+      let r_arg1_parsings = List.map ~f:fst v1.parsings_strings.arg1_data in
+      let r_result_parsings = List.map ~f:fst v2.parsings_strings.output_data in
+      let l_arg1_parsings = List.map ~f:fst v2.parsings_strings.arg1_data in
+      let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
       let is_compat_r =
         is_equal
           (compare_list
@@ -236,14 +236,35 @@ struct
     let requires_mapping
         (v:t)
       : bool =
+      let arg2_data = v.parsings_strings.arg2_data in
+      let output_data = v.parsings_strings.output_data in
+      let arg2_data_keys = List.map ~f:fst arg2_data in
+      let create_parsings =
+        minus_keys_lose_order
+          (compare_list ~cmp:Int.compare)
+          output_data
+          arg2_data_keys
+      in
+      let valid_creates =
+        begin match create_parsings with
+          | [] -> true
+          | (_,s)::t ->
+            let default = s in
+            List.fold_left
+              ~f:(fun acc (_,s) -> acc && s = default)
+              ~init:true
+              t
+        end
+      in
+      valid_creates &&
       not
         (List.for_all
            ~f:(fun p ->
                List.mem
                  ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
-                 v.parsings.output_data
+                 (List.map ~f:fst v.parsings_strings.output_data)
                  p)
-           v.parsings.arg2_data)
+           (List.map ~f:fst (v.parsings_strings.arg2_data)))
 
     module Default = IntModule
     let extract_default _ = failwith "ah"
@@ -253,9 +274,9 @@ struct
   struct
     type t =
       {
-        parsings : int list list example_data ;
-        strings  : string list                ;
-        atoms    : StochasticRegex.t list     ;
+        parsings_strings : (int list * string) list example_data ;
+        strings          : string list                           ;
+        atoms            : StochasticRegex.t list                ;
       }
     [@@deriving hash]
 
@@ -263,13 +284,15 @@ struct
         (td1:t)
         (td2:t)
       : int =
-      compare_parsing_example_data td1.parsings td2.parsings
+      compare_parsings_strings_example_data
+        td1.parsings_strings
+        td2.parsings_strings
 
     let pp
         (f:Format.formatter)
         (td:t)
       : unit =
-      pp_parsing_example_data f td.parsings
+      pp_parsings_strings_example_data f td.parsings_strings
 
     let show
         (x:t)
@@ -280,22 +303,22 @@ struct
         (s:Base__Hash.state)
         (td:t)
       : Base__Hash.state =
-      hash_fold_parsing_example_data s td.parsings
+      hash_fold_parsings_strings_example_data s td.parsings_strings
 
     let hash
         (td:t)
       : int =
-      hash_parsing_example_data td.parsings
+      hash_parsings_strings_example_data td.parsings_strings
 
     let make
-        (parsings:int list list example_data)
+        (parsings_strings:(int list * string) list example_data)
         (strings:string list)
         (atoms:StochasticRegex.t list)
       : t =
       {
-        parsings = parsings ;
-        strings  = strings  ;
-        atoms    = atoms    ;
+        parsings_strings = parsings_strings ;
+        strings          = strings          ;
+        atoms            = atoms            ;
       }
 
     let get_strings
@@ -312,10 +335,10 @@ struct
         (v1:t)
         (v2:t)
       : bool =
-      let r_arg1_parsings = v1.parsings.arg1_data in
-      let r_result_parsings = v2.parsings.output_data in
-      let l_arg1_parsings = v2.parsings.arg1_data in
-      let l_result_parsings = v1.parsings.output_data in
+      let r_arg1_parsings = List.map ~f:fst v1.parsings_strings.arg1_data in
+      let r_result_parsings = List.map ~f:fst v2.parsings_strings.output_data in
+      let l_arg1_parsings = List.map ~f:fst v2.parsings_strings.arg1_data in
+      let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
       let is_compat_r =
         is_equal
           (compare_list
@@ -335,14 +358,40 @@ struct
     let requires_mapping
         (v:t)
       : bool =
+      let arg2_data = v.parsings_strings.arg2_data in
+      let output_data = v.parsings_strings.output_data in
+      let arg2_data_keys = List.map ~f:fst arg2_data in
+      let create_parsings =
+        minus_keys_lose_order
+          (compare_list ~cmp:Int.compare)
+          output_data
+          arg2_data_keys
+      in
+      let valid_creates =
+        begin match create_parsings with
+          | [] -> true
+          | (_,s)::t ->
+            let default = s in
+            List.fold_left
+              ~f:(fun acc (_,s) -> acc && s = default)
+              ~init:true
+              t
+        end
+      in
+      valid_creates &&
+      let parsings_output_data =
+        List.map
+          ~f:fst
+          v.parsings_strings.output_data
+      in
       not
         (List.for_all
            ~f:(fun p ->
                List.mem
                  ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
-                 v.parsings.output_data
-                 p)
-           v.parsings.arg2_data)
+                 parsings_output_data
+                 (fst p))
+           v.parsings_strings.arg2_data)
 
     module Default = IntModule
     let extract_default _ = failwith "ah"
@@ -352,7 +401,7 @@ struct
   struct
     type t =
       {
-        parsings : int list list example_data ;
+        parsings_strings : (int list * string) list example_data ;
       }
     [@@deriving ord, show, hash, make]
 
@@ -360,10 +409,10 @@ struct
         (v1:t)
         (v2:t)
       : bool =
-      let r_arg1_parsings = v1.parsings.arg1_data in
-      let r_result_parsings = v2.parsings.output_data in
-      let l_arg1_parsings = v2.parsings.arg1_data in
-      let l_result_parsings = v1.parsings.output_data in
+      let r_arg1_parsings = List.map ~f:fst v1.parsings_strings.arg1_data in
+      let r_result_parsings = List.map ~f:fst v2.parsings_strings.output_data in
+      let l_arg1_parsings = List.map ~f:fst v2.parsings_strings.arg1_data in
+      let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
       let is_compat_r =
         is_equal
           (compare_list
@@ -383,14 +432,36 @@ struct
     let requires_mapping
         (v:t)
       : bool =
+      let parsings_output_data = List.map ~f:fst v.parsings_strings.output_data in
+      let arg2_data = v.parsings_strings.arg2_data in
+      let output_data = v.parsings_strings.output_data in
+      let arg2_data_keys = List.map ~f:fst arg2_data in
+      let create_parsings =
+        minus_keys_lose_order
+          (compare_list ~cmp:Int.compare)
+          output_data
+          arg2_data_keys
+      in
+      let valid_creates =
+        begin match create_parsings with
+          | [] -> true
+          | (_,s)::t ->
+            let default = s in
+            List.fold_left
+              ~f:(fun acc (_,s) -> acc && s = default)
+              ~init:true
+              t
+        end
+      in
+      valid_creates &&
       not
         (List.for_all
            ~f:(fun p ->
                List.mem
                  ~equal:(is_equal %% (compare_list ~cmp:Int.compare))
-                 v.parsings.output_data
+                 parsings_output_data
                  p)
-           v.parsings.arg2_data)
+           (List.map ~f:fst v.parsings_strings.arg2_data))
 
     module Default = IntModule
     let extract_default _ = failwith "ah"
@@ -401,29 +472,6 @@ struct
     type parsings_strings_example_data =
       (int list * string) list example_data
     [@@deriving ord, show, hash]
-
-    let merge_parsings_strings_example_data
-        (parsings:int list list example_data)
-        (strings:string list example_data)
-      : (int list * string) list example_data =
-      let combine_parsings_strings
-          (parsings:int list list)
-          (strings:string list)
-        : (int list * string) list =
-        List.zip_exn
-          parsings
-          strings
-      in
-      make_example_data
-        ~arg1_data:(combine_parsings_strings
-                      parsings.arg1_data
-                      strings.arg1_data)
-        ~arg2_data:(combine_parsings_strings
-                      parsings.arg2_data
-                      strings.arg2_data)
-        ~output_data:(combine_parsings_strings
-                        parsings.output_data
-                        strings.output_data)
 
     type hashable_t = parsings_strings_example_data * StochasticRegex.t
     [@@deriving hash,show]
@@ -473,12 +521,11 @@ struct
 
     let make
         (stochastic_regex:StochasticRegex.t)
-        (ill:int list list example_data)
-        (ss:string list example_data)
+        (ilsl:((int list * string) list example_data))
       : t =
       {
-        parsings_strings = merge_parsings_strings_example_data ill ss ;
-        stochastic_regex = stochastic_regex                           ;
+        parsings_strings = ilsl             ;
+        stochastic_regex = stochastic_regex ;
       }
 
     module Alignment =
@@ -494,7 +541,6 @@ struct
         (v1:t)
         (v2:t)
       : Lens.t option =
-      (*TODO contextual lenses*)
       let rep_v1 = LensContext.rep_elt lc (StochasticRegex.to_regex v1.stochastic_regex) in
       let rep_v2 = LensContext.rep_elt lc (StochasticRegex.to_regex v2.stochastic_regex) in
       if Regex.compare rep_v1 rep_v2 <> 0 then
@@ -606,6 +652,27 @@ struct
     let requires_mapping
         (v:t)
       : bool =
+      let arg2_data = v.parsings_strings.arg2_data in
+      let output_data = v.parsings_strings.output_data in
+      let arg2_data_keys = List.map ~f:fst arg2_data in
+      let create_parsings =
+        minus_keys_lose_order
+          (compare_list ~cmp:Int.compare)
+          output_data
+          arg2_data_keys
+      in
+      let valid_creates =
+        begin match create_parsings with
+          | [] -> true
+          | (_,s)::t ->
+            let default = s in
+            List.fold_left
+              ~f:(fun acc (_,s) -> acc && s = default)
+              ~init:true
+              t
+        end
+      in
+      not valid_creates ||
       not
         (List.for_all
            ~f:(fun p ->
@@ -665,11 +732,11 @@ struct
         (a:ExampledDNFRegex.exampled_atom)
       : Tree.nonempty_t =
       begin match a with
-        | EAClosed (rs,ss,ill) ->
-          Tree.mk_base (BD.make rs ill ss)
-        | EAStar (d,ill,_) ->
+        | EAClosed (rs,ilss) ->
+          Tree.mk_base (BD.make rs ilss)
+        | EAStar (d,p,ill,_) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in
-          Tree.mk_star (SD.make ill) child
+          Tree.mk_star (SD.make ill) p child
       end
     in
     Tree.mk_nonempty (exampled_dnf_regex_to_nonempty_tree ed)

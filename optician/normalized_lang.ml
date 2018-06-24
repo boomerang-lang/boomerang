@@ -39,11 +39,37 @@ let merge_example_data
     ~arg2_data:(f ed1.arg2_data ed2.arg2_data)
     ~output_data:(f ed1.output_data ed2.output_data)
 
+let merge_example_data_list
+    (f:'a list -> 'b)
+    (eds:('a example_data) list)
+  : 'b example_data =
+  make_example_data
+    ~arg1_data:(f (List.map ~f:(fun ed -> ed.arg1_data) eds))
+    ~arg2_data:(f (List.map ~f:(fun ed -> ed.arg2_data) eds))
+    ~output_data:(f (List.map ~f:(fun ed -> ed.output_data) eds))
+
 type parsing_example_data = (int list list) example_data
 [@@deriving ord, show, hash]
 
 type example_string_data = (string list) example_data
 [@@deriving ord, show, hash]
+
+type parsings_strings_example_data = (int list * string) list example_data
+[@@deriving ord, show, hash]
+
+let extract_parsing
+    (psed:parsings_strings_example_data)
+  : parsing_example_data =
+  map_example_data
+    (List.map ~f:fst)
+    psed
+
+let extract_strings
+    (psed:parsings_strings_example_data)
+  : example_string_data =
+  map_example_data
+    (List.map ~f:snd)
+    psed
 
 let empty_parsing_example_data =
   make_example_data
@@ -229,25 +255,33 @@ let rec extract_string
 module ExampledDNFRegex =
 struct
   type exampled_atom =
-    | EAClosed of StochasticRegex.t *
-                  (string list) example_data *
-                  (int list list) example_data
-    | EAStar of t * (int list list) example_data * StochasticRegex.t
+    | EAClosed of
+        StochasticRegex.t *
+        ((int list * string) list) example_data
+    | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t
 
   and exampled_clause =
     exampled_atom list
     * string list
-    * (int list list) example_data
+    * ((int list) * string) list example_data
 
   and t =
-    (exampled_clause * Probability.t) list * int list list example_data
+    (exampled_clause * Probability.t) list * (int list * string) list example_data
   [@@deriving ord, show, hash]
 
   let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
     begin match ea with
-      | EAClosed (r,_,_) ->
+      | EAClosed (r,_) ->
         StochasticRegex.make_closed r
-      | EAStar (_,_,r) -> r
+      | EAStar (_,_,_,r) -> r
+    end
+
+  let extract_atom_parsing_data
+      (ea:exampled_atom)
+    : parsings_strings_example_data =
+    begin match ea with
+      | EAClosed (_,ilss) -> ilss
+      | EAStar (_,_,ilss,_) -> ilss
     end
 end
 
@@ -380,15 +414,16 @@ let rec to_ordered_exampled_atom
     (lc:LensContext.t)
     (a:ExampledDNFRegex.exampled_atom) : ordered_exampled_atom =
   begin match a with
-  | EAStar (r,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
-  | EAClosed (sorig,el,ill) ->
-      if !use_lens_context then
-        let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc (StochasticRegex.to_regex sorig) in
-        let ss = map_example_data (List.map ~f:(lens_creater converter)) el in
-        OEAClosed (rep_type,sorig,converter,ss)
-      else
-        let rorig = StochasticRegex.to_regex sorig in
-        OEAClosed (rorig,sorig,Lens.Identity rorig,el)
+  | EAStar (r,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
+  | EAClosed (sorig,ilel) ->
+    let (_,el) = unzip_example_data @$ map_example_data List.unzip ilel in
+    if !use_lens_context then
+      let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc (StochasticRegex.to_regex sorig) in
+      let ss = map_example_data (List.map ~f:(lens_creater converter)) el in
+      OEAClosed (rep_type,sorig,converter,ss)
+    else
+      let rorig = StochasticRegex.to_regex sorig in
+      OEAClosed (rorig,sorig,Lens.Identity rorig,el)
 
   end
 
@@ -404,9 +439,15 @@ and to_ordered_exampled_clause
   (ordered_ordered_atoms
   ,strings
   ,make_example_data
-      ~arg1_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.arg1_data)
-      ~arg2_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.arg2_data)
-      ~output_data:(List.sort ~cmp:(compare_list ~cmp:Int.compare) exnums.output_data))
+      ~arg1_data:(List.sort
+                    ~cmp:(compare_list ~cmp:Int.compare)
+                    ((List.map ~f:fst) exnums.arg1_data))
+      ~arg2_data:(List.sort
+                    ~cmp:(compare_list ~cmp:Int.compare)
+                    ((List.map ~f:fst) exnums.arg2_data))
+      ~output_data:(List.sort
+                      ~cmp:(compare_list ~cmp:Int.compare)
+                      ((List.map ~f:fst) exnums.output_data)))
 
 and to_ordered_exampled_dnf_regex
     (lc:LensContext.t)
