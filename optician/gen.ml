@@ -421,7 +421,7 @@ struct
                     (SymmetricQueueElement.dnf_distance qe2))
               qes
           in
-          print_endline "END IT";
+          (*print_endline "END IT";*)
           let (best,best_cost) =
             List.fold_left
               ~f:(fun (best,best_cost) qe ->
