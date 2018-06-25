@@ -449,7 +449,7 @@ struct
               ~init:(best,best_cost)
               sorted_qes
           in
-          if f >=. best_cost || !attempts >= 4 then
+          if f >=. best_cost then
             ((*print_endline @$ string_of_float best_cost;*) best)
           else
             let new_elements =
