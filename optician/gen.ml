@@ -396,9 +396,9 @@ struct
       : Lens.t option =
       begin match SPQ.pop_until_new_priority pq with
         | Some (f,qes,pq) ->
+          attempts := !attempts+List.length qes;
           if !verbose then
             (print_endline "popped";
-             attempts := !attempts+List.length qes;
              print_endline ("attempt #" ^ (string_of_int !attempts));
              (*print_endline ("r1: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r1 qe));
              print_endline "\n\n";
@@ -449,7 +449,7 @@ struct
               ~init:(best,best_cost)
               sorted_qes
           in
-          if f >=. best_cost then
+          if f >=. best_cost || !attempts >= 4 then
             ((*print_endline @$ string_of_float best_cost;*) best)
           else
             let new_elements =

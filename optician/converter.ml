@@ -256,39 +256,33 @@ struct
       (r:ExampledRegex.t)
     : ExampledDNFRegex.t =
     begin match r.node with
-        | ERegExEmpty -> ([],empty_parsing_example_data)
-        | ERegExBase (c, ill) ->
-          let sill = map_example_data (List.map ~f:(fun il -> (il,c))) ill in
-          ([(([],[c],sill),1.)],sill)
-        | ERegExConcat (r1,r2,_) ->
-          concat_exampled_dnf_regexs
-            (recursive_f r1)
-            (recursive_f r2)
-        | ERegExOr (r1,r2,_,p) ->
-          (or_exampled_dnf_regexs
-             (recursive_f r1)
-             (recursive_f r2)
-             p)
-        | ERegExStar (r',ill,p) ->
-          star_exampled_dnf_regex
-            (recursive_f r')
-            p
-            (exampled_regex_to_regex r)
-          (*exampled_atom_to_exampled_dnf_regex
-            (EAStar
-               (recursive_f r'
-                ,p
-               ,ill
-               ,(exampled_regex_to_regex r)))*)
-        | ERegExClosed (s,ss,ill) ->
-          let ilss =
-            merge_example_data
-              List.zip_exn
-              ill
-              ss
-          in
-          exampled_atom_to_exampled_dnf_regex
-            (EAClosed (s,ilss))
+      | ERegExEmpty -> ([],empty_parsing_example_data)
+      | ERegExBase (c, ill) ->
+        let sill = map_example_data (List.map ~f:(fun il -> (il,c))) ill in
+        ([(([],[c],sill),1.)],sill)
+      | ERegExConcat (r1,r2,_) ->
+        concat_exampled_dnf_regexs
+          (recursive_f r1)
+          (recursive_f r2)
+      | ERegExOr (r1,r2,_,p) ->
+        (or_exampled_dnf_regexs
+           (recursive_f r1)
+           (recursive_f r2)
+           p)
+      | ERegExStar (r',ill,p) ->
+        star_exampled_dnf_regex
+          (recursive_f r')
+          p
+          (exampled_regex_to_regex r)
+      | ERegExClosed (s,ss,ill) ->
+        let ilss =
+          merge_example_data
+            List.zip_exn
+            ill
+            ss
+        in
+        exampled_atom_to_exampled_dnf_regex
+          (EAClosed (s,ilss))
     end
 end
 

@@ -276,6 +276,11 @@ struct
       | EAStar (_,_,_,r) -> r
     end
 
+  let extract_example_data
+      ((_,ed):t)
+    : (int list * string) list example_data =
+    ed
+
   let extract_atom_parsing_data
       (ea:exampled_atom)
     : parsings_strings_example_data =

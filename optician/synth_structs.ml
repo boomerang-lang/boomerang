@@ -219,14 +219,14 @@ struct
       let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
       let is_compat_r =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              r_arg1_parsings
              r_result_parsings)
       in
       let is_compat_l =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              l_arg1_parsings
              l_result_parsings)
@@ -339,20 +339,23 @@ struct
       let r_result_parsings = List.map ~f:fst v2.parsings_strings.output_data in
       let l_arg1_parsings = List.map ~f:fst v2.parsings_strings.arg1_data in
       let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
+      (*print_endline @$ show_parsings_strings_example_data v1.parsings_strings;
+      print_endline @$ show_parsings_strings_example_data v2.parsings_strings;*)
       let is_compat_r =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              r_arg1_parsings
              r_result_parsings)
       in
       let is_compat_l =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              l_arg1_parsings
              l_result_parsings)
       in
+      (*print_endline @$ string_of_bool (is_compat_r && is_compat_l);*)
       is_compat_r && is_compat_l
 
     let requires_mapping
@@ -415,14 +418,14 @@ struct
       let l_result_parsings = List.map ~f:fst v1.parsings_strings.output_data in
       let is_compat_r =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              r_arg1_parsings
              r_result_parsings)
       in
       let is_compat_l =
         is_equal
-          (compare_list
+          (compare_list_as_multisets
              ~cmp:(compare_list ~cmp:Int.compare)
              l_arg1_parsings
              l_result_parsings)

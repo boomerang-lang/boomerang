@@ -132,6 +132,15 @@ let compare_list
   : ('a list) comparer =
   compare_list cmp
 
+let compare_list_as_multisets
+    ~cmp:(cmp:'a comparer)
+    (l1:'a list)
+    (l2:'a list)
+  : int =
+  let sorted_l1 = List.sort ~cmp:cmp l1 in
+  let sorted_l2 = List.sort ~cmp:cmp l2 in
+  compare_list ~cmp sorted_l1 sorted_l2
+
 let make_matchable (n:comparison) : matchable_comparison =
   if n = 0 then
     EQ
