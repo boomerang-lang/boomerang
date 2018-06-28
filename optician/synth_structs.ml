@@ -180,7 +180,7 @@ module SymmetricQueueElement = struct
   let priority
       (qe : t)
     : Priority.t =
-    let information_content_of_choice
+    (*let information_content_of_choice
         (n:int)
       : float =
       Math.log2 (Float.of_int n)
@@ -189,12 +189,13 @@ module SymmetricQueueElement = struct
       List.map
         ~f:information_content_of_choice
         qe.expansion_choices
-    in
+    in*)
     Float.of_int qe.expansions_performed
-    +. List.fold_left
+    (*+. List.fold_left
       ~f:( +. )
       ~init:0.
       ps_of_choices
+    +. 20.*)
 end
 
 

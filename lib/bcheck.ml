@@ -837,7 +837,7 @@ and check_exp ?(in_let=false) sev e0 =
     | ECast(i,f,t,b,e) -> 
       static_error i (fun () -> msg "@[unexpected@ cast@ expression@ in@ source@ term@]")
 
-    | ESynth(i,e1,e2,exs) ->
+    | ESynth(i,e1,e2,exs,f) ->
       let check_and_coerce_regexp e =
         let (e_sort,e) = check_exp sev e in
         let i = info_of_exp e in
@@ -857,7 +857,7 @@ and check_exp ?(in_let=false) sev e0 =
       in
       let e1 = check_and_coerce_regexp e1 in
       let e2 = check_and_coerce_regexp e2 in
-      (SLens,ESynth(i,e1,e2,exs))
+      (SLens,ESynth(i,e1,e2,exs,f))
 
     | EGrammar(i,ps) ->
         (* helpers for constructing asts *)

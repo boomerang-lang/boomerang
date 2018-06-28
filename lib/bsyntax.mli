@@ -101,6 +101,7 @@ and exp =
                      | `PutREx
                      | `PutLEx]
                      * exp) list
+                  * float
 
     (* booleans with counter examples *)
     (* None ~ true; Some s ~ false with counterexample s *)
@@ -246,4 +247,5 @@ val mk_synth : Info.t -> exp -> exp ->
    | `PutREx
    | `PutLEx]
    * exp) list ->
+  float ->
   exp

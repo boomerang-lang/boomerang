@@ -380,6 +380,7 @@ struct
     Option.map ~f:(fun x -> x.expansions_forced) (gen_dnf_lens_and_info_zipper lc r1 r2 exs)
 
   let gen_symmetric_lens
+      (keep_going:Float.t)
       (lc:LensContext.t)
       (r1:StochasticRegex.t)
       (r2:StochasticRegex.t)
@@ -394,9 +395,19 @@ struct
         (best:Lens.t option)
         (best_cost:float)
       : Lens.t option =
+      let calc_comparison_cost
+          (distance:Float.t)
+          (choice_cost:Float.t)
+        : Float.t =
+        Float.max
+          (distance +. choice_cost -. keep_going)
+          0.
+      in
       begin match SPQ.pop_until_new_priority pq with
         | Some (f,qes,pq) ->
-          attempts := !attempts+List.length qes;
+          let popped_count = List.length qes in
+          attempts := !attempts+popped_count;
+          let choice_cost = Math.log2 (Float.of_int popped_count) in
           if !verbose then
             (print_endline "popped";
              print_endline ("attempt #" ^ (string_of_int !attempts));
@@ -405,6 +416,7 @@ struct
              print_endline ("r2: " ^ StochasticRegex.representative_exn (SymmetricQueueElement.get_r2 qe));
              print_endline "\n\n";*)
              print_endline ("priority: " ^ (SymmetricQueueElement.Priority.show f));
+             print_endline ("choice_cost: " ^ (Float.to_string choice_cost));
              print_endline "\n\n";
              print_endline ("bestpriority: " ^ (SymmetricQueueElement.Priority.show best_cost));
              print_endline "\n\n";
@@ -413,6 +425,7 @@ struct
              print_endline ("exps_inferred: " ^ (string_of_int (SymmetricQueueElement.get_expansions_inferred qe)));
              print_endline "\n\n";
                print_endline ("exps_forced: " ^ (string_of_int (SymmetricQueueElement.get_expansions_forced qe)))*));
+          let comparison_cost = calc_comparison_cost f choice_cost in
           let sorted_qes =
             List.sort
               ~cmp:(fun qe1 qe2 ->
@@ -421,47 +434,50 @@ struct
                     (SymmetricQueueElement.dnf_distance qe2))
               qes
           in
-          let (best,best_cost) =
-            List.fold_left
-              ~f:(fun (best,best_cost) qe ->
-                  if f >= best_cost then
-                    (best,best_cost)
-                  else
-                    let lco =
-                      kinda_rigid_synth
-                        lc
-                        qe.r1
-                        qe.r2
-                        creater_exs
-                        createl_exs
-                        putr_exs
-                        putl_exs
-                    in
-                    begin match lco with
-                      | None -> (best,best_cost)
-                      | Some (l,c) ->
-                        let cost = c +. f in
-                        if cost <=. best_cost then
-                          (Some l,cost)
-                        else
-                          (best,best_cost)
-                    end)
-              ~init:(best,best_cost)
-              sorted_qes
-          in
-          if f >=. best_cost then
-            ((*print_endline @$ string_of_float best_cost;*) best)
+          if comparison_cost >=. best_cost then
+            (if !verbose then print_endline @$ string_of_float best_cost; best)
           else
-            let new_elements =
-              List.concat_map
-                ~f:(fun qe -> Symmetric_expand.expand lc qe)
-                qes
+            let (best,best_cost) =
+              List.fold_left
+                ~f:(fun (best,best_cost) qe ->
+                    if comparison_cost >= best_cost then
+                      (best,best_cost)
+                    else
+                      let lco =
+                        kinda_rigid_synth
+                          lc
+                          qe.r1
+                          qe.r2
+                          creater_exs
+                          createl_exs
+                          putr_exs
+                          putl_exs
+                      in
+                      begin match lco with
+                        | None -> (best,best_cost)
+                        | Some (l,c) ->
+                          let cost = c in
+                          if cost <=. best_cost then
+                            (Some l,cost)
+                          else
+                            (best,best_cost)
+                      end)
+                ~init:(best,best_cost)
+                sorted_qes
             in
-            let pq = SPQ.push_all pq new_elements in
-            gen_symmetric_lens_queuing
-              pq
-              best
-              best_cost
+            if comparison_cost >=. best_cost then
+              (if !verbose then print_endline @$ string_of_float best_cost; best)
+            else
+              let new_elements =
+                List.concat_map
+                  ~f:(fun qe -> Symmetric_expand.expand lc qe)
+                  qes
+              in
+              let pq = SPQ.push_all pq new_elements in
+              gen_symmetric_lens_queuing
+                pq
+                best
+                best_cost
         | None -> best
       end
     in
@@ -544,6 +560,7 @@ let expansions_forced_for_gen = DNFSynth.expansions_forced_for_gen
 let num_possible_choices = DNFSynth.num_possible_choices
 
 let gen_symmetric_lens
+    (keep_going:Float.t)
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
@@ -571,6 +588,7 @@ let gen_symmetric_lens
     print_endline "Synthesis Start";
   let lens_option =
     DNFSynth.gen_symmetric_lens
+      keep_going
       lc
       r1
       r2
@@ -589,6 +607,7 @@ let gen_symmetric_lens
     lens_option
 
 let gen_lens
+    (keep_going:Float.t)
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
@@ -600,6 +619,7 @@ let gen_lens
   if !gen_symmetric then
     let lo =
       gen_symmetric_lens
+        keep_going
         existing_lenses
         r1
         r2

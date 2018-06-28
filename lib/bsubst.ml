@@ -120,7 +120,7 @@ and free_svars_exp acc = function
   | EBoolean(_,Some e1) ->
       let acc1 = free_svars_exp acc e1 in
       acc1
-  | ESynth (_,e1,e2,_) ->
+  | ESynth (_,e1,e2,_,_) ->
     let acc = free_svars_exp acc e1 in
     let acc = free_svars_exp acc e2 in
     acc
@@ -252,10 +252,10 @@ and subst_svars_exp subst e0 = match e0 with
   | EGrammar(i,ps) ->
       let new_ps = Safelist.map (subst_svars_prod subst) ps in
       EGrammar(i,new_ps)
-  | ESynth(i,e1,e2,exs) ->
+  | ESynth(i,e1,e2,exs,f) ->
     let e1 = subst_svars_exp subst e1 in
     let e2 = subst_svars_exp subst e2 in
-    ESynth(i,e1,e2,exs)
+    ESynth(i,e1,e2,exs,f)
   | EBoolean(_,None) | EUnit _ | EInteger _ | EChar _ | EString _ | ECSet _ | EVar _ -> e0
 
 and subst_svars_prod subst (Prod(i,x,rs)) =
@@ -359,7 +359,7 @@ and free_evars_exp acc = function
 	   | None -> acc1)
       in 
       acc3
-  | ESynth(i,e1,e2,_) ->
+  | ESynth(i,e1,e2,_,_) ->
     let acc = free_evars_exp acc e1 in
     let acc = free_evars_exp acc e2 in
     acc
@@ -588,10 +588,10 @@ and subst_evars_exp subst e0 = match e0 with
   | EGrammar(i,ps) ->
       let new_ps = Safelist.map (subst_evars_prod subst) ps in
       EGrammar(i,new_ps)
-  | ESynth(i,e1,e2,exs) ->
+  | ESynth(i,e1,e2,exs,f) ->
     let e1 = subst_evars_exp subst e1 in
     let e2 = subst_evars_exp subst e2 in
-    ESynth(i,e1,e2,exs)
+    ESynth(i,e1,e2,exs,f)
   | EUnit _ | EBoolean(_,None) | EInteger _ | EChar _ | EString _ | ECSet _  -> 
       e0
 
@@ -887,10 +887,10 @@ and qualify_exp resolve bound e0 = match e0 with
   | EGrammar(i,ps) ->
       let new_ps = Safelist.map (qualify_prod resolve bound) ps in
       EGrammar(i,new_ps)
-  | ESynth(i,e1,e2,exs) -> 
+  | ESynth(i,e1,e2,exs,f) -> 
       let e1 = qualify_exp resolve bound e1 in 
       let e2 = qualify_exp resolve bound e2 in 
-      ESynth(i,e1,e2,exs) 
+      ESynth(i,e1,e2,exs,f) 
   | EUnit _ | EBoolean(_,None) | EInteger _ | EChar _ | EString _ | ECSet _  -> 
       e0
 

@@ -168,6 +168,7 @@ let retrieve_existing_lenses
 let synth
     (i:Info.t)
     (env:CEnv.t)
+    (keep_going:float)
     (r1:Brx.t)
     (r2:Brx.t)
     (creater_exs:create_examples)
@@ -184,6 +185,7 @@ let synth
     d
     (Option.value_exn
        (Gen.gen_lens
+          keep_going
           lss
           r1
           r2

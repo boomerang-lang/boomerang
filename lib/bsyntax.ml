@@ -113,6 +113,7 @@ and exp =
                      | `PutREx
                      | `PutLEx]
                      * exp) list
+                  * float
 
     (* booleans with counter examples *)
     (* None ~ true; Some s ~ false with counterexample s *)
@@ -205,7 +206,7 @@ let rec info_of_exp e = match e with
   | EChar    (i,_)       -> i
   | EString  (i,_)       -> i
   | ECSet    (i,_,_)     -> i
-  | ESynth   (i,_,_,_)   -> i
+  | ESynth   (i,_,_,_,_) -> i
   | EGrammar (i,_)       -> i
 
 let info_of_rule = function
@@ -351,5 +352,5 @@ let mk_set i e1 e2 =
 let mk_rx i e =
   mk_app i (mk_core_var i "str") e
 
-let mk_synth i e1 e2 exs =
-  ESynth(i,e1,e2,exs)
+let mk_synth i e1 e2 exs kg =
+  ESynth(i,e1,e2,exs,kg)

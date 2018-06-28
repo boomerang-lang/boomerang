@@ -211,6 +211,7 @@ let add_atom ai (i,xs,bs) = match ai with
 %token <Hbase.Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
 %token <Hbase.Info.t> ERROR
 %token <Hbase.Info.t> SYNTH USING CREATEREX CREATELEX PUTREX PUTLEX
+%token <Hbase.Info.t> WITH KEEP_GOING
 
 %start modl uid qid
 %type <Bsyntax.modl> modl
@@ -722,11 +723,19 @@ appexp:
 
   | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE
     { let i = m $1 $8 in
-      ESynth (i,$2,$4,$7) }
+      ESynth (i,$2,$4,$7,0.0) }
 
   | SYNTH appexp DEQARROW repexp
     { let i = me2 $1 $4 in
-      ESynth (i,$2,$4,[]) }
+      ESynth (i,$2,$4,[],0.0) }
+
+  | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE WITH KEEP_GOING FLOAT
+    { let i = m $1 (fst $11) in
+      ESynth (i,$2,$4,$7,snd $11) }
+
+  | SYNTH appexp DEQARROW repexp WITH KEEP_GOING FLOAT
+    { let i = m $1 (fst $7) in
+      ESynth (i,$2,$4,[],snd $7) }
 
   | repexp
     { $1 }
