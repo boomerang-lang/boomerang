@@ -82,88 +82,86 @@ let retrieve_existing_lenses
     (relevant_regexps:Brx.t list)
     (e:CEnv.t)
   : (Lens.t * Regex.t * Regex.t) list * IntToLens.t =
-  let lens_list =
-    List.filter_map
-      ~f:ident
-      (CEnv.fold
-         (fun _ (_,v) acc -> (Bvalue.get_l_safe v)::acc)
-         e
-         [])
-  in
-  let bij_lens_list =
-    List.filter
-      ~f:Blenses.MLens.bij
-      lens_list
-  in
-  let lenses_types =
-    List.filter_map
-      ~f:(fun l ->
-          let stype_o =
-            List.find
-              ~f:(Brx.equiv (Blenses.MLens.stype l))
-              relevant_regexps
-          in
-          let vtype_o =
-            List.find
-              ~f:(Brx.equiv (Blenses.MLens.vtype l))
-              relevant_regexps
-          in
-          begin match (stype_o,vtype_o) with
-            | (Some stype, Some vtype) -> Some (l,stype,vtype)
-            | _ -> None
-          end)
-      bij_lens_list
-  in
+  if not !Optician.Consts.use_lens_context then
+    ([],IntToLens.empty)
+  else
+    let lens_list =
+      List.filter_map
+        ~f:ident
+        (CEnv.fold
+           (fun _ (_,v) acc -> (Bvalue.get_l_safe v)::acc)
+           e
+           [])
+    in
+    let lenses_types =
+      List.filter_map
+        ~f:(fun l ->
+            let stype_o =
+              List.find
+                ~f:(Brx.equiv (Blenses.MLens.stype l))
+                relevant_regexps
+            in
+            let vtype_o =
+              List.find
+                ~f:(Brx.equiv (Blenses.MLens.vtype l))
+                relevant_regexps
+            in
+            begin match (stype_o,vtype_o) with
+              | (Some stype, Some vtype) -> Some (l,stype,vtype)
+              | _ -> None
+            end)
+        lens_list
+    in
 
-  let (_,d,lens_list) =
-    List.fold_left
-      ~f:(fun (i,d,lens_list) (l,s,v) ->
-          let rr = Brx.to_optician_regexp v in
-          let rl = Brx.to_optician_regexp s in
-          let creater =
-            (fun s ->
-               (Blenses.MLens.rcreater
-                  l
-                  (Bstring.of_string s)))
-          in
-          let createl =
-            (fun s ->
-               (Blenses.MLens.rcreatel
-                  l
-                  (Bstring.of_string s)))
-          in
-          let putr =
-            (fun s v ->
-               (Blenses.MLens.rputr
-                  l
-                  (Bstring.of_string s)
-                  (Bstring.of_string v)))
-          in
-          let putl =
-            (fun v s ->
-               (Blenses.MLens.rputl
-                  l
-                  (Bstring.of_string v)
-                  (Bstring.of_string s)))
-          in
-          let lens =
-            Lens.make_closed
-              ~rr:rr
-              ~rl:rl
-              ~creater:creater
-              ~createl:createl
-              ~putr:putr
-              ~putl:putl
-              i
-          in
-          let d = IntToLens.insert d i l in
-          let i = i + 1 in
-          let lens_list = (lens,rl,rr)::lens_list in
-          (i,d,lens_list))
-      ~init:(0,IntToLens.empty,[])
-      lenses_types
-  in
-  (lens_list,d)
+    let (_,d,lens_list) =
+      List.fold_left
+        ~f:(fun (i,d,lens_list) (l,s,v) ->
+            let rr = Brx.to_optician_regexp v in
+            let rl = Brx.to_optician_regexp s in
+            let creater =
+              (fun s ->
+                 (Blenses.MLens.rcreater
+                    l
+                    (Bstring.of_string s)))
+            in
+            let createl =
+              (fun s ->
+                 (Blenses.MLens.rcreatel
+                    l
+                    (Bstring.of_string s)))
+            in
+            let putr =
+              (fun s v ->
+                 (Blenses.MLens.rputr
+                    l
+                    (Bstring.of_string s)
+                    (Bstring.of_string v)))
+            in
+            let putl =
+              (fun v s ->
+                 (Blenses.MLens.rputl
+                    l
+                    (Bstring.of_string v)
+                    (Bstring.of_string s)))
+            in
+            let lens =
+              Lens.make_closed
+                ~rr:rr
+                ~rl:rl
+                ~creater:creater
+                ~createl:createl
+                ~putr:putr
+                ~putl:putl
+                i
+            in
+            let d = IntToLens.insert d i l in
+            let i = i + 1 in
+            let lens_list = (lens,rl,rr)::lens_list in
+            (i,d,lens_list))
+        ~init:(0,IntToLens.empty,[])
+        lenses_types
+    in
+    (lens_list,d)
 
 let synth
     (i:Info.t)
@@ -176,6 +174,9 @@ let synth
     (putr_exs:put_examples)
     (putl_exs:put_examples)
   : Blenses.MLens.t =
+  Optician.Consts.gen_symmetric := not (Prefs.read Prefs.bijSynthPref);
+  Optician.Consts.use_lens_context := not (Prefs.read Prefs.noCSPref);
+
   let subregexps = (Brx.subregexp_list r1)@(Brx.subregexp_list r2) in
   let (lss,d) = retrieve_existing_lenses subregexps env in
   let r1 = Brx.to_optician_regexp r1 in

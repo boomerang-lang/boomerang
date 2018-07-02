@@ -1,0 +1,60 @@
+module Normalize-spaces =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*
+
+let WORD : regexp = (DIGIT | UPPERCASE | LOWERCASE)+
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let NON_NORMALIZED_TEXT : regexp = WORD . (NONEMPTY_WSP . WORD)*
+
+let NORMALIZED_TEXT : regexp = WORD . (" " . WORD)*
+
+let normalize_text
+  : (lens in NON_NORMALIZED_TEXT <-> NORMALIZED_TEXT) =
+  synth NON_NORMALIZED_TEXT <=> NORMALIZED_TEXT
+  using
+  {
+  createrex ("Fix     spaces","Fix spaces")
+  }

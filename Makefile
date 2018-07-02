@@ -1,5 +1,7 @@
 TARGETS=boomerang.exe
 
+GENERATE_DATA := python generate-data.py
+
 .PHONY: all build clean %.exe
 
 all: build link
@@ -34,11 +36,17 @@ functionaltest: all
 	for file in examples/*/*/*.boom ; do \
 		./boomerang.exe $$file || exit ; \
 	done
+	for file in examples/*/*/*/*.boom ; do \
+		./boomerang.exe $$file || exit ; \
+	done
 
 unittest:
 	jbuilder runtest
 
 test: unittest functionaltest
+
+generate-data: all
+	$(GENERATE_DATA) ./boomerang.exe examples/synth_examples/
 
 documentation:
 	jbuilder build @docs

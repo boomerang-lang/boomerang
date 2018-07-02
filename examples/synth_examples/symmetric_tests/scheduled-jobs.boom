@@ -1,0 +1,100 @@
+module Scheduled-jobs =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+let COMMAND
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT | " " | "." | "/" | "\\" | "$" | "(" | ")" | "\"" | "-" | "@" | "|" | "=")+
+test matches_cex COMMAND "cp -r /Library/ \"$(date)\" " = true
+
+let NUMBER : regexp = DIGIT . DIGIT*
+
+let MINUTE : regexp = (("" | "1" | "2" | "3" | "4" | "5") . DIGIT)
+
+let MINUTE_LIST = MINUTE . ("," . MINUTE)*
+
+let TIMES = "*" | MINUTE_LIST
+test matches_cex TIMES "*" = true
+test matches_cex TIMES "0,20,40" = true
+
+let LINE = TIMES . " " . COMMAND
+test matches_cex LINE "0,20,40 cp -r /Library/ \"$(date)\" " = true
+test matches_cex LINE "* df -h | sendmail admin@domain.com" = true
+
+let CRONTAB = "" | LINE . ("\n\n" . LINE)*
+test matches_cex CRONTAB "0,20,40 cp -r /Library/ \"$(date)\" \n\n* df -h | sendmail admin@domain.com" = true
+
+
+let MINUTE_XML = "<Time>" . MINUTE . "</Time>"
+let MINUTES_XML = MINUTE_XML . MINUTE_XML*
+let XML_TIME = "<AllTimes/>" | MINUTES_XML
+let COMMAND_XML = "<Command>" . COMMAND . "</Command>"
+let XML_TASK = "<Task>" . COMMAND_XML . XML_TIME . "</Task>"
+
+test matches_cex XML_TASK
+"<Task><Command>cp -r /Library/ \"$(date)\" </Command><Time>0</Time><Time>20</Time><Time>40</Time></Task>"
+= true
+
+test matches_cex XML_TASK
+"<Task><Command>df -h | sendmail admin@domain.com</Command><AllTimes/></Task>"
+= true
+
+
+let SCHEDULED_JOB = "<Tasks>" . XML_TASK* . "</Tasks>"
+
+test matches_cex SCHEDULED_JOB
+"<Tasks><Task><Command>cp -r /Library/ \"$(date)\" </Command><Time>0</Time><Time>20</Time><Time>40</Time></Task><Task><Command>df -h | sendmail admin@domain.com</Command><AllTimes/></Task></Tasks>"
+= true
+
+
+
+let synchronize_jobs
+  : (lens in CRONTAB <-> SCHEDULED_JOB) =
+  synth CRONTAB <=> SCHEDULED_JOB using
+  {createrex
+    ("0,20,40 cp -r /Library/ \"$(date)\" \n\n* df -h | sendmail admin@domain.com","<Tasks><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task></Tasks>"),
+   createrex
+    ("* df -h | sendmail admin@domain.com\n\n0,20,40 cp -r /Library/ \"$(date)\" ","<Tasks><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task></Tasks>"),
+   createlex
+    ("<Tasks><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task></Tasks>","* false"),
+   createlex
+    ("<Tasks><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task></Tasks>","0,20,40 false")
+  }
+  with keep_going -50.0

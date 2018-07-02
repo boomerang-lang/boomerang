@@ -1,4 +1,4 @@
-module Cap_prob =
+module Remove_last =
 let LOWERCASE
   : regexp =
   "a"
@@ -72,5 +72,3 @@ test capitalize.get "DOE" = "Doe"
 let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
   synth (NAME . " " . NAME) <=> NAME
   using { createrex ("Anders Miltner","Anders") }
-
-test remove_last = ?

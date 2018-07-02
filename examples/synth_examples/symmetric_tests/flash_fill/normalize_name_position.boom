@@ -1,0 +1,59 @@
+module Normalize_name_position =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+let CAP_WORD : regexp = (UPPERCASE . LOWERCASE* )
+
+let POTENTIAL_CAP_WORD : regexp = CAP_WORD | ""
+
+let ROW : regexp =
+  "NAME: " . POTENTIAL_CAP_WORD .
+  " TITLE: " . POTENTIAL_CAP_WORD
+
+let TITLED_NAME : regexp =
+  (CAP_WORD . "(" . CAP_WORD . ")")
+  | ""
+
+let combine_name_title
+  : (lens in ROW <-> TITLED_NAME) =
+  synth ROW <=> TITLED_NAME
+  using
+  {
+  createrex ("NAME: Alex TITLE: Asst","Alex(Asst)"),
+  createrex ("NAME: Ryan TITLE: ",""),
+  createrex ("NAME:  TITLE: Asst",""),
+  createrex ("NAME:  TITLE: ","")
+  }

@@ -157,6 +157,7 @@ let exampled_atom_to_exampled_dnf_regex
   ([(([a],["";""],sils),1.)],sils)
 
 let star_exampled_dnf_regex
+    (ill:int list list example_data)
     (dr:ExampledDNFRegex.t)
     (p:Probability.t)
     (s:StochasticRegex.t)
@@ -194,9 +195,38 @@ let star_exampled_dnf_regex
                 sorted_isl)))
       keygroup_sils
   in
+  let old_new_example_data =
+    merge_example_data
+      (fun ill isll ->
+         let nonempty_ill = List.map ~f:fst isll in
+         let empty_ills =
+           List.filter
+             ~f:(fun il ->
+                 not (List.mem ~equal:(fun x y -> 0 = (compare_list ~cmp:Int.compare) x y) nonempty_ill il))
+             ill
+         in
+         let empty_isls =
+           List.map
+             ~f:(fun il -> (il,""))
+             empty_ills
+         in
+         empty_isls@isll)
+      ill
+      new_sils
+  in
+  (*let empty_sils =
+    map_example_data
+      (fun isll ->
+         let nonempty_ill = List.map ~f:fst isll in
+         let empty_ills =
+           List.filter
+             ~f:(fun il ->
+                 not (List.mem ~equal:Int.equal nonempty_ill il))
+             ill
+         in)*)
   exampled_atom_to_exampled_dnf_regex
     (ExampledDNFRegex.EAStar
-       (dr,p,new_sils,s))
+       (dr,p,old_new_example_data,s))
 
 let rec exampled_regex_to_regex
     (er:ExampledRegex.t)
@@ -255,7 +285,8 @@ struct
       (recursive_f:Arg.t -> Result.t)
       (r:ExampledRegex.t)
     : ExampledDNFRegex.t =
-    begin match r.node with
+    (*let ini = ExampledRegex.extract_example_data r in*)
+    (*let ans = *)begin match r.node with
       | ERegExEmpty -> ([],empty_parsing_example_data)
       | ERegExBase (c, ill) ->
         let sill = map_example_data (List.map ~f:(fun il -> (il,c))) ill in
@@ -271,6 +302,7 @@ struct
            p)
       | ERegExStar (r',ill,p) ->
         star_exampled_dnf_regex
+          ill
           (recursive_f r')
           p
           (exampled_regex_to_regex r)
@@ -284,6 +316,9 @@ struct
         exampled_atom_to_exampled_dnf_regex
           (EAClosed (s,ilss))
     end
+    (*in
+    let endi = ExampledDNFRegex.extract_example_data ans in
+    ans*)
 end
 
 module Memo = FixHCMemoizerOf(UnfixedExampledRegexToExampledDnfRegex)

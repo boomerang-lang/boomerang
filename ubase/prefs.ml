@@ -189,6 +189,12 @@ let logPref = createBool "log" true "record actions in file specified by logfile
     "When this flag is set, Unison will log all changes to the filesystems
      on a file."
 
+let noCSPref = createBool "noCS" false "don't use compositional synthesis while synthesizing"
+    "When this flag is set, we don't use compositional synthesis during synthesis"
+
+let bijSynthPref = createBool "bijSynth" false "use bijective synth synthesizing"
+    "When this flag is set, we use bijective synthesis"
+
 let logfilePref = createString "logfile" (Util.fileInHomeDir "unison.log") "Log file name"
     "By default, logging messages will be appended to the file
      \\verb|unison.log| in your HOME directory.  Set this preference if

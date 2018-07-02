@@ -211,7 +211,7 @@ let add_atom ai (i,xs,bs) = match ai with
 %token <Hbase.Info.t> STYPE VTYPE ASTYPE AVTYPE BIJ GET PUT CREATE CANONIZE CHOOSE INTO
 %token <Hbase.Info.t> ERROR
 %token <Hbase.Info.t> SYNTH USING CREATEREX CREATELEX PUTREX PUTLEX
-%token <Hbase.Info.t> WITH KEEP_GOING
+%token <Hbase.Info.t> WITH KEEP_GOING GO_UNTIL_BIJ_IF_NO_CS
 
 %start modl uid qid
 %type <Bsyntax.modl> modl
@@ -733,9 +733,21 @@ appexp:
     { let i = m $1 (fst $11) in
       ESynth (i,$2,$4,$7,snd $11) }
 
+  | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE WITH GO_UNTIL_BIJ_IF_NO_CS
+    { let i = m $1 $10 in
+      ESynth (i,$2,$4,$7,if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
+
   | SYNTH appexp DEQARROW repexp WITH KEEP_GOING FLOAT
     { let i = m $1 (fst $7) in
       ESynth (i,$2,$4,[],snd $7) }
+
+  | SYNTH appexp DEQARROW repexp WITH KEEP_GOING FLOAT GO_UNTIL_BIJ_IF_NO_CS
+    { let i = m $1 $8 in
+      ESynth (i,$2,$4,[],if (Prefs.read Prefs.noCSPref) then 100000000. else snd $7) }
+
+  | SYNTH appexp DEQARROW repexp WITH GO_UNTIL_BIJ_IF_NO_CS
+    { let i = m $1 $6 in
+      ESynth (i,$2,$4,[],if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
 
   | repexp
     { $1 }

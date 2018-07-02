@@ -135,9 +135,12 @@ let reachables_set_minus
       (s1:Expand.IntSet.t)
       (s2:Expand.IntSet.t)
     : ((Expand.IntSet.t,Expand.IntSet.t) either) option =
-    (*if is_equal c then*)
+    let max_s1 = Expand.IntSet.max_exn s1 in
+    let max_s2 = Expand.IntSet.max_exn s2 in
+    let c = Int.compare max_s1 max_s2 in
+    if is_equal c then
       None
-    (*else if is_lt c then
+    else if is_lt c then
       Some
         (Right
            (Expand.IntSet.filter
@@ -150,7 +153,7 @@ let reachables_set_minus
            (Expand.IntSet.filter
               ~f:(fun x ->
                   is_gt (Int.compare x max_s2))
-              s1))*)
+              s1))
   in
   let problem_elts_options_list =
     Expand.RegexToIntSetDict.merge
@@ -396,8 +399,8 @@ let fix_problem_elts
     (lc:LensContext.t)
     (qe:SymmetricQueueElement.t)
   : SymmetricQueueElement.t list =
-  (*print_endline @$ Regex.show_with_closed (StochasticRegex.to_regex (SymmetricQueueElement.get_r1 qe));
-  print_endline @$ Regex.show_with_closed (StochasticRegex.to_regex (SymmetricQueueElement.get_r2 qe));*)
+  print_endline @$ Regex.show_with_closed (StochasticRegex.to_regex (SymmetricQueueElement.get_r1 qe));
+  print_endline @$ Regex.show_with_closed (StochasticRegex.to_regex (SymmetricQueueElement.get_r2 qe));
   let s1 = get_current_set lc (SymmetricQueueElement.get_r1 qe) in
   let s2 = get_current_set lc (SymmetricQueueElement.get_r2 qe) in
   let problem_elements =
@@ -410,7 +413,28 @@ let fix_problem_elts
        (Expand.RegexIntSet.as_list (Expand.RegexIntSet.diff s2 s1)))
   in
   let problem_elements = List.sort ~cmp:(either_compare Expand.HCRegexInt.compare Expand.HCRegexInt.compare) problem_elements in
-  let to_qes new_problems =
+  print_endline @$ string_of_int @$ List.length problem_elements;
+  begin match problem_elements with
+    | [] ->
+      expand_once
+        qe
+    | h::_ ->
+      let new_problems =
+        begin match h with
+          | Left d ->
+            let (v,star_depth) = d.node in
+            let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r2 qe) in
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
+            assert (not (List.is_empty exposes));
+            List.map ~f:(fun (e,exp) -> (SymmetricQueueElement.get_r1 qe,e,exp)) exposes
+          | Right d ->
+            let (v,star_depth) = d.node in
+            let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r1 qe) in
+            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
+            assert (not (List.is_empty exposes));
+            List.map ~f:(fun (e,exp) -> (e,SymmetricQueueElement.get_r2 qe,exp)) exposes
+        end
+      in
       let new_problem_count = List.length new_problems in
       List.map
         ~f:(fun (r1,r2,exp) ->
@@ -422,35 +446,8 @@ let fix_problem_elts
               ~expansions_inferred:((SymmetricQueueElement.get_expansions_inferred qe)+exp)
               ~expansions_forced:(SymmetricQueueElement.get_expansions_forced qe)
               ())
-        new_problems in
-  let rec find_qes
-      (problem_elements) =
-  begin match problem_elements with
-    | [] ->
-      expand_once
-        qe
-    | h::t ->
-        begin match h with
-          | Left d ->
-            let (v,star_depth) = d.node in
-            let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r2 qe) in
-            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
-            if (not (List.is_empty exposes)) then
-            to_qes (List.map ~f:(fun (e,exp) -> (SymmetricQueueElement.get_r1 qe,e,exp)) exposes)
-            else
-            find_qes t
-          | Right d ->
-            let (v,star_depth) = d.node in
-            let exposes = reveal lc v star_depth (SymmetricQueueElement.get_r1 qe) in
-            (*print_endline @$ string_of_list (string_of_pair Regex.show string_of_int) @$ (List.map ~f:(fun (r,i) -> (StochasticRegex.to_regex r,i)) exposes);*)
-            if (not (List.is_empty exposes)) then
-            to_qes (List.map ~f:(fun (e,exp) -> (e,SymmetricQueueElement.get_r2 qe,exp)) exposes)
-            else
-            find_qes t
-        end
-  end in
-
-  find_qes problem_elements
+        new_problems
+  end
 (***** }}} *****)
 
 let expand

@@ -139,7 +139,31 @@ let compare_list_as_multisets
   : int =
   let sorted_l1 = List.sort ~cmp:cmp l1 in
   let sorted_l2 = List.sort ~cmp:cmp l2 in
-  compare_list ~cmp sorted_l1 sorted_l2
+  compare_list ~cmp:cmp sorted_l1 sorted_l2
+
+let rec is_sublist
+    ~cmp:(cmp:'a comparer)
+    (l1:'a list)
+    (l2:'a list)
+  : bool =
+  begin match (l1,l2) with
+    | ([],_) -> true
+    | (h::_,[]) -> false
+    | (h1::t1,h2::t2) ->
+      if is_equal (cmp h1 h2) then
+        is_sublist ~cmp:cmp t1 t2
+      else
+        is_sublist ~cmp:cmp l1 t2
+  end
+
+let is_submultiset
+    ~cmp:(cmp:'a comparer)
+    (l1:'a list)
+    (l2:'a list)
+  : bool =
+  let sorted_l1 = List.sort ~cmp:cmp l1 in
+  let sorted_l2 = List.sort ~cmp:cmp l2 in
+  is_sublist ~cmp:cmp sorted_l1 sorted_l2
 
 let make_matchable (n:comparison) : matchable_comparison =
   if n = 0 then

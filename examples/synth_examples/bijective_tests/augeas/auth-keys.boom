@@ -1,4 +1,4 @@
-module Aptconf =
+module Auth-keys =
 let LOWERCASE
   : regexp =
   "a"
@@ -170,93 +170,69 @@ let multiline_comment_map
   : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
   synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
 
-let SLASH_COMMENT : regexp = "//" . STRING 
+let OPTION_KEY
+  : regexp =
+  "command" | "environment" | "from" | "permitopen" | "principals" | "tunnel" 
 
-let scomment_comment_map
-  : (lens in SLASH_COMMENT <=> COMMENT_DICT) =
-  synth SLASH_COMMENT <=> COMMENT_DICT 
+let FLAG
+  : regexp =
+  "cert-authority"
+    | "no-agent-forwarding"
+    | "no-port-forwarding" | "no-pty" | "no-user-rc" | "no-X11-forwarding" 
 
-let INCLUDE_CONF : regexp = "#include " . FOLDER 
+let KEY
+  : regexp =
+  (UPPERCASE | LOWERCASE | DIGIT | "+" | "/")
+    . (UPPERCASE | LOWERCASE | DIGIT | "+" | "/")*  
 
-test matches_cex INCLUDE_CONF "#include myfolder/my_filE.txt" = true
+let KEY_TYPE
+  : regexp =
+  "ssh-" . (LOWERCASE | DIGIT) . (LOWERCASE | DIGIT)* 
+    | "ecdsa-sha2-nistp" . DIGIT . DIGIT*  
 
-let INCLUDE_DICT : regexp = "{\"@include\"=\"" . FOLDER . "\"}" 
+let OPTION_KVP_DICT : regexp = "{\"" . OPTION_KEY . "\"=\"" . STRING . "\"}" 
+
+let OPTION_FLAG_DICT : regexp = "{\"" . FLAG . "\"}" 
+
+let OPTION_DICT
+  : regexp =
+  ""
+    | "{\"options\""
+        . (OPTION_KVP_DICT | OPTION_FLAG_DICT)
+        . (OPTION_KVP_DICT | OPTION_FLAG_DICT)* 
+        . "}" 
+
+let OPTION_ELEMENT_CONF
+  : regexp =
+  OPTION_KEY . "=\"" . DELIMITED_STRING . "\"" | FLAG 
+
+let OPTION_LIST_CONF
+  : regexp =
+  "" | OPTION_ELEMENT_CONF . ("," . OPTION_ELEMENT_CONF)*  . " " 
+
+let KEY_CONF
+  : regexp =
+  OPTION_LIST_CONF . KEY_TYPE . " " . KEY . ("" | " " . NONEMPTY_STRING) 
 
 test matches_cex
-  INCLUDE_DICT
-  "{\"@include\"=\"myfolder/my_filE.txt\"}" = true
+  KEY_CONF
+  "cert-authority,command=\"t\" ssh-dsa 12345 my comment" = true
 
-let CLEAR_CONF : regexp = "#clear" . (" " . WORD)*  
-
-test matches_cex CLEAR_CONF "#clear" = true
-
-test matches_cex CLEAR_CONF "#clear mydata:hello tester" = true
-
-let CLEAR_DICT
+let KEY_DICT
   : regexp =
-  "{\"#clear\"" . ("{\"name\"=\"" . WORD . "\"}")*  . "}" 
-
-test matches_cex CLEAR_DICT "{\"#clear\"}" = true
+  "{\"key\"=\""
+    . KEY
+    . "\""
+    . OPTION_DICT
+    . "{\"type\"=\""
+    . KEY_TYPE
+    . "\"}" . ("" | "{\"comment\"=\"" . NONEMPTY_STRING . "\"}") . "}" 
 
 test matches_cex
-  CLEAR_DICT
-  "{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}" = true
+  KEY_DICT
+  "{\"key\"=\"12345\"{\"options\"{\"cert-authority\"}{\"command\"=\"t\"}}{\"type\"=\"ssh-dsa\"}{\"comment\"=\"my comment\"}}" = true
 
-let NO_SLASH_QUOTELESS_STRING
-  : regexp =
-  (UPPERCASE
-     | LOWERCASE
-     | DIGIT
-     | " " | "'" | "_" | ":" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
-
-let NO_SLASH_WORD
-  : regexp =
-  (LOWERCASE
-     | UPPERCASE | "_" | "." | "-" | ":" | "+" | DIGIT | "," | "=" | "*")
-    . (LOWERCASE
-         | UPPERCASE | "_" | "." | "-" | ":" | "+" | DIGIT | "," | "=" | "*")*  
-
-let ELEMENT_DICT
-  : regexp =
-  "{\"@elem\"=\"" . NO_SLASH_QUOTELESS_STRING . "\"}" 
-
-test matches_cex ELEMENT_DICT "{\"@elem\"=\"--force-confold\"}" = true
-
-let KVP_CONF : regexp = NO_SLASH_WORD . " \"" . DELIMITED_STRING . "\"" 
-
-test matches_cex KVP_CONF "hello \"testingh ielloo asdfwer s\"" = true
-
-let KVP_DICT
-  : regexp =
-  "{\"" . NO_SLASH_WORD . "\"=\"" . DELIMITED_STRING . "\"}" 
-
-test matches_cex KVP_DICT "{\"hello\"=\"testingh ielloo asdfwer s\"}" = true
-
-let NONRECURSIVE_CONF
-  : regexp =
-  (KVP_CONF | NO_SLASH_QUOTELESS_STRING) . ";"
-    | CLEAR_CONF | MULTILINE_COMMENT | INCLUDE_CONF | SLASH_COMMENT 
-
-let NONRECURSIVE_DICT
-  : regexp =
-  KVP_DICT
-    | ELEMENT_DICT
-    | CLEAR_DICT | MULTILINE_COMMENT_DICT | INCLUDE_DICT | COMMENT_DICT 
-
-let APT_L0_CONF
-  : regexp =
-  WORD . " {\n" . (NONRECURSIVE_CONF . "\n")*  . "}" 
-
-test matches_cex
-  APT_L0_CONF
-  "APT {\nhello \"testingh ielloo asdfwer s\";\n--force-confold;\n/*test\nmultiline*/\n//comment\n#clear mydata:hello tester\n#include myfolder/my_filE.txt\n}" = true
-
-let APT_L0_DICT : regexp = "{\"" . WORD . "\"" . NONRECURSIVE_DICT*  . "}" 
-
-test matches_cex
-  APT_L0_DICT
-  "{\"APT\"{\"hello\"=\"testingh ielloo asdfwer s\"}{\"@elem\"=\"--force-confold\"}{\"#mcomment\"{\"string\"=\"test\"}{\"string\"=\"multiline\"}}{\"#comment\"=\"comment\"}{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}{\"include\"=\"myfolder/my_filE.txt\"}}" = true
-
-let apt_l0_dict
-  : (lens in APT_L0_CONF <=> APT_L0_DICT) =
-  synth APT_L0_CONF <=> APT_L0_DICT 
+let x
+  : (lens in KEY_CONF <=> KEY_DICT) =
+  synth KEY_CONF <=> KEY_DICT using {createrex ("cert-authority,command=\"t\" ssh-dsa 12345 my comment","{\"key\"=\"12345\"{\"options\"{\"cert-authority\"}{\"command\"=\"t\"}}{\"type\"=\"ssh-dsa\"}{\"comment\"=\"my comment\"}}")}
+  with go_until_bij_if_no_cs

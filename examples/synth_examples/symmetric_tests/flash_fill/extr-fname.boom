@@ -1,4 +1,4 @@
-module Extr-fname-err =
+module Extr-fname =
 let LOWERCASE
   : regexp =
   "a"
@@ -60,24 +60,15 @@ test matches_cex LOCALFOLDER "extract-filename.txt" = true
 
 let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*  
 
-let GLOBALFOLDER : regexp = DIRECTORY . LOCALFOLDER 
-
-let FOLDER : regexp = (LOCALFOLDER . "/")*  . LOCALFOLDER . ("" | "/") 
-
-test matches_cex
-  DIRECTORY
-  "Users/amiltner/lens/tests/flashfill/extract-filename.txt/" = true
-
-let FILEANDFOLDER
+let NONEMPTYDIRECTORY
   : regexp =
-  "file: " . LOCALFOLDER . "\nfolder: " . DIRECTORY
-    | "empty directory given" | "root directory given" 
-
-test matches_cex
-  FILEANDFOLDER
-  "file: extract-filename.txt\nfolder: Users/amiltner/lens/tests/flashfill/" = true
+  (LOCALFOLDER . "/")* . LOCALFOLDER
 
 let extract_file
-  : (lens in DIRECTORY <=> FILEANDFOLDER) =
-  synth DIRECTORY <=> FILEANDFOLDER using {createrex ("Users/amiltner/lens/tests/flashfill/extract-filename.txt/","file: extract-filename.txt\nfolder: Users/amiltner/lens/tests/flashfill/"),
-    createrex ("/","root directory given")} 
+  : (lens in NONEMPTYDIRECTORY <-> LOCALFOLDER) =
+  synth NONEMPTYDIRECTORY <=> LOCALFOLDER
+  using {
+    createrex ("extract-file.txt","extract-file.txt"),
+    createrex ("folder/extract-folder.txt","extract-folder.txt")
+  }
+  with keep_going -185.0

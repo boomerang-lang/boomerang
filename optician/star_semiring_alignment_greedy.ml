@@ -877,8 +877,6 @@ struct
         let info_dict_r = list_to_dict subtrees_r in
         let t1_keys = TreeInfoDict.key_list info_dict_l in
         let t2_keys = TreeInfoDict.key_list info_dict_r in
-        (*TODO: required creates*)
-        (*TODO: required puts*)
         let relevant_trees =
           (cartesian_filter_map
              ~f:(fun (t1,p1) (t2,p2) ->
@@ -1836,7 +1834,6 @@ struct
                 end)
             s
         in
-        (*TODO, when does it not have a solution*)
         let aligns_createsl_createsr_opt =
           PlusMappingState.to_aligns_and_creates
             s
@@ -2209,8 +2206,7 @@ struct
       | None -> 0.
       | Some Empty -> 1.
       | Some NonemptyTree nt ->
-        failwith "TODO"
-        (*NonemptyNormalizedPlusStarTreeAlignment.cost nt*)
+        failwith "not allowed"
     end
 
   module Tree = PlusTimesStarTreeOf(PD)(TD)(SD)(BD)

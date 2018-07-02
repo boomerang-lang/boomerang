@@ -35,7 +35,7 @@ module LensContext = struct
       r2
 
   (* TODO: is this the right thing, simpler if just between vars ? *)
-  let insert (lc:t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t =
+  let insert (lc:t) (l:Lens.t) (r1:Regex.t) (r2:Regex.t) : t * (string option) =
     begin match l with
       | Lens.Closed _ -> ()
       | _ -> failwith "not closed into lens context"
@@ -43,15 +43,26 @@ module LensContext = struct
     begin match (r1.node,r2.node) with
       | (Regex.RegExClosed r1, Regex.RegExClosed r2) ->
         { outgoing = update_outgoing lc.outgoing r1 r2 l;
-          equivs   = update_equivs lc.equivs r1 r2       ; }
+          equivs   = update_equivs lc.equivs r1 r2       ; } , None
+      | (Regex.RegExClosed r1, Regex.RegExBase s) ->
+        { outgoing = update_outgoing lc.outgoing r1 r2 l;
+          equivs   = update_equivs lc.equivs r1 r2       ; } , Some s
+      | (Regex.RegExBase s, Regex.RegExClosed r2) ->
+        { outgoing = update_outgoing lc.outgoing r1 r2 l;
+          equivs   = update_equivs lc.equivs r1 r2       ; } , Some s
       | _ ->
-        failwith "something went wrong"
+        failwith ("something went wrong: " ^ (Regex.show r1) ^ " and also " ^ (Regex.show r2))
     end
 
-  let insert_list (lc:t) (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
+  let insert_list (lc:t) (nirsl:(Lens.t * Regex.t * Regex.t) list) : t * string list =
     List.fold_left
-      ~f:(fun acc (l,r1,r2) -> insert acc l r1 r2)
-      ~init:lc
+      ~f:(fun (acc_lc,acc_ss) (l,r1,r2) ->
+        let (acc_lc,so) = insert acc_lc l r1 r2 in
+    begin match so with 
+      |None -> (acc_lc,acc_ss)
+      |Some s -> (acc_lc,s::acc_ss)
+end )
+      ~init:(lc,[])
       nirsl
 
   let get_outgoing_edges (outgoing:OutgoingD.t) (source:Regex.t)
@@ -61,7 +72,7 @@ module LensContext = struct
       | Some connections -> connections
     end
 
-  let create_from_list (nirsl:(Lens.t * Regex.t * Regex.t) list) : t =
+  let create_from_list (nirsl:(Lens.t * Regex.t * Regex.t) list) : t * string list =
     insert_list empty nirsl
 
   let shortest_path (lc:t) (r1:Regex.t) (r2:Regex.t)

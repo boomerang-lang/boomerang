@@ -1,4 +1,4 @@
-module Carbon =
+module Aptconf_l1 =
 let LOWERCASE
   : regexp =
   "a"
@@ -170,132 +170,105 @@ let multiline_comment_map
   : (lens in MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT) =
   synth MULTILINE_COMMENT <=> MULTILINE_COMMENT_DICT 
 
-let BRACKETLESS_STRING_COMPONENT
-  : regexp =
-  UPPERCASE
-    | LOWERCASE
-    | DIGIT
-    | "\""
-    | " "
-    | "'"
-    | "_"
-    | ":"
-    | "/"
-    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+let SLASH_COMMENT : regexp = "//" . STRING 
 
-let NONEMPTY_BRACKETLESS_STRING
-  : regexp =
-  BRACKETLESS_STRING_COMPONENT . BRACKETLESS_STRING_COMPONENT*  
+let scomment_comment_map
+  : (lens in SLASH_COMMENT <=> COMMENT_DICT) =
+  synth SLASH_COMMENT <=> COMMENT_DICT 
 
-let BRACKETLESS_DELIMITED_STRING_COMPONENT
-  : regexp =
-  UPPERCASE
-    | LOWERCASE
-    | DIGIT
-    | "\\\""
-    | " "
-    | "'"
-    | "_"
-    | ":"
-    | "/"
-    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
+let INCLUDE_CONF : regexp = "#include " . FOLDER 
 
-let NONEMPTY_BRACKETLESS_DELIMITED_STRING
-  : regexp =
-  BRACKETLESS_STRING_COMPONENT . BRACKETLESS_STRING_COMPONENT*  
+test matches_cex INCLUDE_CONF "#include myfolder/my_filE.txt" = true
 
-let HASHLESS_STRING_COMPONENT
-  : regexp =
-  UPPERCASE
-    | LOWERCASE
-    | DIGIT
-    | "\""
-    | " "
-    | "'"
-    | "_"
-    | ":"
-    | "/"
-    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
-
-let NONEMPTY_HASHLESS_STRING
-  : regexp =
-  HASHLESS_STRING_COMPONENT . HASHLESS_STRING_COMPONENT*  
-
-let HASHLESS_DELIMITED_STRING_COMPONENT
-  : regexp =
-  UPPERCASE
-    | LOWERCASE
-    | DIGIT
-    | "\\\""
-    | " "
-    | "'"
-    | "_"
-    | ":"
-    | "/"
-    | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")" | ";" | "!" | "*" | "," 
-
-let NONEMPTY_HASHLESS_DELIMITED_STRING
-  : regexp =
-  BRACKETLESS_DELIMITED_STRING_COMPONENT
-    . BRACKETLESS_DELIMITED_STRING_COMPONENT*  
-
-let CARBON_ENTRY_ENTRY
-  : regexp =
-  WORD . " =" . ("" | " " . NONEMPTY_HASHLESS_STRING) . ("" | COMMENT) 
+let INCLUDE_DICT : regexp = "{\"@include\"=\"" . FOLDER . "\"}" 
 
 test matches_cex
-  CARBON_ENTRY_ENTRY
-  "LINE_RECEIVER_INTERFACE = 0.0.0.0" = true
+  INCLUDE_DICT
+  "{\"@include\"=\"myfolder/my_filE.txt\"}" = true
+
+let CLEAR_CONF : regexp = "#clear" . (" " . WORD)*  
+
+test matches_cex CLEAR_CONF "#clear" = true
+
+test matches_cex CLEAR_CONF "#clear mydata:hello tester" = true
+
+let CLEAR_DICT
+  : regexp =
+  "{\"#clear\"" . ("{\"name\"=\"" . WORD . "\"}")*  . "}" 
+
+test matches_cex CLEAR_DICT "{\"#clear\"}" = true
 
 test matches_cex
-  CARBON_ENTRY_ENTRY
-  "MAX_CACHE_SIZE = inf # comment at EOL" = true
+  CLEAR_DICT
+  "{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}" = true
 
-test matches_cex CARBON_ENTRY_ENTRY "USER =" = true
-
-test matches_cex CARBON_ENTRY_ENTRY "USER =# test" = true
-
-let CARBON_ENTRY
+let NO_SLASH_QUOTELESS_STRING
   : regexp =
-  "[" . NONEMPTY_BRACKETLESS_STRING . "]\n"
-    . ((CARBON_ENTRY_ENTRY | COMMENT | "") . "\n")*  
+  (UPPERCASE
+     | LOWERCASE
+     | DIGIT
+     | " " | "'" | "_" | ":" | "-" | "." | "=" | "+" | "[" | "]" | "(" | ")")*  
+
+let NO_SLASH_WORD
+  : regexp =
+  (LOWERCASE
+     | UPPERCASE | "_" | "." | "-" | ":" | "+" | DIGIT | "," | "=" | "*")
+    . (LOWERCASE
+         | UPPERCASE | "_" | "." | "-" | ":" | "+" | DIGIT | "," | "=" | "*")*  
+
+let ELEMENT_DICT
+  : regexp =
+  "{\"@elem\"=\"" . NO_SLASH_QUOTELESS_STRING . "\"}" 
+
+test matches_cex ELEMENT_DICT "{\"@elem\"=\"--force-confold\"}" = true
+
+let KVP_CONF : regexp = NO_SLASH_WORD . " \"" . DELIMITED_STRING . "\"" 
+
+test matches_cex KVP_CONF "hello \"testingh ielloo asdfwer s\"" = true
+
+let KVP_DICT
+  : regexp =
+  "{\"" . NO_SLASH_WORD . "\"=\"" . DELIMITED_STRING . "\"}" 
+
+test matches_cex KVP_DICT "{\"hello\"=\"testingh ielloo asdfwer s\"}" = true
+
+let NONRECURSIVE_CONF
+  : regexp =
+  (KVP_CONF | NO_SLASH_QUOTELESS_STRING) . ";"
+    | CLEAR_CONF | MULTILINE_COMMENT | INCLUDE_CONF | SLASH_COMMENT 
+
+let NONRECURSIVE_DICT
+  : regexp =
+  KVP_DICT
+    | ELEMENT_DICT
+    | CLEAR_DICT | MULTILINE_COMMENT_DICT | INCLUDE_DICT | COMMENT_DICT 
+
+let APT_L0_CONF
+  : regexp =
+  WORD . " {\n" . (NONRECURSIVE_CONF . "\n")*  . "}" 
 
 test matches_cex
-  CARBON_ENTRY
-  "[cache]\n# Configure carbon directories.\n\n# Specify the user to drop privileges to\n# If this is blank carbon runs as the user that invokes it\n# This user must have write access to the local data directory\nUSER =\n\nMAX_CACHE_SIZE = inf # comment at EOL\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2003\nENABLE_UDP_LISTENER = False\n" = true
+  APT_L0_CONF
+  "APT {\nhello \"testingh ielloo asdfwer s\";\n--force-confold;\n/*test\nmultiline*/\n//comment\n#clear mydata:hello tester\n#include myfolder/my_filE.txt\n}" = true
 
-let CARBON_CONF : regexp = CARBON_ENTRY*  
+let APT_L0_DICT : regexp = "{\"" . WORD . "\"" . NONRECURSIVE_DICT*  . "}" 
 
 test matches_cex
-  CARBON_CONF
-  "[cache]\n# Configure carbon directories.\n\n# Specify the user to drop privileges to\n# If this is blank carbon runs as the user that invokes it\n# This user must have write access to the local data directory\nUSER =\n\nMAX_CACHE_SIZE = inf # comment at EOL\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2003\nENABLE_UDP_LISTENER = False\n\n[relay]\nLINE_RECEIVER_INTERFACE = 0.0.0.0\nLINE_RECEIVER_PORT = 2013\nPICKLE_RECEIVER_INTERFACE = 0.0.0.0\nPICKLE_RECEIVER_PORT = 2014\n" = true
+  APT_L0_DICT
+  "{\"APT\"{\"hello\"=\"testingh ielloo asdfwer s\"}{\"@elem\"=\"--force-confold\"}{\"#mcomment\"{\"string\"=\"test\"}{\"string\"=\"multiline\"}}{\"#comment\"=\"comment\"}{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}{\"include\"=\"myfolder/my_filE.txt\"}}" = true
 
-let CARBON_ENTRY_ENTRY_DICT
+let apt_l0_dict
+  : (lens in APT_L0_CONF <=> APT_L0_DICT) =
+  synth APT_L0_CONF <=> APT_L0_DICT using {createrex ("APT {\nhello \"testingh ielloo asdfwer s\";\n--force-confold;\n/*test\nmultiline*/\n//comment\n#clear mydata:hello tester\n#include myfolder/my_filE.txt\n}","{\"APT\"{\"hello\"=\"testingh ielloo asdfwer s\"}{\"@elem\"=\"--force-confold\"}{\"#mcomment\"{\"string\"=\"test\"}{\"string\"=\"multiline\"}}{\"#comment\"=\"comment\"}{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}{\"@include\"=\"myfolder/my_filE.txt\"}}")} with go_until_bij_if_no_cs
+
+let APT_L1_CONF
   : regexp =
-  "{\""
-    . WORD
-    . "\""
-    . ("" | "=\"" . NONEMPTY_BRACKETLESS_DELIMITED_STRING . "\"")
-    . ("" | COMMENT_DICT) . "}" 
+  WORD . " {\n" . ((NONRECURSIVE_CONF | APT_L0_CONF) . "\n")*  . "}" 
 
-let entry_entry_map
-  : (lens in CARBON_ENTRY_ENTRY <=> CARBON_ENTRY_ENTRY_DICT) =
-  synth CARBON_ENTRY_ENTRY <=> CARBON_ENTRY_ENTRY_DICT 
-
-let CARBON_ENTRY_DICT
+let APT_L1_DICT
   : regexp =
-  "{\""
-    . NONEMPTY_BRACKETLESS_DELIMITED_STRING
-    . "\"" . (CARBON_ENTRY_ENTRY_DICT | "{ }" | COMMENT_DICT)*  . "}" 
+  "{\"" . WORD . "\"" . (NONRECURSIVE_DICT | APT_L0_DICT)*  . "}" 
 
-let entry_map
-  : (lens in CARBON_ENTRY <=> CARBON_ENTRY_DICT) =
-  synth CARBON_ENTRY <=> CARBON_ENTRY_DICT 
-
-let CARBON_DICT
-  : regexp =
-  "" | "{" . CARBON_ENTRY_DICT . CARBON_ENTRY_DICT*  . "}" 
-
-let carbon_map
-  : (lens in CARBON_CONF <=> CARBON_DICT) =
-  synth CARBON_CONF <=> CARBON_DICT 
+let transformer
+  : (lens in APT_L1_CONF <=> APT_L1_DICT) =
+  synth APT_L1_CONF <=> APT_L1_DICT 

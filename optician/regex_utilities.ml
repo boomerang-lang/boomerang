@@ -98,20 +98,21 @@ let simplify_regex : Regex.t -> Regex.t =
 
 let rec iteratively_deepen
     (r:Regex.t)
+    (ss:string List.t)
   : Regex.t =
   begin match r.node with
     | Regex.RegExEmpty -> r
-    | Regex.RegExBase _ -> r
+    | Regex.RegExBase s -> if List.mem ~equal:String.equal ss s then Regex.make_closed r else r
     | Regex.RegExConcat (r1,r2) ->
-      let r1 = iteratively_deepen r1 in
-      let r2 = iteratively_deepen r2 in
+      let r1 = iteratively_deepen r1 ss in
+      let r2 = iteratively_deepen r2 ss in
       Regex.make_closed (Regex.make_concat r1 r2)
     | Regex.RegExOr (r1,r2) ->
-      let r1 = iteratively_deepen r1 in
-      let r2 = iteratively_deepen r2 in
+      let r1 = iteratively_deepen r1 ss in
+      let r2 = iteratively_deepen r2 ss in
       Regex.make_closed (Regex.make_or r1 r2)
     | Regex.RegExStar r' ->
-      let r' = iteratively_deepen r' in
+      let r' = iteratively_deepen r' ss in
       Regex.make_closed (Regex.make_star r')
     | Regex.RegExClosed _ ->
       failwith "shouldn't happen"

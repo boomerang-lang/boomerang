@@ -72,16 +72,6 @@ test matches_cex
   PHONENUMBERHIDDEN
   "asdfscxv as df415-342-3622 asdfasdf v a" = true
 
-let PHONENUMBEREXPLICIT
-  : regexp =
-  "number: \""
-    . PHONENUMBER
-    . "\"\nbeforetext: \"" . TEXT . "\"\naftertext: \"" . TEXT . "\"" 
-
-test matches_cex
-  PHONENUMBEREXPLICIT
-  "number: \"415-342-3622\"\nbeforetext: \"asdfscxv as df\"\naftertext: \" asdfasdf v a\"" = true
-
 let extract_number
-  : (lens in PHONENUMBERHIDDEN <=> PHONENUMBEREXPLICIT) =
-  synth PHONENUMBERHIDDEN <=> PHONENUMBEREXPLICIT using {createrex ("asdfscxv as df415-342-3622 asdfasdf v a","number: \"415-342-3622\"\nbeforetext: \"asdfscxv as df\"\naftertext: \" asdfasdf v a\"")} 
+  : (lens in PHONENUMBERHIDDEN <-> PHONENUMBER) =
+  synth PHONENUMBERHIDDEN <=> PHONENUMBER using {createrex ("asdfscxv as df415-342-3622 asdfasdf v a","415-342-3622")} 

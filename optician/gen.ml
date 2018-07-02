@@ -124,6 +124,8 @@ struct
       (putr_exs:put_examples)
       (putl_exs:put_examples)
     : (Lens.t * float) option =
+    (*print_endline (Regex.show_with_closed (StochasticRegex.to_regex r1));
+    print_endline (Regex.show_with_closed (StochasticRegex.to_regex r2));*)
     (*print_endline "wait this should happen";
     if (LensContext.size lc = 4) then
       (print_endline "R1:"; print_endline @$ Regex.show @$ StochasticRegex.to_regex r1;
@@ -180,13 +182,13 @@ struct
     let exampled_r1_opt =
       regex_to_exampled_dnf_regex
         lc
-        (StochasticRegex.from_regex @$ StochasticRegex.to_regex r1)
+        r1
         left_example_data
     in
     let exampled_r2_opt =
       regex_to_exampled_dnf_regex
         lc
-        (StochasticRegex.from_regex @$ StochasticRegex.to_regex r2)
+        r2
         right_example_data
     in
     begin match (exampled_r1_opt,exampled_r2_opt) with
@@ -571,17 +573,17 @@ let gen_symmetric_lens
   : Lens.t option =
   let existing_lenses =
     List.map
-      ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1, iteratively_deepen r2))
+      ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1 [], iteratively_deepen r2 []))
       existing_lenses
   in
-  let lc = LensContext.insert_list LensContext.empty existing_lenses in
+  let (lc,ss) = LensContext.insert_list LensContext.empty existing_lenses in
   Star_semiring_alignment_greedy.lc := lc;
   Star_semiring_tree_alignment_optimal.lc := lc;
   StarSemiringTreeRep.clear_alignments ();
   (*print_endline "lenscontext!";
   print_endline @$ LensContext.show lc;*)
-  let r1 = iteratively_deepen r1 in
-  let r2 = iteratively_deepen r2 in
+  let r1 = iteratively_deepen r1 ss in
+  let r2 = iteratively_deepen r2 ss in
   let r1 = StochasticRegex.from_regex r1 in
   let r2 = StochasticRegex.from_regex r2 in
   if !verbose then
@@ -637,12 +639,12 @@ let gen_lens
   else
     let existing_lenses =
       List.map
-        ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1, iteratively_deepen r2))
+        ~f:(fun (l,r1,r2) -> (l,iteratively_deepen r1 [], iteratively_deepen r2 []))
         existing_lenses
     in
-    let lc = LensContext.insert_list LensContext.empty existing_lenses in
-    let r1 = iteratively_deepen r1 in
-    let r2 = iteratively_deepen r2 in
+    let (lc,ss) = LensContext.insert_list LensContext.empty existing_lenses in
+    let r1 = iteratively_deepen r1 ss in
+    let r2 = iteratively_deepen r2 ss in
     if !verbose then
       print_endline "Synthesis Start";
     let lens_option = DNFSynth.gen_lens lc r1 r2 creater_exs in

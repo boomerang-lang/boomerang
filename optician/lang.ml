@@ -46,6 +46,18 @@ struct
 
   let uid (r:t) = r.tag
 
+  let rec show_with_closed
+      (r:t)
+    : string =
+    begin match r.node with
+      | RegExEmpty -> "{}"
+      | RegExBase s -> "\"" ^ s ^ "\""
+      | RegExConcat (r1,r2) -> show_with_closed r1 ^ "." ^ show_with_closed r2
+      | RegExOr (r1,r2) -> show_with_closed r1 ^ "|" ^ show_with_closed r2
+      | RegExStar (r1) -> show_with_closed r1 ^ "*"
+      | RegExClosed _ -> "closed"
+    end
+
   let separate_plus
       (r:t)
     : (t * t) option =

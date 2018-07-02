@@ -1,4 +1,4 @@
-module Extr-quant =
+module Extr-acronym =
 let LOWERCASE
   : regexp =
   "a"
@@ -49,20 +49,17 @@ let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n"
 
 let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
 
-let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*
 
-let CHARACTER : regexp = LOWERCASE | UPPERCASE 
+let CONFERENCE_WORD : regexp = UPPERCASE . LOWERCASE*
 
-let TEXT : regexp = (CHARACTER | " ")*  
+let CONFERENCE_NAME : regexp = CONFERENCE_WORD . (" " . CONFERENCE_WORD)*
 
-let NUMERICTEXT : regexp = (CHARACTER | " " | DIGIT)*  
+let CONFERENCE_ACRONYM : regexp = UPPERCASE . UPPERCASE*
 
-let THINGANDAMOUNT : regexp = TEXT . DIGIT . NUMERICTEXT 
-
-let AMOUNT_EXTRACTED
-  : regexp =
-  "amount: " . DIGIT . NUMERICTEXT . "\nworthless text: " . TEXT 
-
-let extract_amount
-  : (lens in THINGANDAMOUNT <=> AMOUNT_EXTRACTED) =
-  synth THINGANDAMOUNT <=> AMOUNT_EXTRACTED using {createrex ("hey look we sure have a lot of corn we have 35 OZ","amount: 35 OZ\nworthless text: hey look we sure have a lot of corn we have ")} 
+let extract_acronym
+  : (lens in CONFERENCE_NAME <-> CONFERENCE_ACRONYM) =
+  synth CONFERENCE_NAME <=> CONFERENCE_ACRONYM using
+  {
+    createrex ("Principals Of Programming Languages", "POPL")
+  }

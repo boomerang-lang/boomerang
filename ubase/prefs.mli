@@ -23,6 +23,10 @@ val testallPref : bool t
 val debugPref : string list t
 val debugtimesPref : bool t
 
+val noCSPref : bool t
+
+val bijSynthPref : bool t
+
 val logPref : bool t
 val logfilePref : string t
 

@@ -233,6 +233,7 @@ let _ =
     ; ("using", (fun i -> USING i))
     ; ("with", (fun i -> WITH i))
     ; ("keep_going", (fun i -> KEEP_GOING i))
+    ; ("go_until_bij_if_no_cs", (fun i -> GO_UNTIL_BIJ_IF_NO_CS i))
     ; ("createrex", (fun i -> CREATEREX i))
     ; ("createlex", (fun i -> CREATELEX i))
     ; ("putrex", (fun i -> PUTREX i))
@@ -329,7 +330,7 @@ rule main = parse
     QUALIDENT(info lexbuf,qident)
   }
 | int_char+ as integ { INTEGER(info lexbuf, int_of_string integ) }
-| (int_char* "." int_char+) as flot 
+| (("-" | "") int_char* "." int_char+) as flot 
                      { FLOAT(info lexbuf, float_of_string flot) } 
 | newline            { newline lexbuf; main lexbuf }
 | eof                { EOF(info lexbuf) } 

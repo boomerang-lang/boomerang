@@ -1,0 +1,112 @@
+module Extr-fname-err =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let LOCALFOLDER
+  : regexp =
+  (LOWERCASE | UPPERCASE | "_" | "." | "-")
+    . (LOWERCASE | UPPERCASE | "_" | "." | "-")*  
+
+test matches_cex LOCALFOLDER "extract-filename.txt" = true
+
+let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*
+
+let directory_projection
+  : (lens in DIRECTORY <-> "directory given") =
+  synth DIRECTORY <=> "directory given" using {
+    createrex ("/hello/folder/","directory given"),
+    createrex ("/hello/newfolder/","directory given"),
+    createrex ("","directory given"),
+    createrex ("","directory given")}
+    with keep_going -100.0
+
+let FILE : regexp = DIRECTORY . LOCALFOLDER
+
+let FILE_OR_FOLDER : regexp = FILE | DIRECTORY
+
+test matches_cex
+  DIRECTORY
+  "Users/amiltner/lens/tests/flashfill/extract-filename.txt/" = true
+
+test matches_cex
+  (DIRECTORY . LOCALFOLDER)
+  "a.txt" = true
+
+test matches_cex
+  (DIRECTORY . LOCALFOLDER)
+  "/hello/newfolder/a.txt" = true
+
+let with_folder_directory_projection
+  : (lens in FILE <-> LOCALFOLDER) =
+  synth FILE <=> LOCALFOLDER using {
+    createrex ("a.txt","a.txt"),
+    createrex ("/hello/newfolder/a.txt","a.txt")}
+    with keep_going -400.0
+
+let FILENAME_OR_ERR
+  : regexp =
+  LOCALFOLDER
+    | "directory given"
+
+test matches_cex
+  FILENAME_OR_ERR
+  "extract-filename.txt" = true
+
+let extract_file
+  : (lens in FILE_OR_FOLDER <-> FILENAME_OR_ERR) =
+  synth FILE_OR_FOLDER <=> FILENAME_OR_ERR using {
+    createrex ("/hello/folder/","directory given"),
+    createrex ("/hello/folder/a.txt","a.txt"),
+    createrex ("a.txt","a.txt"),
+    createrex ("b.txt","b.txt")
+    }
+    with keep_going -400.0
