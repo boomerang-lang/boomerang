@@ -24,3 +24,8 @@ let gen_symmetric : bool ref = ref true
 let simplify_generated_lens : bool ref = ref true
 
 let compare_type : bool ref = ref true
+
+let no_intelligent_cost : bool ref = ref false
+let test_dumb_cost_at_correct_pair : bool ref = ref false
+
+let no_termination : bool ref = ref false

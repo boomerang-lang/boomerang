@@ -26,6 +26,10 @@ val debugtimesPref : bool t
 val noCSPref : bool t
 
 val bijSynthPref : bool t
+val dumbCostPref : bool t
+val dumbCostCorrectPairPref : bool t
+val noTerminationConditionPref : bool t
+val noKeepGoingPref : bool t
 
 val logPref : bool t
 val logfilePref : string t

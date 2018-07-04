@@ -195,6 +195,18 @@ let noCSPref = createBool "noCS" false "don't use compositional synthesis while 
 let bijSynthPref = createBool "bijSynth" false "use bijective synth synthesizing"
     "When this flag is set, we use bijective synthesis"
 
+let dumbCostPref = createBool "dumbCost" false "use dumb cost when synthesizing"
+    "When this flag is set, we use dumb cost"
+
+let dumbCostCorrectPairPref = createBool "dumbCostCorrectPair" false "use dumb cost when synthesizing but only on correct pair"
+    "When this flag is set, we use dumb cost, but only on correct pair"
+
+let noTerminationConditionPref = createBool "noTerminationCondition" false "we use no termination condition when synth"
+    "When this flag set, no termination condition"
+
+let noKeepGoingPref = createBool "noKeepGoing" false "we don't listen when users tell us to keep going"
+    "When this flag set, we don't listen when users tell us to keep going"
+
 let logfilePref = createString "logfile" (Util.fileInHomeDir "unison.log") "Log file name"
     "By default, logging messages will be appended to the file
      \\verb|unison.log| in your HOME directory.  Set this preference if

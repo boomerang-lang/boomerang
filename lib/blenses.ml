@@ -1931,4 +1931,89 @@ module MLens = struct
   let iter i dl1 min maxo =
     Arx.generic_iter (copy i Rx.epsilon) (union i) (concat i) (star i)
       min maxo dl1
+
+  let rec is_eq l1 l2 : bool =
+    begin match (l1.desc,l2.desc) with
+      | (Copy r1, Copy r2) -> Rx.equiv r1 r2
+      | (Copy _, _) -> false
+      | (_, Copy _) -> false
+      | (Disconnect (r11,r12,_,_), Disconnect (r21,r22,_,_)) ->
+        Rx.equiv r11 r21 && Rx.equiv r12 r22
+      | (Disconnect _, _) -> false
+      | (_, Disconnect _) -> false
+      | (Concat (l11,l12), Concat (l21,l22)) ->
+        is_eq l11 l21 && is_eq l12 l22
+      | (Concat _, _) -> false
+      | (_, Concat _) -> false
+      | (Union (l11,l12), Union (l21,l22)) ->
+        is_eq l11 l21 && is_eq l12 l22
+      | (Union _, _) -> false
+      | (_, Union _) -> false
+      | (Star l1, Star l2) ->
+        is_eq l1 l2
+      | (Star _, _) -> false
+      | (_, Star _) -> false
+      | (Match (_,l1), Match (_,l2)) ->
+        is_eq l1 l2
+      | (Match _, _) -> false
+      | (_, Match _) -> false
+      | (Weight (_,l1), Weight (_,l2)) ->
+        is_eq l1 l2
+      | (Weight _, _) -> false
+      | (_, Weight _) -> false
+      | (Compose (l11,l12), Compose (l21,l22)) ->
+        is_eq l11 l21 && is_eq l12 l22
+      | (Compose _, _) -> false
+      | (_, Compose _) -> false
+      | (Align l1, Align l2) ->
+        is_eq l1 l2
+      | (Align _, _) -> false
+      | (_, Align _) -> false
+      | (Invert l1, Invert l2) ->
+        is_eq l1 l2
+      | (Invert _, _) -> false
+      | (_, Invert _) -> false
+      | (Defaults (l1,_,_), Defaults (l2,_,_)) ->
+        is_eq l1 l2
+      | (Defaults _, _) -> false
+      | (_, Defaults _) -> false
+      | (LeftQuot (_,l1), LeftQuot (_,l2)) ->
+        is_eq l1 l2
+      | (LeftQuot _, _) -> false
+      | (_, LeftQuot _) -> false
+      | (RightQuot (l1,_), RightQuot (l2,_)) ->
+        is_eq l1 l2
+      | (RightQuot _, _) -> false
+      | (_, RightQuot _) -> false
+      | (DupFirst _, DupFirst _) -> true
+      | (DupFirst _, _) -> false
+      | (_, DupFirst _) -> false
+      | (DupSecond _, DupSecond _) -> true
+      | (DupSecond _, _) -> false
+      | (_, DupSecond _) -> false
+      | (Partition _, Partition _) -> true
+      | (Partition _, _) -> false
+      | (_, Partition _) -> false
+      | (Interleave _, Interleave _) -> true
+      | (Interleave _, _) -> false
+      | (_, Interleave _) -> false
+      | (Merge r1, Merge r2) -> Rx.equiv r1 r2
+      | (Merge _, _) -> false
+      | (_, Merge _) -> false
+      | (Fiat l1, Fiat l2) -> is_eq l1 l2
+      | (Fiat _, _) -> false
+      | (_, Fiat _) -> false
+      | (Permute ((i1,ia1,_,_,_),ls1), Permute ((i2,ia2,_,_,_),ls2)) ->
+        if i1 = i2 then
+          let ls1 = Array.to_list ls1 in
+          let ls2 = Array.to_list ls2 in
+          let ls12 = List.combine ls1 ls2 in
+          List.fold_left
+            (fun acc (l1,l2) ->
+               acc && is_eq l1 l2)
+            true
+            ls12
+        else
+          false
+    end
 end

@@ -124,4 +124,6 @@ module MLens : sig
     -> Brx.t -> (string -> (string * string) option -> string)
     -> Brx.t -> (string -> (string * string) option -> string)
     -> t -> t
+
+  val is_eq : t -> t -> bool
 end

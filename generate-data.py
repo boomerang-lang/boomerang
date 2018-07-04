@@ -14,6 +14,7 @@ TEST_EXT = '.boom'
 BASELINE_EXT = '.out'
 BASE_FLAGS = []
 TIMEOUT_TIME = 60
+STILL_WORK_TIMEOUT_TIME = 120
 GENERATE_EXAMPLES_TIMEOUT_TIME = 600000
 
 REPETITION_COUNT = 5
@@ -50,7 +51,7 @@ def gather_data(rootlength, prog, path, base):
         error = False
         for iteration in range(repetition_count):
     	    (time,datum,err) = gather_datum(prog, path, base,flags,timeout_time)
-            if err != "":
+            if err != "" or datum != "":
                 error = True
                 break
             if time > TIMEOUT_TIME:
@@ -89,6 +90,10 @@ def gather_data(rootlength, prog, path, base):
     gather_col(["-noCS"],ctime_combiner,"SSNC",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col(["-bijSynth"],ctime_combiner,"BS",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col(["-bijSynth","-noCS"],ctime_combiner,"BSNC",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col(["-noKeepGoing"],ctime_combiner,"NoTP",TIMEOUT_TIME,1)
+    gather_col(["-noTerminationCondition"],ctime_combiner,"FC",TIMEOUT_TIME,1)
+    gather_col(["-dumbCost"],ctime_combiner,"NM",TIMEOUT_TIME,1)
+    gather_col(["-dumbCostCorrectPair"],ctime_combiner,"NMCC",TIMEOUT_TIME,1)
     ##gather_col(['-forceexpand','-time'],ctime_combiner,"ForceExpandTime",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(['-naive_strategy','-time'],ctime_combiner,"NaiveStrategy",TIMEOUT_TIME,REPETITION_COUNT)
     ##gather_col(['-naive_pqueue','-time'],ctime_combiner,"NaivePQueue",TIMEOUT_TIME,REPETITION_COUNT)

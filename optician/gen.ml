@@ -396,6 +396,8 @@ struct
         (pq:SPQ.t)
         (best:Lens.t option)
         (best_cost:float)
+        (best_r1:StochasticRegex.t)
+        (best_r2:StochasticRegex.t)
       : Lens.t option =
       let calc_comparison_cost
           (distance:Float.t)
@@ -404,6 +406,11 @@ struct
         Float.max
           (distance +. choice_cost -. keep_going)
           0.
+      in
+      let satisfies_from_no_termination
+          (f:Float.t)
+        : bool =
+        f < Float.max_finite_value && !no_termination
       in
       begin match SPQ.pop_until_new_priority pq with
         | Some (f,qes,pq) ->
@@ -436,14 +443,29 @@ struct
                     (SymmetricQueueElement.dnf_distance qe2))
               qes
           in
-          if comparison_cost >=. best_cost then
-            (if !verbose then print_endline @$ string_of_float best_cost; best)
+          if comparison_cost >=. best_cost || satisfies_from_no_termination best_cost then
+            (if !verbose then print_endline @$ string_of_float best_cost;
+             if !test_dumb_cost_at_correct_pair then
+               (no_intelligent_cost := true;
+  StarSemiringTreeRep.clear_alignments ();
+                assert (Lens.is_eq
+                         (Option.value_exn best)
+                         (fst @$ Option.value_exn (kinda_rigid_synth
+                                              lc
+                                              best_r1
+                                              best_r2
+                                              creater_exs
+                                              createl_exs
+                                              putr_exs
+                                              putl_exs)));
+                no_intelligent_cost := false );
+             best)
           else
-            let (best,best_cost) =
+            let (best,best_cost,best_r1,best_r2) =
               List.fold_left
-                ~f:(fun (best,best_cost) qe ->
-                    if comparison_cost >= best_cost then
-                      (best,best_cost)
+                ~f:(fun (best,best_cost,best_r1,best_r2) qe ->
+                    if comparison_cost >= best_cost || satisfies_from_no_termination best_cost then
+                      (best,best_cost,best_r1,best_r2)
                     else
                       let lco =
                         kinda_rigid_synth
@@ -456,19 +478,34 @@ struct
                           putl_exs
                       in
                       begin match lco with
-                        | None -> (best,best_cost)
+                        | None -> (best,best_cost,best_r1,best_r2)
                         | Some (l,c) ->
                           let cost = c in
                           if cost <=. best_cost then
-                            (Some l,cost)
+                            (Some l,cost,qe.r1,qe.r2)
                           else
-                            (best,best_cost)
+                            (best,best_cost,best_r1,best_r2)
                       end)
-                ~init:(best,best_cost)
+                ~init:(best,best_cost,best_r1,best_r2)
                 sorted_qes
             in
-            if comparison_cost >=. best_cost then
-              (if !verbose then print_endline @$ string_of_float best_cost; best)
+            if comparison_cost >=. best_cost || satisfies_from_no_termination best_cost then
+            (if !verbose then print_endline @$ string_of_float best_cost;
+             if !test_dumb_cost_at_correct_pair then
+               (no_intelligent_cost := true;
+  StarSemiringTreeRep.clear_alignments ();
+                assert (Lens.is_eq
+                         (Option.value_exn best)
+                         (fst @$ Option.value_exn (kinda_rigid_synth
+                                              lc
+                                              best_r1
+                                              best_r2
+                                              creater_exs
+                                              createl_exs
+                                              putr_exs
+                                              putl_exs)));
+                no_intelligent_cost := false );
+             best)
             else
               let new_elements =
                 List.concat_map
@@ -480,6 +517,8 @@ struct
                 pq
                 best
                 best_cost
+                best_r1
+                best_r2
         | None -> best
       end
     in
@@ -488,6 +527,8 @@ struct
          (SymmetricQueueElement.init r1 r2))
       None
       Float.max_finite_value
+      StochasticRegex.empty
+      StochasticRegex.empty
 
   let gen_dnf_lens
       (lc:LensContext.t)

@@ -1,4 +1,5 @@
 open MyStdlib
+open Consts
 
 module type BaseData = sig
   include Data
@@ -118,35 +119,39 @@ struct
     -. (Math.log2 (1. -. likelihood_star))
 
   let information_content
-    : t -> float =
-    (* TODO *)
-    fold
-      ~base_f:BD.information_content
-      ~plus_f:(fun _ lfl ->
-          let nfl = List.map ~f:(fun (l,f,p) -> (L.as_count l,f)) lfl in
-          let (n,f) =
+      (tr:t)
+    : float =
+    if !no_intelligent_cost then
+      0.
+    else
+      fold
+        ~base_f:BD.information_content
+        ~plus_f:(fun _ lfl ->
+            let nfl = List.map ~f:(fun (l,f,p) -> (L.as_count l,f)) lfl in
+            let (n,f) =
+              List.fold_left
+                ~f:(fun (n_acc,f_acc) (n,f) ->
+                    (n_acc+n
+                    ,f_acc +. (f *. (Float.of_int n))))
+                ~init:(0,0.)
+                nfl
+            in
+            (Math.log2 @$ Float.of_int @$ n)
+            +. (f /. Float.of_int n))
+        ~times_f:(fun _ lfl ->
+            let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
             List.fold_left
-              ~f:(fun (n_acc,f_acc) (n,f) ->
-                  (n_acc+n
-                  ,f_acc +. (f *. (Float.of_int n))))
-              ~init:(0,0.)
-              nfl
-          in
-          (Math.log2 @$ Float.of_int @$ n)
-          +. (f /. Float.of_int n))
-      ~times_f:(fun _ lfl ->
-          let nfl = List.map ~f:(fun (l,f) -> (L.as_count l,f)) lfl in
-          List.fold_left
-            ~f:(fun acc (n,f) ->
-                acc +. (f *. (Float.of_int n)))
-            ~init:0.
-            nfl)
-      ~star_f:(fun _ p _ ic ->
-          let not_p = Probability.not p in
-          let multiplier = p /. not_p in
-          (multiplier *. ic) +.
-          (multiplier *. (Probability.information_content p)) +.
-          (Probability.information_content not_p))
+              ~f:(fun acc (n,f) ->
+                  acc +. (f *. (Float.of_int n)))
+              ~init:0.
+              nfl)
+        ~star_f:(fun _ p _ ic ->
+            let not_p = Probability.not p in
+            let multiplier = p /. not_p in
+            (multiplier *. ic) +.
+            (multiplier *. (Probability.information_content p)) +.
+            (Probability.information_content not_p))
+        tr
 end
 
 module LabelledPlusTimesStarTreeOf
