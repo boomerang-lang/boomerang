@@ -286,20 +286,24 @@ struct
       (r:ExampledRegex.t)
     : ExampledDNFRegex.t =
     (*let ini = ExampledRegex.extract_example_data r in*)
-    (*let ans = *)begin match r.node with
-      | ERegExEmpty -> ([],empty_parsing_example_data)
+    (*let ans = *)
+    begin match r.node with
+      | ERegExEmpty ->
+        ([],empty_parsing_example_data)
       | ERegExBase (c, ill) ->
         let sill = map_example_data (List.map ~f:(fun il -> (il,c))) ill in
         ([(([],[c],sill),1.)],sill)
       | ERegExConcat (r1,r2,_) ->
-        concat_exampled_dnf_regexs
+        let ans = concat_exampled_dnf_regexs
           (recursive_f r1)
-          (recursive_f r2)
+          (recursive_f r2) in
+        ans
       | ERegExOr (r1,r2,_,p) ->
-        (or_exampled_dnf_regexs
+        let ans = (or_exampled_dnf_regexs
            (recursive_f r1)
            (recursive_f r2)
-           p)
+           p) in
+        ans
       | ERegExStar (r',ill,p) ->
         star_exampled_dnf_regex
           ill
@@ -317,7 +321,7 @@ struct
           (EAClosed (s,ilss))
     end
     (*in
-    let endi = ExampledDNFRegex.extract_example_data ans in
+      let endi = ExampledDNFRegex.extract_example_data ans in
     ans*)
 end
 
