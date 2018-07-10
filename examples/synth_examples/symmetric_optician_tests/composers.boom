@@ -9,11 +9,6 @@ let years_to_empty
 let SOURCE : regexp = ALPHA . ", " . YEARS . ", " . ALPHA
 let VIEW : regexp = ALPHA . ", " . ALPHA . ""
 
-let comp : (lens in SOURCE <-> VIEW) = synth SOURCE <=> VIEW
-using { createrex ("Jean Sibelius, 1865-1957, Finnish" ,"Jean Sibelius, Finnish")}
-
-test comp.get "Jean Sibelius, 1865-1957, Finnish"  = "Jean Sibelius, Finnish"
-
 let SOURCES : regexp = "" | SOURCE . ("\n" . SOURCE)*
 let VIEWS : regexp = "" | VIEW . ("\n" . VIEW)*
 
