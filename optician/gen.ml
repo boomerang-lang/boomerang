@@ -459,6 +459,20 @@ struct
                                               putr_exs
                                               putl_exs)));
                 no_intelligent_cost := false );
+             if !test_constants_cost_at_correct_pair then
+               (constants_cost := true;
+  StarSemiringTreeRep.clear_alignments ();
+                assert (Lens.is_eq
+                         (Option.value_exn best)
+                         (fst @$ Option.value_exn (kinda_rigid_synth
+                                              lc
+                                              best_r1
+                                              best_r2
+                                              creater_exs
+                                              createl_exs
+                                              putr_exs
+                                              putl_exs)));
+                constants_cost := false );
              best)
           else
             let (best,best_cost,best_r1,best_r2) =
@@ -505,6 +519,20 @@ struct
                                               putr_exs
                                               putl_exs)));
                 no_intelligent_cost := false );
+             if !test_constants_cost_at_correct_pair then
+               (constants_cost := true;
+  StarSemiringTreeRep.clear_alignments ();
+                assert (Lens.is_eq
+                         (Option.value_exn best)
+                         (fst @$ Option.value_exn (kinda_rigid_synth
+                                              lc
+                                              best_r1
+                                              best_r2
+                                              creater_exs
+                                              createl_exs
+                                              putr_exs
+                                              putl_exs)));
+                constants_cost := false );
              best)
             else
               let new_elements =

@@ -369,16 +369,18 @@ struct
   type t = float list
   [@@deriving ord, show, hash]
 
-  let average
+  let sum
       (l:t)
-    : float =
-  let sum =
+    : float = 
     List.fold_left
       ~f:(+.)
       ~init:0.0
       l
-  in
-  sum /. (Float.of_int (List.length l))
+
+  let average
+      (l:t)
+    : float =
+  (sum l) /. (Float.of_int (List.length l))
 end
 
 module IntList =

@@ -91,9 +91,13 @@ def gather_data(rootlength, prog, path, base):
     gather_col(["-bijSynth"],ctime_combiner,"BS",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col(["-bijSynth","-noCS"],ctime_combiner,"BSNC",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col(["-noKeepGoing"],ctime_combiner,"NoTP",TIMEOUT_TIME,1)
+    gather_col(["-twentyfivetc"],ctime_combiner,"TC25",TIMEOUT_TIME,1)
+    gather_col(["-negtwentyfivetc"],ctime_combiner,"TCN25",TIMEOUT_TIME,1)
     gather_col(["-noTerminationCondition"],ctime_combiner,"FC",TIMEOUT_TIME,1)
     gather_col(["-dumbCost"],ctime_combiner,"NM",TIMEOUT_TIME,1)
     gather_col(["-dumbCostCorrectPair"],ctime_combiner,"NMCC",TIMEOUT_TIME,1)
+    gather_col(["-constantCost"],ctime_combiner,"ConstCost",TIMEOUT_TIME,1)
+    gather_col(["-constantCostCorrectPair"],ctime_combiner,"ConstCostCC",TIMEOUT_TIME,1)
     ##gather_col(['-forceexpand','-time'],ctime_combiner,"ForceExpandTime",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(['-naive_strategy','-time'],ctime_combiner,"NaiveStrategy",TIMEOUT_TIME,REPETITION_COUNT)
     ##gather_col(['-naive_pqueue','-time'],ctime_combiner,"NaivePQueue",TIMEOUT_TIME,REPETITION_COUNT)
@@ -143,7 +147,7 @@ def sort_data(data):
 
 def print_data(data):
     ensure_dir("generated_data/")
-    with open("generated_data/data.csv", "wb") as csvfile:
+    with open("generated_data/data" + str(time.time()) + ".csv", "wb") as csvfile:
 	datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())
 	datawriter.writeheader()
 	datawriter.writerows(data)

@@ -201,8 +201,20 @@ let dumbCostPref = createBool "dumbCost" false "use dumb cost when synthesizing"
 let dumbCostCorrectPairPref = createBool "dumbCostCorrectPair" false "use dumb cost when synthesizing but only on correct pair"
     "When this flag is set, we use dumb cost, but only on correct pair"
 
+let constantsCostPref = createBool "constantCost" false "use dumb cost when synthesizing"
+    "When this flag is set, we use constants cost"
+
+let constantsCostCorrectPairPref = createBool "constantCostCorrectPair" false "use constants cost when synthesizing but only on correct pair"
+    "When this flag is set, we use constants cost, but only on correct pair"
+
 let noTerminationConditionPref = createBool "noTerminationCondition" false "we use no termination condition when synth"
     "When this flag set, no termination condition"
+
+let twentyFiveTerminationConditionPref = createBool "twentyfivetc" false "we use termination condition of 25 when synth"
+    "When this flag set, termination condition of 25"
+
+let negTwentyFiveTerminationConditionPref = createBool "negtwentyfivetc" false "we use termination condition of -25 when synth"
+    "When this flag set, termination condition of -25"
 
 let noKeepGoingPref = createBool "noKeepGoing" false "we don't listen when users tell us to keep going"
     "When this flag set, we don't listen when users tell us to keep going"

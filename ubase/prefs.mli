@@ -28,7 +28,11 @@ val noCSPref : bool t
 val bijSynthPref : bool t
 val dumbCostPref : bool t
 val dumbCostCorrectPairPref : bool t
+val constantsCostPref : bool t
+val constantsCostCorrectPairPref : bool t
 val noTerminationConditionPref : bool t
+val twentyFiveTerminationConditionPref : bool t
+val negTwentyFiveTerminationConditionPref : bool t
 val noKeepGoingPref : bool t
 
 val logPref : bool t

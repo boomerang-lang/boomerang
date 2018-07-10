@@ -1,4 +1,4 @@
-module Remove_last =
+module Cap_prob =
 let LOWERCASE
   : regexp =
   "a"
@@ -37,9 +37,8 @@ let UPPERCASE
 
 let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
-  synth LOWERCASE <=> UPPERCASE using
-  {createrex ("v","V")
-  ,createrex ("w","W")}
+  synth LOWERCASE <=> UPPERCASE 
+  using { putrex (("a","B"),"A") }
 
 let DIGIT
   : regexp =
@@ -61,10 +60,11 @@ let NAME : regexp = UPPERCASE . LOWERCASE*
 
 let UPPERCASENAME : regexp = UPPERCASE . UPPERCASE*  
 
+let capitalize
+  : (lens in UPPERCASENAME <=> NAME) =
+  synth UPPERCASENAME <=> NAME using
+  { createrex ("DOE","Doe"), createrex ("ODE","Ode") }
+
 test capitalize.get "JOHN" = "John"
 
 test capitalize.get "DOE" = "Doe"
-
-let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
-  synth (NAME . " " . NAME) <=> NAME
-  using { createrex ("Anders Miltner","Anders") }

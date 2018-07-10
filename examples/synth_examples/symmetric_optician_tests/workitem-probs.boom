@@ -1,0 +1,135 @@
+module Workitem-probs =
+let LOWERCASE
+  : regexp =
+  "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" 
+
+let UPPERCASE
+  : regexp =
+  "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 
+
+let to_upper_or_lower
+  : (lens in LOWERCASE <=> UPPERCASE) =
+  synth LOWERCASE <=> UPPERCASE 
+  using { putrex (("a","B"),"A") }
+
+let DIGIT
+  : regexp =
+  "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
+
+let NUMBER : regexp = DIGIT . DIGIT*  
+
+let WSP : regexp = (" " | "\n" | "\t")*  
+
+let NONEMPTY_WSP : regexp = (" " | "\n" | "\t") . (" " | "\n" | "\t")*  
+
+let SAMELINE_WSP_CHAR : regexp = " " | "\t" | "\\\n" 
+
+let SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR*  
+
+let NONEMPTY_SAMELINE_WSP : regexp = SAMELINE_WSP_CHAR . SAMELINE_WSP_CHAR*  
+
+let TEXT_FIELD_CHAR
+  : regexp =
+  UPPERCASE | LOWERCASE | DIGIT | " " | "\n" | "\t" 
+
+let TEXT_FIELD : regexp = TEXT_FIELD_CHAR*  
+
+let NONEMPTY_TEXT_FIELD : regexp = TEXT_FIELD_CHAR . TEXT_FIELD_CHAR*  
+
+let NUMERIC_FIELD : regexp = NUMBER 
+
+let TITLE_LEGACY : regexp = "<Field Id=1>" . TEXT_FIELD . "</Field>" 
+
+let TITLE_MODERN : regexp = "\"title\"=\"" . NONEMPTY_TEXT_FIELD . "\"" 
+
+let TITLE_MODERN_FIELD : regexp = "" | TITLE_MODERN . "," 
+
+test matches_cex TITLE_MODERN "\"title\"=\"title\"" = true
+
+let title_converter
+  : (lens in TITLE_LEGACY <=> TITLE_MODERN_FIELD) =
+  synth TITLE_LEGACY <=> TITLE_MODERN_FIELD using
+  {createrex ("<Field Id=1>title</Field>","\"title\"=\"title\",") }
+
+let TYPE_LEGACY : regexp = "<Field Id=2>" . TEXT_FIELD . "</Field>" 
+
+let TYPE_MODERN : regexp = "\"type\"=\"" . NONEMPTY_TEXT_FIELD . "\"" 
+
+let TYPE_MODERN_FIELD : regexp = "" | TYPE_MODERN . "," 
+
+let type_converter
+  : (lens in TYPE_LEGACY <=> TYPE_MODERN_FIELD) =
+  synth TYPE_LEGACY <=> TYPE_MODERN_FIELD using
+  {createrex ("<Field Id=2>bug</Field>","\"type\"=\"bug\",") }
+
+let ID_LEGACY : regexp = "<Field Id=3>" . NUMERIC_FIELD . "</Field>" 
+
+let ID_MODERN : regexp = "\"id\"=\"" . NUMERIC_FIELD . "\"" 
+
+let DESCRIPTION_LEGACY : regexp = "<Field Id=4>" . TEXT_FIELD . "</Field>" 
+
+let DESCRIPTION_MODERN
+  : regexp =
+  "\"description\"=\"" . NONEMPTY_TEXT_FIELD . "\"" 
+
+let DESCRIPTION_MODERN_FIELD : regexp = "" | DESCRIPTION_MODERN . "," 
+
+let description_converter
+  : (lens in DESCRIPTION_LEGACY <=> DESCRIPTION_MODERN_FIELD) =
+  synth DESCRIPTION_LEGACY <=> DESCRIPTION_MODERN_FIELD using
+  {createrex ("<Field Id=4>this is a bad bug</Field>","\"description\"=\"this is a bad bug\",") }
+
+let WORKITEM_LEGACY
+  : regexp =
+  "<WorkItem>"
+    . TITLE_LEGACY
+    . TYPE_LEGACY . ID_LEGACY . DESCRIPTION_LEGACY . "</WorkItem>" 
+
+test matches_cex
+  WORKITEM_LEGACY
+  "<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>" = true
+
+let WORKITEM_MODERN
+  : regexp =
+  "{"
+    . DESCRIPTION_MODERN_FIELD
+    . ID_MODERN . "," . TITLE_MODERN_FIELD . TYPE_MODERN_FIELD . "}" 
+
+let legacy_converter
+  : (lens in WORKITEM_LEGACY <=> WORKITEM_MODERN) =
+  synth WORKITEM_LEGACY <=> WORKITEM_MODERN using {createrex ("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"type\"=\"bug\",}"),
+    createrex ("<WorkItem><Field Id=1>title</Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",\"title\"=\"title\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2></Field><Field Id=3>1</Field><Field Id=4>this is a bad bug</Field></WorkItem>","{\"description\"=\"this is a bad bug\",\"id\"=\"1\",}"),
+    createrex ("<WorkItem><Field Id=1></Field><Field Id=2>bug</Field><Field Id=3>1</Field><Field Id=4></Field></WorkItem>","{\"id\"=\"1\",\"type\"=\"bug\",}")} 

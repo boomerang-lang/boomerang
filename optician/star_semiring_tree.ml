@@ -123,6 +123,8 @@ struct
     : float =
     if !no_intelligent_cost then
       0.
+    else if !constants_cost then
+      1.
     else
       fold
         ~base_f:BD.information_content

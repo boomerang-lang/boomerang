@@ -46,7 +46,8 @@ unittest:
 test: unittest functionaltest
 
 generate-data: all
-	$(GENERATE_DATA) ./boomerang.exe examples/synth_examples/
+	$(GENERATE_DATA) ./boomerang.exe examples/synth_examples/bijective_optician_tests/
+	$(GENERATE_DATA) ./boomerang.exe examples/synth_examples/symmetric_optician_tests/
 
 documentation:
 	jbuilder build @docs

@@ -466,75 +466,190 @@ struct
     let rec right_left_cost
         (nt:t)
       : float =
-      begin match nt.right_left_cost with
-        | Some c -> c
-        | None ->
-          let c =
-            begin match nt.node with
-              | Plus (_,_,md,_,_) ->
-                let position_cost
-                    (iam:MappingDict.IndirectAlignmentMapping.t)
-                    (p:position)
-                  : float =
-                  let associated_edges =
-                    MappingDict.SingleAlignmentMapping.value_list
-                      (MappingDict.IndirectAlignmentMapping.lookup_exn
-                         iam
-                         p)
+      if !no_intelligent_cost then
+        0.
+      else if !constants_cost then
+        begin match nt.node with
+          | Plus (_,_,md,_,_) ->
+            let position_cost
+                (iam:MappingDict.IndirectAlignmentMapping.t)
+                (p:position)
+              : float =
+              let associated_edges =
+                MappingDict.SingleAlignmentMapping.value_list
+                  (MappingDict.IndirectAlignmentMapping.lookup_exn
+                     iam
+                     p)
+              in
+              let edge_costs = List.map ~f:right_left_cost associated_edges in
+              let edge_cost = FloatList.sum edge_costs in
+              let edge_count = List.length associated_edges in
+              let choice_cost = (Float.of_int edge_count) -. 1. in
+              edge_cost +. choice_cost
+            in
+            let side_cost
+                (iam:MappingDict.IndirectAlignmentMapping.t)
+              : float =
+              let positions =
+                MappingDict.IndirectAlignmentMapping.key_list
+                  iam
+              in
+              let positions_cost =
+                List.map
+                  ~f:(position_cost iam)
+                  positions
+              in
+              if List.is_empty positions_cost then
+                0.
+              else
+                FloatList.sum positions_cost
+            in
+            let right_cost =
+              side_cost
+                (MappingDict.indirect_mapping_right md)
+            in
+            right_cost
+          | Times (_,_,als,_,pright) ->
+            let recursive_costs =
+              List.map
+                ~f:(fun (_,_,a) -> right_left_cost a +. 1.)
+                als
+            in
+            let projected_costs = List.map ~f:snd pright in
+            let merge_costs = List.fold_left ~f:(+.) ~init:0. in
+            (merge_costs recursive_costs)
+            +. (merge_costs projected_costs)
+          | Star (_,_,a) ->
+            right_left_cost a
+          | Base (a) ->
+            BD.Alignment.cost a
+        end
+      else
+        begin match nt.right_left_cost with
+          | Some c -> c
+          | None ->
+            let c =
+              begin match nt.node with
+                | Plus (_,_,md,_,_) ->
+                  let position_cost
+                      (iam:MappingDict.IndirectAlignmentMapping.t)
+                      (p:position)
+                    : float =
+                    let associated_edges =
+                      MappingDict.SingleAlignmentMapping.value_list
+                        (MappingDict.IndirectAlignmentMapping.lookup_exn
+                           iam
+                           p)
+                    in
+                    let edge_costs = List.map ~f:right_left_cost associated_edges in
+                    let average_edge_cost = FloatList.average edge_costs in
+                    let edge_count = List.length associated_edges in
+                    let choice_cost = Math.log2 (Float.of_int edge_count) in
+                    average_edge_cost +. choice_cost
                   in
-                  let edge_costs = List.map ~f:right_left_cost associated_edges in
-                  let average_edge_cost = FloatList.average edge_costs in
-                  let edge_count = List.length associated_edges in
-                  let choice_cost = Math.log2 (Float.of_int edge_count) in
-                  average_edge_cost +. choice_cost
-                in
-                let side_cost
-                    (iam:MappingDict.IndirectAlignmentMapping.t)
-                  : float =
-                  let positions =
-                    MappingDict.IndirectAlignmentMapping.key_list
-                      iam
+                  let side_cost
+                      (iam:MappingDict.IndirectAlignmentMapping.t)
+                    : float =
+                    let positions =
+                      MappingDict.IndirectAlignmentMapping.key_list
+                        iam
+                    in
+                    let positions_cost =
+                      List.map
+                        ~f:(position_cost iam)
+                        positions
+                    in
+                    if List.is_empty positions_cost then
+                      0.
+                    else
+                      FloatList.average positions_cost
                   in
-                  let positions_cost =
+                  let right_cost =
+                    side_cost
+                      (MappingDict.indirect_mapping_right md)
+                  in
+                  right_cost
+                | Times (_,_,als,_,pright) ->
+                  let recursive_costs =
                     List.map
-                      ~f:(position_cost iam)
-                      positions
+                      ~f:(fun (_,_,a) -> right_left_cost a)
+                      als
                   in
-                  if List.is_empty positions_cost then
-                    0.
-                  else
-                    FloatList.average positions_cost
-                in
-                let right_cost =
-                  side_cost
-                    (MappingDict.indirect_mapping_right md)
-                in
-                right_cost
-              | Times (_,_,als,_,pright) ->
-                let recursive_costs =
-                  List.map
-                    ~f:(fun (_,_,a) -> right_left_cost a)
-                    als
-                in
-                let projected_costs = List.map ~f:snd pright in
-                let merge_costs = List.fold_left ~f:(+.) ~init:0. in
-                (merge_costs recursive_costs)
-                +. (merge_costs projected_costs)
-              | Star (_,_,a) ->
-                right_left_cost a
-              | Base (a) ->
-                BD.Alignment.cost a
-            end
-          in
-          nt.right_left_cost <- Some c;
-          c
-      end
+                  let projected_costs = List.map ~f:snd pright in
+                  let merge_costs = List.fold_left ~f:(+.) ~init:0. in
+                  (merge_costs recursive_costs)
+                  +. (merge_costs projected_costs)
+                | Star (_,_,a) ->
+                  right_left_cost a
+                | Base (a) ->
+                  BD.Alignment.cost a
+              end
+            in
+            nt.right_left_cost <- Some c;
+            c
+        end
 
     let rec left_right_cost
         (nt:t)
       : float =
       if !no_intelligent_cost then
         0.
+      else if !constants_cost then
+        begin match nt.node with
+          | Plus (_,_,md,_,_) ->
+            let position_cost
+                (iam:MappingDict.IndirectAlignmentMapping.t)
+                (p:position)
+              : float =
+              let associated_edges =
+                MappingDict.SingleAlignmentMapping.value_list
+                  (MappingDict.IndirectAlignmentMapping.lookup_exn
+                     iam
+                     p)
+              in
+              let edge_costs = List.map ~f:left_right_cost associated_edges in
+              let edge_cost = FloatList.sum edge_costs in
+              let edge_count = List.length associated_edges in
+              let choice_cost = (Float.of_int edge_count) -. 1. in
+              edge_cost +. choice_cost
+            in
+            let side_cost
+                (iam:MappingDict.IndirectAlignmentMapping.t)
+              : float =
+              let positions =
+                MappingDict.IndirectAlignmentMapping.key_list
+                  iam
+              in
+              let positions_cost =
+                List.map
+                  ~f:(position_cost iam)
+                  positions
+              in
+              if List.is_empty positions_cost then
+                0.
+              else
+                FloatList.sum positions_cost
+            in
+            let left_cost =
+              side_cost
+                (MappingDict.indirect_mapping_left md)
+            in
+            left_cost
+          | Times (_,_,als,pleft,_) ->
+            let recursive_costs =
+              List.map
+                ~f:(fun (_,_,a) -> left_right_cost a +. 1.)
+                als
+            in
+            let projected_costs = List.map ~f:snd pleft in
+            let merge_costs = List.fold_left ~f:(+.) ~init:0. in
+            (merge_costs recursive_costs)
+            +. (merge_costs projected_costs)
+          | Star (_,_,a) ->
+            left_right_cost a
+          | Base (a) ->
+            BD.Alignment.cost a
+        end
       else
         begin match nt.left_right_cost with
           | Some c -> c

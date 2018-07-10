@@ -176,11 +176,16 @@ let synth
   : Blenses.MLens.t =
   let dumb_cost = Prefs.read Prefs.dumbCostPref in
   let dumb_cost_correct_pair = Prefs.read Prefs.dumbCostCorrectPairPref in
+  let constants_cost = Prefs.read Prefs.constantsCostPref in
+  let constants_cost_correct_pair = Prefs.read Prefs.constantsCostCorrectPairPref in
   let no_termination_condition = Prefs.read Prefs.noTerminationConditionPref in
+  let termination_condition_25 = Prefs.read Prefs.twentyFiveTerminationConditionPref in
+  let termination_condition_neg25 = Prefs.read Prefs.negTwentyFiveTerminationConditionPref in
   let no_keep_going = Prefs.read Prefs.noKeepGoingPref in
   Optician.Consts.gen_symmetric := not (Prefs.read Prefs.bijSynthPref);
   Optician.Consts.use_lens_context := not (Prefs.read Prefs.noCSPref);
   Optician.Consts.test_dumb_cost_at_correct_pair := dumb_cost_correct_pair;
+  Optician.Consts.test_constants_cost_at_correct_pair := constants_cost_correct_pair;
 
   let subregexps = (Brx.subregexp_list r1)@(Brx.subregexp_list r2) in
   let (lss,d) = retrieve_existing_lenses subregexps env in
@@ -221,6 +226,26 @@ let synth
      Optician.Consts.no_intelligent_cost := false;
      assert (Blenses.MLens.is_eq ans ans2);
      ans)
+  else if constants_cost then
+    (Optician.Consts.constants_cost := true;
+     let ans2 =
+       to_boomerang_lens
+         i
+         d
+         (Option.value_exn
+            (Gen.gen_lens
+               0.
+               lss
+               r1
+               r2
+               creater_exs
+               createl_exs
+               putr_exs
+               putl_exs))
+     in
+     Optician.Consts.constants_cost := false;
+     assert (Blenses.MLens.is_eq ans ans2);
+     ans)
   else if no_keep_going then
     (let ans2 =
        to_boomerang_lens
@@ -229,6 +254,42 @@ let synth
          (Option.value_exn
             (Gen.gen_lens
                0.
+               lss
+               r1
+               r2
+               creater_exs
+               createl_exs
+               putr_exs
+               putl_exs))
+     in
+     assert (Blenses.MLens.is_eq ans ans2);
+     ans)
+  else if termination_condition_25 then
+    (let ans2 =
+       to_boomerang_lens
+         i
+         d
+         (Option.value_exn
+            (Gen.gen_lens
+               25.0
+               lss
+               r1
+               r2
+               creater_exs
+               createl_exs
+               putr_exs
+               putl_exs))
+     in
+     assert (Blenses.MLens.is_eq ans ans2);
+     ans)
+  else if termination_condition_neg25 then
+    (let ans2 =
+       to_boomerang_lens
+         i
+         d
+         (Option.value_exn
+            (Gen.gen_lens
+               (-25.0)
                lss
                r1
                r2
