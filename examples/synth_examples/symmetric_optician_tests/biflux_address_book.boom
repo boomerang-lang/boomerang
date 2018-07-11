@@ -4,74 +4,32 @@ let LOWER_OR_NUMBER : regexp = ([a-z] | [0-9])+
 let NAME : regexp = ([A-Z] . [a-z]* )
 let NAMES : regexp = "\n\t\t<name>" . NAME . (" " . NAME)* . "</name>"
 let NII_EMAIL : regexp = LOWER_OR_NUMBER . "@nii.ac.jp"
-let OTHER_EMAIL : regexp = LOWER_OR_NUMBER . ("@" | "") . LOWER_OR_NUMBER . ("." . LOWER_OR_NUMBER)*
-let NII_EMAILS : regexp = 
-("\n\t\t<email>" . OTHER_EMAIL . "</email>")* . 
-("\n\t\t<email>" . NII_EMAIL . "</email>") .
-("\n\t\t<email>" . (NII_EMAIL | OTHER_EMAIL) . "</email>")*
-let TELEPHONE : regexp = "\n\t\t<tel>" . [0-9]{3} . "-" . [0-9]{4} . "-" . [0-9]{4} . "</tel>"
-let NII_PERSON : regexp = "\n\t<person>" . NAMES . NII_EMAILS . (TELEPHONE | "") . "\n\t</person>"
+let NON_NII_DOMAIN : regexp = "gmail" | "comcast" | "domain"
+let OTHER_EMAIL : regexp = LOWER_OR_NUMBER . ("@" | "") . NON_NII_DOMAIN . ("." . LOWER_OR_NUMBER)*
 
-let NOT_NII_EMAILS : regexp =  ("\n\t\t<email>" . OTHER_EMAIL . "</email>")*
-let NOT_NII_PERSON : regexp = "\n\t<person>" . NAMES . NOT_NII_EMAILS . (TELEPHONE | "") . "\n\t</person>"
+let NII_EMAIL_XML = ("\n\t\t<email>" . NII_EMAIL . "</email>")
 
-let ADDRESS_BOOK : regexp = "<addrbook>" . (NII_PERSON | NOT_NII_PERSON)* . "\n</addrbook>"
+let NON_NII_EMAIL_XML = ("\n\t\t<email>" . OTHER_EMAIL . "</email>")
 
-let address_book : string = 
-"<addrbook>
-	<person>
-		<name>Hugo Pacheco</name>
+let delete_non_nii_email = synth NON_NII_EMAIL_XML* <=> "" with keep_going -500.0
+
+let NII_EMAILS : regexp =
+(NII_EMAIL_XML . NON_NII_EMAIL_XML* )*
+test matches_cex NII_EMAILS "
 		<email>hpacheco@nii.ac.jp</email>
-		<email>hpacheco@gmail.com</email>
-	</person>
-	<person>
-		<name>John Doe</name>
-		<email>doe@domain.com</email>
-	</person>
-	<person>
-		<name>Zhenjiang Hu</name>
-		<email>zh@nii.ac.jp</email>
-		<tel>123-4567-8910</tel>
-	</person>
-</addrbook>"
+		<email>hpacheco@gmail.com</email>" = true
 
-test matches ADDRESS_BOOK address_book = true
+let ONLY_NII_EMAILS : regexp = "" . (NII_EMAIL_XML . "" )*
+test matches_cex ONLY_NII_EMAILS "
+		<email>hpacheco@nii.ac.jp</email>" = true
 
-let ONLY_NII_EMAILS : regexp = ("\n\t\t<email>" . NII_EMAIL . "</email>")*
-let EMPLOYEE : regexp = "\n\t<employee>" . NAMES . ONLY_NII_EMAILS . "\n\t</employee>"
-let NII_BOOK : regexp = "<niibook>" . (EMPLOYEE | "")* . "\n</niibook>"
-
-let nii_book : string = 
-"<niibook>
-	<employee>
-		<name>Hugo Pacheco</name>
-		<email>hpacheco@nii.ac.jp</email>
-	</employee>
-	<employee>
-		<name>Zhenjiang Hu</name>
-		<email>zh@nii.ac.jp</email>
-	</employee>
-</niibook>"
-
-test matches NII_BOOK nii_book = true
-
-let delete_not_nii : (lens in NOT_NII_PERSON <-> "") = synth NOT_NII_PERSON <=> "" with keep_going -185.0
-let transform_nii : (lens in NII_PERSON <-> EMPLOYEE) = synth NII_PERSON <=> EMPLOYEE using
+let project_non_nii_emails : (lens in NII_EMAILS <-> ONLY_NII_EMAILS) =
+synth NII_EMAILS <=> ONLY_NII_EMAILS
+using
 { createrex
 ("
-	<person>
-		<name>Hugo Pacheco</name>
 		<email>hpacheco@nii.ac.jp</email>
-		<email>hpacheco@gmail.com</email>
-	</person>",
+		<email>hpacheco@gmail.com</email>",
 "
-	<employee>
-		<name>Hugo Pacheco</name>
-		<email>hpacheco@nii.ac.jp</email>
-	</employee>")
-} with keep_going -185.0
-
-let final_lens : (lens in ADDRESS_BOOK <-> NII_BOOK) = synth ADDRESS_BOOK <=> NII_BOOK
-using { createrex (address_book, nii_book)} with keep_going -185.0
-
-
+		<email>hpacheco@nii.ac.jp</email>")
+} with keep_going -300.0
