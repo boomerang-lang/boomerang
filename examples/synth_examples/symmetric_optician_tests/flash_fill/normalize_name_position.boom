@@ -57,3 +57,5 @@ let combine_name_title
   createrex ("NAME:  TITLE: Asst",""),
   createrex ("NAME:  TITLE: ","")
   }
+
+test combine_name_title = ?

@@ -71,5 +71,3 @@ test matches_cex NAME_OR_OTHER "Madonna" = true
 let merge_remove_last : (lens in (NAME . " " . NAME)
 <-> NAME_OR_OTHER) = synth (NAME . " " . NAME) <=> NAME_OR_OTHER
 using { createlex ("Madonna","Madonna A") }
-
-test merge_remove_last = ?
