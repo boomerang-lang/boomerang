@@ -619,8 +619,8 @@ struct
     let comparer = (pair_compare compare_key V.compare) in
     compare_list
       ~cmp:comparer
-      (List.sort ~cmp:comparer (as_kvp_list d1))
-      (List.sort ~cmp:comparer (as_kvp_list d2))
+      (List.sort ~compare:comparer (as_kvp_list d1))
+      (List.sort ~compare:comparer (as_kvp_list d2))
 
   let merge
       ~combiner:(combiner:value -> value -> 'a)

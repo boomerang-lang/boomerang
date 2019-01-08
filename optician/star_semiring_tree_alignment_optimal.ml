@@ -1082,7 +1082,7 @@ struct
               in
               let sorted_clp =
                 List.sort
-                  ~cmp:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
+                  ~compare:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
                   unsorted_clp
               in
               List.map

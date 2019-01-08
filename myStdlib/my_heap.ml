@@ -141,8 +141,8 @@ struct
     end
 
   let compare (h1:t) (h2:t) : comparison =
-    let h1es = List.sort ~cmp:D.compare (to_list h1) in
-    let h2es = List.sort ~cmp:D.compare (to_list h2) in
+    let h1es = List.sort ~compare:D.compare (to_list h1) in
+    let h2es = List.sort ~compare:D.compare (to_list h2) in
     compare_list
       ~cmp:D.compare
       h1es

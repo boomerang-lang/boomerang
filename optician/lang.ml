@@ -451,6 +451,7 @@ struct
     | Or of t * t * Probability.t
     | Star of t * Probability.t
     | Closed of t
+    | Skip of t
   [@@deriving show,hash]
 
   let rec compare
@@ -505,6 +506,9 @@ struct
       | (Star _      ,_           ) -> -1
       | (_           ,Star _      ) -> 1
       | (Closed r1,Closed r2) -> compare r1 r2
+      | (Closed r1,_        ) -> -1
+      | (_        ,Closed r2) -> 1
+      | (Skip r1, Skip r2) -> compare r1 r2
     end
 
   let table = HashConsTable.create 10000
@@ -580,6 +584,11 @@ struct
     : t =
     mk_t (Closed r)
 
+  let make_skip
+      (r:t)
+    : t =
+    mk_t (Skip r)
+
   let make_plus = make_or
 
   let make_times = make_concat
@@ -601,10 +610,12 @@ struct
       ~upward_or:(upward_or:'b -> Probability.t -> 'a -> 'a -> 'a)
       ~upward_star:(upward_star:'b -> Probability.t -> 'a -> 'a)
       ~upward_closed:(upward_closed:'b -> 'a -> 'a)
+      ~upward_skip:(upward_skip:'b -> 'a -> 'a)
       ?downward_concat:(downward_concat:'b -> 'b = ident)
       ?downward_or:(downward_or:'b -> 'b = ident)
       ?downward_star:(downward_star:'b -> 'b = ident)
       ?downward_closed:(downward_closed:'b -> 'b = ident)
+      ?downward_skip:(downward_skip:'b -> 'b = ident)
     : t -> 'a =
     let rec fold_downward_upward_internal
         (downward_acc:'b)
@@ -637,6 +648,11 @@ struct
           upward_closed
             downward_acc
             (fold_downward_upward_internal downward_acc' r')
+        | Skip r' ->
+          let downward_acc' = downward_closed downward_acc in
+          upward_closed
+            downward_acc
+            (fold_downward_upward_internal downward_acc' r')
       end
     in
     fold_downward_upward_internal init
@@ -648,6 +664,7 @@ struct
       ~or_f:(or_f:Probability.t -> 'a -> 'a -> 'a)
       ~star_f:(star_f:Probability.t -> 'a -> 'a)
       ~closed_f:(closed_f:'a -> 'a)
+      ~skip_f:(skip_f:'a -> 'a)
       (r:t)
     : 'a =
     fold_downward_upward
@@ -658,6 +675,7 @@ struct
       ~upward_or:(thunk_of or_f)
       ~upward_star:(thunk_of star_f)
       ~upward_closed:(thunk_of closed_f)
+      ~upward_skip:(thunk_of skip_f)
       r
 
   let fold_with_subcomponents
@@ -667,6 +685,7 @@ struct
       ~or_f:(or_f:t -> t -> Probability.t -> 'a -> 'a -> 'a)
       ~star_f:(star_f:t -> Probability.t -> 'a -> 'a)
       ~closed_f:(closed_f:t -> 'a -> 'a)
+      ~skip_f:(skip_f:t -> 'a -> 'a)
       (r:t)
     : 'a =
     snd
@@ -681,6 +700,8 @@ struct
              (make_star r' p, star_f r' p x'))
          ~closed_f:(fun (r',x') ->
              (make_closed r', closed_f r' x'))
+         ~skip_f:(fun (r',x') ->
+             (make_skip r', skip_f r' x'))
          r)
 
   let dnf_size
@@ -705,6 +726,8 @@ struct
           (size+1,1)
         | Closed _ ->
           (1,1)
+        | Skip _ ->
+          (1,1)
       end
     in
     fst (dnf_size_internal s)
@@ -720,6 +743,7 @@ struct
       ~or_f:(fun p r1 r2 -> f (make_or r1 r2 p))
       ~star_f:(fun p r' -> f (make_star r' p))
       ~closed_f:(fun r' -> f (make_closed r'))
+      ~skip_f:(fun r' -> f (make_skip r'))
       r
 
   let rec applies_for_every_applicable_level
@@ -782,6 +806,15 @@ struct
               r's
           in
           (closed_r, level_contribution@recursed_inner))
+      ~skip_f:(fun (r',r's) ->
+          let skip_r = make_skip r' in
+          let level_contribution = option_to_empty_or_singleton (f skip_r) in
+          let recursed_inner =
+            List.map
+              ~f:(fun r'' -> make_skip r'')
+              r's
+          in
+          (skip_r, level_contribution@recursed_inner))
 
   let rec size
     : t -> int =
@@ -792,6 +825,7 @@ struct
       ~or_f:(fun _ n1 n2 -> 1+n1+n2)
       ~star_f:(fun _ n -> 1+n)
       ~closed_f:(fun n -> n+1)
+      ~skip_f:(fun n -> n+1)
 
   let from_regex
       (r:Regex.t)
@@ -839,6 +873,8 @@ struct
             | Closed r ->
               let r = to_regex r in
               Regex.make_closed r
+            | Skip r ->
+              to_regex r
           end
         in
         r.node.regex <- Some ans;
@@ -862,6 +898,8 @@ struct
         false
       | Base _ ->
         false
+      | Skip r ->
+        is_empty r
     end
 
   let rec is_singleton
@@ -881,6 +919,8 @@ struct
         || (is_singleton r2 && is_empty r1)
       | Concat (r1,r2) ->
         is_singleton r1 && is_singleton r2
+      | Skip r ->
+        is_singleton r
     end
 
   let rec representative
@@ -903,6 +943,7 @@ struct
       | Closed r -> representative r
       | Base s -> Some s
       | Star (r,_) -> Some ""
+      | Skip r -> representative r
     end
 
   let rec representative_exn
@@ -940,6 +981,7 @@ struct
         (multiplier *. ic) +.
         (multiplier *. (Probability.information_content p)) +.
         (Probability.information_content not_p)
+      | Skip r -> 0.
     end in
     if (Float.compare x Float.nan = 0) then failwith (Regex.show @$ to_regex r);
     x

@@ -445,13 +445,13 @@ and to_ordered_exampled_clause
   ,strings
   ,make_example_data
       ~arg1_data:(List.sort
-                    ~cmp:(compare_list ~cmp:Int.compare)
+                    ~compare:(compare_list ~cmp:Int.compare)
                     ((List.map ~f:fst) exnums.arg1_data))
       ~arg2_data:(List.sort
-                    ~cmp:(compare_list ~cmp:Int.compare)
+                    ~compare:(compare_list ~cmp:Int.compare)
                     ((List.map ~f:fst) exnums.arg2_data))
       ~output_data:(List.sort
-                      ~cmp:(compare_list ~cmp:Int.compare)
+                      ~compare:(compare_list ~cmp:Int.compare)
                       ((List.map ~f:fst) exnums.output_data)))
 
 and to_ordered_exampled_dnf_regex

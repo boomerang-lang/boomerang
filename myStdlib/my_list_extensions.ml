@@ -13,7 +13,7 @@ let sorting
   in
   let sorted_l_with_is =
     List.sort
-      ~cmp:(fun (x1,_) (x2,_) -> cmp x1 x2)
+      ~compare:(fun (x1,_) (x2,_) -> cmp x1 x2)
       l_with_is
   in
   Permutation.create
@@ -30,7 +30,7 @@ let sorting_and_sort
   in
   let sorted_l_with_is =
     List.sort
-      ~cmp:(fun (x1,_) (x2,_) -> cmp x1 x2)
+      ~compare:(fun (x1,_) (x2,_) -> cmp x1 x2)
       l_with_is
   in
   (Permutation.create

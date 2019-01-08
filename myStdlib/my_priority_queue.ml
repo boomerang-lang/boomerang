@@ -112,12 +112,12 @@ struct
       : comparison =
       let ordered_qhl1 =
         List.sort
-          ~cmp:D.compare
+          ~compare:D.compare
           (List.map ~f:fst (QueueHeap.to_list qh1))
       in
       let ordered_qhl2 =
         List.sort
-          ~cmp:D.compare
+          ~compare:D.compare
           (List.map ~f:fst (QueueHeap.to_list qh2))
       in
       compare_list

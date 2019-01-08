@@ -1,5 +1,6 @@
 open Core
 
+let default_compare = compare
 let compare _ _ = failwith "don't be so lazy"
 
 let random_char () =
@@ -137,8 +138,8 @@ let compare_list_as_multisets
     (l1:'a list)
     (l2:'a list)
   : int =
-  let sorted_l1 = List.sort ~cmp:cmp l1 in
-  let sorted_l2 = List.sort ~cmp:cmp l2 in
+  let sorted_l1 = List.sort ~compare:cmp l1 in
+  let sorted_l2 = List.sort ~compare:cmp l2 in
   compare_list ~cmp:cmp sorted_l1 sorted_l2
 
 let rec is_sublist
@@ -161,8 +162,8 @@ let is_submultiset
     (l1:'a list)
     (l2:'a list)
   : bool =
-  let sorted_l1 = List.sort ~cmp:cmp l1 in
-  let sorted_l2 = List.sort ~cmp:cmp l2 in
+  let sorted_l1 = List.sort ~compare:cmp l1 in
+  let sorted_l2 = List.sort ~compare:cmp l2 in
   is_sublist ~cmp:cmp sorted_l1 sorted_l2
 
 let make_matchable (n:comparison) : matchable_comparison =
@@ -865,7 +866,7 @@ let sort_and_partition_with_indices (f:'a -> 'a -> comparison)
 
 
   let sorted = List.sort
-    ~cmp:(fun (x,_) (y,_) -> (f x y))
+    ~compare:(fun (x,_) (y,_) -> (f x y))
     (List.mapi ~f:(fun i x -> (x,i)) l) in
 
   begin match sorted with
@@ -1063,8 +1064,8 @@ let intersect_map_lose_order_no_dupes
     | (_,[]) -> []
     end
   in
-  let ordered_l1 = List.sort ~cmp:cmp l1 in
-  let ordered_l2 = List.sort ~cmp:cmp l2 in
+  let ordered_l1 = List.sort ~compare:cmp l1 in
+  let ordered_l2 = List.sort ~compare:cmp l2 in
   intersect_ordered ordered_l1 ordered_l2
 
 let intersect_lose_order_no_dupes
@@ -1098,7 +1099,7 @@ let minus_keys_lose_order
   in
   let ordered_l1 =
     List.sort
-      ~cmp:(fun (k1,_) (k2,_) -> cmp k1 k2)
+      ~compare:(fun (k1,_) (k2,_) -> cmp k1 k2)
       l1
   in
   let ordered_l2 =
@@ -1126,8 +1127,8 @@ let set_minus_lose_order (cmp:'a -> 'a -> comparison)
     | (_,[]) -> l1
     end
   in
-  let ordered_l1 = List.dedup_and_sort (List.sort ~cmp:cmp l1) in
-  let ordered_l2 = List.dedup_and_sort (List.sort ~cmp:cmp l2) in
+  let ordered_l1 = List.dedup_and_sort ~compare:cmp (List.sort ~compare:cmp l1) in
+  let ordered_l2 = List.dedup_and_sort ~compare:cmp (List.sort ~compare:cmp l2) in
   set_minus_ordered ordered_l1 ordered_l2
 
 let symmetric_set_minus
@@ -1171,7 +1172,7 @@ let project_out_elements
     end
   in
   project_out_elements_internal
-    (List.sort ~cmp:Int.compare indices)
+    (List.sort ~compare:Int.compare indices)
     l
     0
 
@@ -1248,8 +1249,9 @@ let rec append_into_correct_list ((k,v):'a * 'b list) (l:('a * 'b list) list)
   | [] -> failwith "bad lisat"
   end
 
-let group_by_values (l:('a list * 'b) list) : ('a list * 'b) list =
-  let empty_value_list = List.dedup_and_sort (List.map ~f:(fun v -> (snd v,[])) l) in
+let group_by_values
+    (l:('a list * 'b) list) : ('a list * 'b) list =
+  let empty_value_list = List.dedup_and_sort ~compare:default_compare (List.map ~f:(fun v -> (snd v,[])) l) in
   let l' = List.fold_left
   ~f:(fun acc (k,v) ->
     append_into_correct_list (v,k) acc)

@@ -218,12 +218,12 @@ module HCDictOf(K:UIDData)(V:Data) = struct
     in
     let ordered_d1_kvp_list =
       List.sort
-        ~cmp:(fun (k1,_) (k2,_) -> K.compare k1 k2)
+        ~compare:(fun (k1,_) (k2,_) -> K.compare k1 k2)
         (as_kvp_list d1)
     in
     let ordered_d2_kvp_list =
       List.sort
-        ~cmp:(fun (k1,_) (k2,_) -> K.compare k1 k2)
+        ~compare:(fun (k1,_) (k2,_) -> K.compare k1 k2)
         (as_kvp_list d2)
     in
     (merge_ordered_lists ordered_d1_kvp_list ordered_d2_kvp_list)

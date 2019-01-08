@@ -184,7 +184,7 @@ let star_exampled_dnf_regex
          ~f:(fun (il,isl) ->
              let sorted_isl =
                List.sort
-                 ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+                 ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
                  isl
              in
              (il

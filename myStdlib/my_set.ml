@@ -66,8 +66,8 @@ struct
     : comparison =
     compare_list
       ~cmp:C.compare
-      (List.sort ~cmp:C.compare (as_list s1))
-      (List.sort ~cmp:C.compare (as_list s2))
+      (List.sort ~compare:C.compare (as_list s1))
+      (List.sort ~compare:C.compare (as_list s2))
 
   let po_compare
       (s1:t)

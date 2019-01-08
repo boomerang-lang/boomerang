@@ -22,6 +22,7 @@ let stochastic_star_depth_regex_fold
     ~or_f:(or_f:int -> Probability.t -> a -> a -> a)
     ~star_f:(star_f:int -> Probability.t -> a -> a)
     ~closed_f:(closed_f:int -> StochasticRegex.t -> a -> a)
+    ~skip_f:(skip_f:int -> a -> a)
     (r:StochasticRegex.t)
   : a =
   fst
@@ -42,6 +43,9 @@ let stochastic_star_depth_regex_fold
            (closed_f i r' x'
            ,StochasticRegex.make_closed r'))
        ~downward_star:(fun d -> d+1)
+       ~upward_skip:(fun i (x',r') ->
+           (skip_f i x'
+           ,StochasticRegex.make_skip r'))
        r)
 
 let star_depth_regex_fold
@@ -220,6 +224,8 @@ let force_expand
           (r_expanded,e+1)
         else
           (StochasticRegex.make_closed r,0))
+    ~skip_f:(fun _ (r,e) ->
+        (StochasticRegex.make_skip r, e))
     r
 (***** }}} *****)
 
@@ -311,6 +317,7 @@ let rec reveal
       unrolled_r'_exposes_right
     | StochasticRegex.Empty -> []
     | StochasticRegex.Base _ -> []
+    | StochasticRegex.Skip _ -> []
   end
 (***** }}} *****)
 
@@ -409,7 +416,7 @@ let fix_problem_elts
        ~f:(fun e -> Right e)
        (Expand.RegexIntSet.as_list (Expand.RegexIntSet.diff s2 s1)))
   in
-  let problem_elements = List.sort ~cmp:(either_compare Expand.HCRegexInt.compare Expand.HCRegexInt.compare) problem_elements in
+  let problem_elements = List.sort ~compare:(either_compare Expand.HCRegexInt.compare Expand.HCRegexInt.compare) problem_elements in
   let to_qes new_problems =
       let new_problem_count = List.length new_problems in
       List.map

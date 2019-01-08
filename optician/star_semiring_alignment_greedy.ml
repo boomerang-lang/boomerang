@@ -1792,12 +1792,12 @@ struct
           | (Some pleft,Some pright) ->
             let positions_l =
               List.sort
-                ~cmp:compare_position
+                ~compare:compare_position
                 (TreeInfoDict.all_positions s.t1_dict)
             in
             let positions_r =
               List.sort
-                ~cmp:compare_position
+                ~compare:compare_position
                 (TreeInfoDict.all_positions s.t2_dict)
             in
             let returned_positions_l =
@@ -2190,7 +2190,7 @@ struct
               in
               let sorted_clp =
                 List.sort
-                  ~cmp:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
+                  ~compare:(fun (s1,_) (s2,_) -> Int.compare s1 s2)
                   unsorted_clp
               in
               List.map

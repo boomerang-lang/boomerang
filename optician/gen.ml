@@ -83,7 +83,7 @@ struct
     let atom_lens_perm_part_list = List.concat atom_lens_perm_part_list_list in
     let atom_lens_perm_part_list_by_left_atom =
       List.sort
-        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
+        ~compare:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
         atom_lens_perm_part_list in
     let (atom_lenses,perm_parts) = List.unzip
         atom_lens_perm_part_list_by_left_atom in
@@ -109,7 +109,7 @@ struct
     let clause_lens_perm_part_list = List.concat clause_lens_perm_part_list_list in
     let clause_lens_perm_part_list_by_left_clause =
       List.sort
-        ~cmp:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
+        ~compare:(fun (_,(x,_)) (_,(y,_)) -> Int.compare x y)
         clause_lens_perm_part_list in
     let (clause_lenses,perm_parts) = List.unzip
         clause_lens_perm_part_list_by_left_clause in
@@ -437,7 +437,7 @@ struct
           let comparison_cost = calc_comparison_cost f choice_cost in
           let sorted_qes =
             List.sort
-              ~cmp:(fun qe1 qe2 ->
+              ~compare:(fun qe1 qe2 ->
                   Int.compare
                     (SymmetricQueueElement.dnf_distance qe1)
                     (SymmetricQueueElement.dnf_distance qe2))

@@ -358,7 +358,7 @@ let fix_problem_elts
        ~f:(fun e -> Right e)
        (RegexIntSet.as_list (RegexIntSet.diff s2 s1)))
   in
-  let problem_elements = List.sort ~cmp:(either_compare HCRegexInt.compare HCRegexInt.compare) problem_elements in
+  let problem_elements = List.sort ~compare:(either_compare HCRegexInt.compare HCRegexInt.compare) problem_elements in
   begin match problem_elements with
     | [] ->
       expand_once

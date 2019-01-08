@@ -327,7 +327,7 @@ module Permutation = struct
     List.map
       ~f:snd
       (List.sort
-         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
          perm_pos_l)
 
   let apply_inverse_to_list_exn (permutation:t) (l:'a list) : 'a list =
@@ -339,7 +339,7 @@ module Permutation = struct
     List.map
       ~f:snd
       (List.sort
-         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
          perm_pos_l)
 
   let size
@@ -397,7 +397,7 @@ module Permutation = struct
     List.map
       ~f:snd
       (List.sort
-         ~cmp:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+         ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
          (IntIntDict.as_kvp_list perm.reverse))
 
   let to_swap_concat_compose_tree

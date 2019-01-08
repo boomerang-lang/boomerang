@@ -596,12 +596,12 @@ struct
             | Some merged_arg_result_parsings ->
               let ordered_l1 =
                 List.sort
-                  ~cmp:(fun (il1,_,_) (il2,_,_) -> IntList.compare il1 il2)
+                  ~compare:(fun (il1,_,_) (il2,_,_) -> IntList.compare il1 il2)
                   merged_arg_result_parsings
               in
               let ordered_l2 =
                 List.sort
-                  ~cmp:(fun (il1,_) (il2,_) -> IntList.compare il1 il2)
+                  ~compare:(fun (il1,_) (il2,_) -> IntList.compare il1 il2)
                   v2.parsings_strings.arg2_data
               in
               let ssosl =
@@ -862,12 +862,12 @@ struct
             in
             let lij_list_sorted_l =
               List.sort
-                ~cmp:(lens_sort_compare_by_createdict cdl)
+                ~compare:(lens_sort_compare_by_createdict cdl)
                 lij_list_l
             in
             let lij_list_sorted_r =
               List.sort
-                ~cmp:(lens_sort_compare_by_createdict cdr)
+                ~compare:(lens_sort_compare_by_createdict cdr)
                 lij_list_r
             in
             let l_list_l = List.map ~f:trd3 lij_list_sorted_l in
@@ -895,8 +895,8 @@ struct
         | OptimalAlignment.Nonempty.Star (_,_,a) ->
           Lens.make_star (nonempty_alignment_to_lens a)
         | OptimalAlignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->
-          let projl = List.sort ~cmp:Int.compare projl in
-          let projr = List.sort ~cmp:Int.compare projr in
+          let projl = List.sort ~compare:Int.compare projl in
+          let projr = List.sort ~compare:Int.compare projr in
           let rec combine_scct_and_sub_lenses
               (sub_lenses:Lens.t list)
               (scct:Permutation.swap_concat_compose_tree)
@@ -1002,7 +1002,7 @@ struct
           in
           let all_aligns_ordered =
             List.sort
-              ~cmp:(fun ((i1,_),_) ((i2,_),_) -> Int.compare i1 i2)
+              ~compare:(fun ((i1,_),_) ((i2,_),_) -> Int.compare i1 i2)
               all_aligns
           in
           let (index_pairs,alignments) =
@@ -1183,12 +1183,12 @@ struct
             in
             let lij_list_sorted_l =
               List.sort
-                ~cmp:(lens_sort_compare_by_createdict cdl)
+                ~compare:(lens_sort_compare_by_createdict cdl)
                 lij_list_l
             in
             let lij_list_sorted_r =
               List.sort
-                ~cmp:(lens_sort_compare_by_createdict cdr)
+                ~compare:(lens_sort_compare_by_createdict cdr)
                 lij_list_r
             in
             let l_list_l = List.map ~f:trd3 lij_list_sorted_l in
@@ -1216,8 +1216,8 @@ struct
         | GreedyAlignment.Nonempty.Star (_,_,a) ->
           Lens.make_star (nonempty_alignment_to_lens a)
         | GreedyAlignment.Nonempty.Times (tll,tlr,aligns,projl,projr) ->
-          let projl = List.sort ~cmp:Int.compare projl in
-          let projr = List.sort ~cmp:Int.compare projr in
+          let projl = List.sort ~compare:Int.compare projl in
+          let projr = List.sort ~compare:Int.compare projr in
           let rec combine_scct_and_sub_lenses
               (sub_lenses:Lens.t list)
               (scct:Permutation.swap_concat_compose_tree)
@@ -1323,7 +1323,7 @@ struct
           in
           let all_aligns_ordered =
             List.sort
-              ~cmp:(fun ((i1,_),_) ((i2,_),_) -> Int.compare i1 i2)
+              ~compare:(fun ((i1,_),_) ((i2,_),_) -> Int.compare i1 i2)
               all_aligns
           in
           let (index_pairs,alignments) =
