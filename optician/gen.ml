@@ -386,6 +386,7 @@ struct
       (lc:LensContext.t)
       (r1:StochasticRegex.t)
       (r2:StochasticRegex.t)
+      (enforce_costless:bool)
       (creater_exs:create_examples)
       (createl_exs:create_examples)
       (putr_exs:put_examples)
@@ -403,6 +404,7 @@ struct
           (distance:Float.t)
           (choice_cost:Float.t)
         : Float.t =
+        if enforce_costless then 0. else
         Float.max
           (distance +. choice_cost -. keep_going)
           0.
@@ -617,6 +619,7 @@ struct
       | OEAClosed _ -> 1.0
       | OEAStar dr ->
         get_possibible_lenses_oedr dr
+      | OEASkip _ -> 1.0
       end
     in
     Option.map
@@ -635,6 +638,7 @@ let gen_symmetric_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
+    (enforce_costless:bool)
     (creater_exs:create_examples)
     (createl_exs:create_examples)
     (putr_exs:put_examples)
@@ -663,6 +667,7 @@ let gen_symmetric_lens
       lc
       r1
       r2
+      enforce_costless
       creater_exs
       createl_exs
       putr_exs
@@ -682,6 +687,7 @@ let gen_lens
     (existing_lenses:(Lens.t * Regex.t * Regex.t) list)
     (r1:Regex.t)
     (r2:Regex.t)
+    (enforce_costless:bool)
     (creater_exs:create_examples)
     (createl_exs:create_examples)
     (putr_exs:put_examples)
@@ -694,6 +700,7 @@ let gen_lens
         existing_lenses
         r1
         r2
+        enforce_costless
         creater_exs
         createl_exs
         putr_exs

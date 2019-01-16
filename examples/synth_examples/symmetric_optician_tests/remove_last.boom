@@ -62,5 +62,5 @@ let NAME : regexp = UPPERCASE . LOWERCASE*
 let UPPERCASENAME : regexp = UPPERCASE . UPPERCASE*  
 
 let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
-  synth (NAME . " " . NAME) <=> NAME
+  synth (NAME . " " . NAME) <-> NAME
   using { createrex ("Anders Miltner","Anders") }

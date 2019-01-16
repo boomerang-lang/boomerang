@@ -62,12 +62,12 @@ let NAME : regexp = UPPERCASE . LOWERCASE*
 let UPPERCASENAME : regexp = UPPERCASE . UPPERCASE*  
 
 let remove_last : (lens in (NAME . " " . NAME) <-> NAME) =
-  synth (NAME . " " . NAME) <=> NAME
+  synth (NAME . " " . NAME) <-> NAME
   using { createrex ("Anders Miltner","Anders") }
 
 let NAME_OR_OTHER : regexp = (NAME . " " . NAME) | NAME
 test matches_cex NAME_OR_OTHER "Madonna" = true
 
 let merge_remove_last : (lens in (NAME . " " . NAME)
-<-> NAME_OR_OTHER) = synth (NAME . " " . NAME) <=> NAME_OR_OTHER
+<-> NAME_OR_OTHER) = synth (NAME . " " . NAME) <-> NAME_OR_OTHER
 using { createlex ("Madonna","Madonna A") }

@@ -188,4 +188,3 @@ let THIRDLEVEL_XML_DICT
 let map_inner
   : (lens in XML_INNER_ELEMENT <=> INNER_XML_DICT) =
   synth XML_INNER_ELEMENT <=> INNER_XML_DICT
-  with keep_going 100.0

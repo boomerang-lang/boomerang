@@ -723,31 +723,39 @@ appexp:
 
   | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE
     { let i = m $1 $8 in
-      ESynth (i,$2,$4,$7,0.0) }
+      ESynth (i,$2,$4,true,$7,0.0) }
+
+  | SYNTH appexp DARROW repexp USING LBRACE listexp RBRACE
+    { let i = m $1 $8 in
+      ESynth (i,$2,$4,false,$7,0.0) }
 
   | SYNTH appexp DEQARROW repexp
     { let i = me2 $1 $4 in
-      ESynth (i,$2,$4,[],0.0) }
+      ESynth (i,$2,$4,true,[],0.0) }
 
-  | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE WITH KEEP_GOING FLOAT
+  | SYNTH appexp DARROW repexp
+    { let i = me2 $1 $4 in
+      ESynth (i,$2,$4,false,[],0.0) }
+
+  | SYNTH appexp DARROW repexp USING LBRACE listexp RBRACE WITH KEEP_GOING FLOAT
     { let i = m $1 (fst $11) in
-      ESynth (i,$2,$4,$7,snd $11) }
+      ESynth (i,$2,$4,false,$7,snd $11) }
 
-  | SYNTH appexp DEQARROW repexp USING LBRACE listexp RBRACE WITH GO_UNTIL_BIJ_IF_NO_CS
+  | SYNTH appexp DARROW repexp USING LBRACE listexp RBRACE WITH GO_UNTIL_BIJ_IF_NO_CS
     { let i = m $1 $10 in
-      ESynth (i,$2,$4,$7,if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
+      ESynth (i,$2,$4,false,$7,if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
 
-  | SYNTH appexp DEQARROW repexp WITH KEEP_GOING FLOAT
+  | SYNTH appexp DARROW repexp WITH KEEP_GOING FLOAT
     { let i = m $1 (fst $7) in
-      ESynth (i,$2,$4,[],snd $7) }
+      ESynth (i,$2,$4,false,[],snd $7) }
 
-  | SYNTH appexp DEQARROW repexp WITH KEEP_GOING FLOAT GO_UNTIL_BIJ_IF_NO_CS
+  | SYNTH appexp DARROW repexp WITH KEEP_GOING FLOAT GO_UNTIL_BIJ_IF_NO_CS
     { let i = m $1 $8 in
-      ESynth (i,$2,$4,[],if (Prefs.read Prefs.noCSPref) then 100000000. else snd $7) }
+      ESynth (i,$2,$4,false,[],if (Prefs.read Prefs.noCSPref) then 100000000. else snd $7) }
 
-  | SYNTH appexp DEQARROW repexp WITH GO_UNTIL_BIJ_IF_NO_CS
+  | SYNTH appexp DARROW repexp WITH GO_UNTIL_BIJ_IF_NO_CS
     { let i = m $1 $6 in
-      ESynth (i,$2,$4,[],if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
+      ESynth (i,$2,$4,false,[],if (Prefs.read Prefs.noCSPref) then 100000000. else 0.) }
 
   | repexp
     { $1 }

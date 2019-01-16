@@ -12,6 +12,8 @@ let rec clean_exampledness_atom
     (a:ExampledDNFRegex.exampled_atom)
   : ExampledDNFRegex.exampled_atom =
   begin match a with
+    | EASkip (r,r') ->
+      EASkip(clean_exampledness_dnf_regex choices r, r')
     | EAClosed (sorig,csel) ->
       let actual_choices_orig =
         merge_example_data
@@ -247,6 +249,9 @@ let rec exampled_regex_to_regex
       StochasticRegex.make_star
         (exampled_regex_to_regex er)
         p
+    | ERegExSkip er ->
+      StochasticRegex.make_skip
+        (exampled_regex_to_regex er)
     | ERegExClosed (r,_,_) ->
       StochasticRegex.make_closed
         r
@@ -271,6 +276,9 @@ let rec exampled_regex_to_stochastic_regex
       StochasticRegex.make_star
         (exampled_regex_to_stochastic_regex er)
         p
+    | ERegExSkip er ->
+      StochasticRegex.make_skip
+        (exampled_regex_to_stochastic_regex er)
     | ERegExClosed (r,_,_) ->
       StochasticRegex.make_closed
         r
@@ -310,6 +318,9 @@ struct
           (recursive_f r')
           p
           (exampled_regex_to_regex r)
+      | ERegExSkip (r') ->
+        exampled_atom_to_exampled_dnf_regex
+          (ExampledDNFRegex.EASkip (recursive_f r', exampled_regex_to_regex r))
       | ERegExClosed (s,ss,ill) ->
         let ilss =
           merge_example_data

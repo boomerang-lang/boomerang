@@ -259,7 +259,7 @@ test matches_cex
 
 let apt_l0_dict
   : (lens in APT_L0_CONF <=> APT_L0_DICT) =
-  synth APT_L0_CONF <=> APT_L0_DICT using {createrex ("APT {\nhello \"testingh ielloo asdfwer s\";\n--force-confold;\n/*test\nmultiline*/\n//comment\n#clear mydata:hello tester\n#include myfolder/my_filE.txt\n}","{\"APT\"{\"hello\"=\"testingh ielloo asdfwer s\"}{\"@elem\"=\"--force-confold\"}{\"#mcomment\"{\"string\"=\"test\"}{\"string\"=\"multiline\"}}{\"#comment\"=\"comment\"}{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}{\"@include\"=\"myfolder/my_filE.txt\"}}")} with go_until_bij_if_no_cs
+  synth APT_L0_CONF <=> APT_L0_DICT using {createrex ("APT {\nhello \"testingh ielloo asdfwer s\";\n--force-confold;\n/*test\nmultiline*/\n//comment\n#clear mydata:hello tester\n#include myfolder/my_filE.txt\n}","{\"APT\"{\"hello\"=\"testingh ielloo asdfwer s\"}{\"@elem\"=\"--force-confold\"}{\"#mcomment\"{\"string\"=\"test\"}{\"string\"=\"multiline\"}}{\"#comment\"=\"comment\"}{\"#clear\"{\"name\"=\"mydata:hello\"}{\"name\"=\"tester\"}}{\"@include\"=\"myfolder/my_filE.txt\"}}")}
 
 let APT_L1_CONF
   : regexp =

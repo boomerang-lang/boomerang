@@ -22,6 +22,7 @@ let star_depth_regex_fold
     ~or_f:(or_f:int -> a -> a -> a)
     ~star_f:(star_f:int -> a -> a)
     ~closed_f:(closed_f:int -> Regex.t -> a -> a)
+    ~skip_f:(skip_f:int -> Regex.t -> a -> a)
     (r:Regex.t)
   : a =
   fst
@@ -41,6 +42,9 @@ let star_depth_regex_fold
        ~upward_closed:(fun i (x',r') ->
            (closed_f i r' x'
            ,Regex.make_closed r'))
+       ~upward_skip:(fun i (x',r') ->
+           (skip_f i r' x'
+           ,Regex.make_skip r'))
        ~downward_star:(fun d -> d+1)
        r)
 
@@ -70,6 +74,7 @@ let get_current_set
     ~closed_f:(fun i r' _ ->
         let r'' = get_rep_var lc r' in
         RegexIntSet.singleton (HCRegexInt.hashcons (r'',i)))
+    ~skip_f:(fun i r' _ -> RegexIntSet.empty)
 
 let rec get_transitive_set
     (lc:LensContext.t)
@@ -88,6 +93,7 @@ let rec get_transitive_set
           s1
           s2)
     ~star_f:(fun _ -> ident)
+    ~skip_f:(fun _ _ _ -> RegexToIntSetDict.empty)
     ~closed_f:(fun star_depth r s ->
         RegexToIntSetDict.insert_or_combine
           ~combiner:IntSet.union
@@ -182,6 +188,8 @@ let force_expand
         (Regex.make_or lr rr, le+re))
     ~star_f:(fun _ (r,e) ->
         (Regex.make_star r, e))
+    ~skip_f:(fun _ _ (r,e) ->
+        (Regex.make_skip r, e))
     ~closed_f:(fun star_depth r (r_expanded,e) ->
         if RegexIntSet.member problem_elts (HCRegexInt.hashcons (get_rep_var lc r,star_depth)) then
           (r_expanded,e+1)
@@ -274,6 +282,7 @@ let rec reveal
       unrolled_r'_exposes_right
     | Regex.RegExEmpty -> []
     | Regex.RegExBase _ -> []
+    | Regex.RegExSkip _ -> []
   end
 (***** }}} *****)
 

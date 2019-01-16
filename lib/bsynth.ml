@@ -53,6 +53,7 @@ let rec to_boomerang_regex
     ~concat_f:Brx.mk_seq
     ~or_f:Brx.mk_alt
     ~star_f:Brx.mk_star
+    ~skip_f:Brx.mk_skip
     ~closed_f:ident
 
 let rec to_boomerang_lens
@@ -169,6 +170,7 @@ let synth
     (keep_going:float)
     (r1:Brx.t)
     (r2:Brx.t)
+    (enforce_costless:bool)
     (creater_exs:create_examples)
     (createl_exs:create_examples)
     (putr_exs:put_examples)
@@ -201,6 +203,7 @@ let synth
             lss
             r1
             r2
+            enforce_costless
             creater_exs
             createl_exs
             putr_exs
@@ -218,6 +221,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -238,6 +242,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -257,6 +262,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -275,6 +281,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -293,6 +300,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -312,6 +320,7 @@ let synth
                lss
                r1
                r2
+               enforce_costless
                creater_exs
                createl_exs
                putr_exs

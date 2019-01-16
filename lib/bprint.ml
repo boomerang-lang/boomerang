@@ -258,10 +258,10 @@ and format_exp e0 = match e0 with
   | EInteger (_,i) ->
       msg "@[%d@]" i
 
-  | ESynth (_,e1,e2,exs,_) ->
+  | ESynth (_,e1,e2,b,exs,_) ->
     msg "@[synth@ ";
     format_exp e1;
-    msg "@ <=>@ ";
+    if b then msg "@ <=>@ " else msg "@ <->@ ";
     format_exp e2;
     (* TODO *)
     begin match exs with

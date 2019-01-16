@@ -56,6 +56,7 @@ let star_depth_regex_fold
     ~or_f:(or_f:int -> a -> a -> a)
     ~star_f:(star_f:int -> a -> a)
     ~closed_f:(closed_f:int -> Regex.t -> a -> a)
+    ~skip_f:(skip_f:int -> Regex.t -> a -> a)
     (r:Regex.t)
   : a =
   fst
@@ -75,6 +76,9 @@ let star_depth_regex_fold
        ~upward_closed:(fun i (x',r') ->
            (closed_f i r' x'
            ,Regex.make_closed r'))
+       ~upward_skip:(fun i (x',r') ->
+           (skip_f i r' x'
+           ,Regex.make_skip r'))
        ~downward_star:(fun d -> d+1)
        r)
 
@@ -93,6 +97,7 @@ let get_current_set
   star_depth_regex_fold
     ~empty_f:(fun _ -> Expand.RegexIntSet.empty)
     ~base_f:(fun _ _ -> Expand.RegexIntSet.empty)
+    ~skip_f:(fun _ _ _ -> Expand.RegexIntSet.empty)
     ~concat_f:(fun _ s1 s2 ->
         Expand.RegexIntSet.union
           s1
@@ -113,6 +118,7 @@ let rec get_transitive_set
   star_depth_regex_fold
     ~empty_f:(fun _ -> Expand.RegexToIntSetDict.empty)
     ~base_f:(fun _ _ -> Expand.RegexToIntSetDict.empty)
+    ~skip_f:(fun _ _ _ -> Expand.RegexToIntSetDict.empty)
     ~concat_f:(fun _ s1 s2 ->
         Expand.RegexToIntSetDict.merge_to_dict
           ~combiner:Expand.IntSet.union

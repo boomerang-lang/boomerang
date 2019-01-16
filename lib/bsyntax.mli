@@ -95,7 +95,7 @@ and exp =
     | ECSet    of Info.t * bool * (char * char) list 
 
     (* synthesis of lenses *)
-    | ESynth   of Info.t * exp * exp
+    | ESynth   of Info.t * exp * exp * bool
                   * ([`CreateREx
                      | `CreateLEx
                      | `PutREx
@@ -241,7 +241,7 @@ val mk_inter : Info.t -> exp -> exp -> exp
 val mk_compose : Info.t -> exp -> exp -> exp
 val mk_set : Info.t -> exp -> exp -> exp
 val mk_rx : Info.t -> exp -> exp
-val mk_synth : Info.t -> exp -> exp ->
+val mk_synth : Info.t -> exp -> exp -> bool ->
   ([`CreateREx
    | `CreateLEx
    | `PutREx

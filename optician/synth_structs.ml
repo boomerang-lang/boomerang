@@ -737,6 +737,8 @@ struct
       begin match a with
         | EAClosed (rs,ilss) ->
           Tree.mk_base (BD.make rs ilss)
+        | EASkip (_,rs) ->
+          Tree.mk_base (BD.make rs (ExampledDNFRegex.extract_atom_parsing_data a))
         | EAStar (d,p,ill,_) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in
           Tree.mk_star (SD.make ill) p child

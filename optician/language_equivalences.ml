@@ -19,6 +19,7 @@ let rec to_dnf_regex (r:Regex.t) : dnf_regex =
   | Regex.RegExOr (r1, r2) -> (to_dnf_regex r1) @ (to_dnf_regex r2)
   | Regex.RegExStar (r') -> atom_to_dnf_regex (AStar (to_dnf_regex r'))
   | Regex.RegExClosed r' -> atom_to_dnf_regex (AClosed r')
+  | Regex.RegExSkip r' -> atom_to_dnf_regex (ASkip (to_dnf_regex r'))
   end
 
 let rec atom_lens_to_lens (a:atom_lens) : Lens.t =

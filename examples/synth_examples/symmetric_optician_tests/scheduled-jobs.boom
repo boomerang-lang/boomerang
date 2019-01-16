@@ -87,14 +87,14 @@ test matches_cex SCHEDULED_JOB
 
 let synchronize_jobs
   : (lens in CRONTAB <-> SCHEDULED_JOB) =
-  synth CRONTAB <=> SCHEDULED_JOB using
+  synth CRONTAB <-> SCHEDULED_JOB using
   {createrex
     ("0,20,40 cp -r /Library/ \"$(date)\" \n\n* df -h | sendmail admin@domain.com","<Tasks><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task></Tasks>"),
    createrex
     ("* df -h | sendmail admin@domain.com\n\n0,20,40 cp -r /Library/ \"$(date)\" ","<Tasks><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task></Tasks>"),
    createlex
+    ("<Tasks><Task><Command>SET ERRORLEVEL=1</Command><AllTimes/></Task></Tasks>","* false"),
+   createlex
     ("<Tasks><Task><Command>SET ERRORLEVEL=1</Command><Time>0</Time><Time>20</Time><Time>40</Time></Task></Tasks>","0,20,40 false")
   }
   with keep_going -50.0
-
-test synchronize_jobs = ?

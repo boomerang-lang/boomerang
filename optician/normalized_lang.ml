@@ -91,6 +91,7 @@ struct
   and t_node =
     | ERegExEmpty
     | ERegExBase of string * (int list list) example_data
+    | ERegExSkip of t
     | ERegExConcat of t * t * (int list list) example_data
     | ERegExOr of t * t * (int list list) example_data * Probability.t
     | ERegExStar of t * (int list list) example_data * Probability.t
@@ -138,6 +139,11 @@ struct
     : t =
     make_t (ERegExClosed (sr,es,ill))
 
+  let mk_skip
+      (er:t)
+    : t =
+    make_t (ERegExSkip er)
+
   let uid
       (er:t)
     : int =
@@ -148,7 +154,7 @@ struct
 
   let node er = er.node
 
-  let extract_example_data (er:t) : parsing_example_data =
+  let rec extract_example_data (er:t) : parsing_example_data =
     begin match er.node with
       | ERegExEmpty -> empty_parsing_example_data
       | ERegExBase (_,pd) -> pd
@@ -156,6 +162,7 @@ struct
       | ERegExOr (_,_,pd,_) -> pd
       | ERegExStar (_,pd,_) -> pd
       | ERegExClosed (_,_,pd) -> pd
+      | ERegExSkip (er) -> extract_example_data er
     end
 
   let extract_iterations_consumed
@@ -212,6 +219,8 @@ let rec extract_string
         (List.map
            ~f:(extract_string m er')
            valid_iterations)
+    | ERegExSkip er ->
+      extract_string m er iteration
     | ERegExClosed (_,sl,ill) ->
       let dat_opt = List.findi
           ~f:(fun _ il -> il = iteration)
@@ -258,6 +267,7 @@ struct
     | EAClosed of
         StochasticRegex.t *
         ((int list * string) list) example_data
+    | EASkip of t * StochasticRegex.t
     | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t
 
   and exampled_clause =
@@ -274,6 +284,7 @@ struct
       | EAClosed (r,_) ->
         StochasticRegex.make_closed r
       | EAStar (_,_,_,r) -> r
+      | EASkip (_,r) -> r
     end
 
   let extract_example_data
@@ -287,6 +298,7 @@ struct
     begin match ea with
       | EAClosed (_,ilss) -> ilss
       | EAStar (_,_,ilss,_) -> ilss
+      | EASkip ((_,ilss),_) -> ilss
     end
 end
 
@@ -331,6 +343,7 @@ and exampled_atom_to_string (a:exampled_atom) : string =
 
 type ordered_exampled_atom =
   | OEAClosed of Regex.t * StochasticRegex.t * Lens.t * string list example_data
+  | OEASkip of ordered_exampled_dnf_regex
   | OEAStar of ordered_exampled_dnf_regex
 
 and ordered_exampled_clause = ((ordered_exampled_atom * int) list) list * string
@@ -386,10 +399,13 @@ let rec compare_ordered_exampled_atoms (a1:ordered_exampled_atom)
             el2
         else
           cmp
+    | (OEAClosed _,         _) -> -1
+    | (        _, OEAClosed _) -> 1
     | (OEAStar r1, OEAStar r2) -> compare_ordered_exampled_dnf_regexs r1 r2
-    | (OEAStar _, OEAClosed _) -> 1
-    | (OEAClosed _, OEAStar _) -> -1
-    end 
+    | (OEAStar _,         _) -> -1
+    | (        _, OEAStar _) -> 1
+    | (OEASkip r1, OEASkip r2) -> compare_ordered_exampled_dnf_regexs r1 r2
+    end
 
 and compare_ordered_exampled_clauses
         ((atoms_partitions1,_,ints1):ordered_exampled_clause)
@@ -420,6 +436,7 @@ let rec to_ordered_exampled_atom
     (a:ExampledDNFRegex.exampled_atom) : ordered_exampled_atom =
   begin match a with
   | EAStar (r,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
+  | EASkip (r,_) -> OEASkip (to_ordered_exampled_dnf_regex lc r)
   | EAClosed (sorig,ilel) ->
     let (_,el) = unzip_example_data @$ map_example_data List.unzip ilel in
     if !use_lens_context then
@@ -550,6 +567,7 @@ and compare_atom_lens
 type atom =
   | AClosed of Regex.t
   | AStar of dnf_regex
+  | ASkip of dnf_regex
 
 and clause = atom list * string list
 
@@ -596,9 +614,12 @@ let singleton_atom (a:atom) : dnf_regex =
 let rec compare_atoms (a1:atom) (a2:atom) : comparison =
   begin match (a1,a2) with
   | (AClosed s1, AClosed s2) -> Regex.compare s1 s2
-  | (AClosed  _, AStar         _) -> -1
-  | (AStar         _, AClosed  _) -> 1
+  | (AClosed  _, _) -> -1
+  | (_, AClosed  _) -> 1
   | (AStar        r1, AStar        r2) -> compare_dnf_regexs r1 r2
+  | (AStar        r1, _) -> -1
+  | (_, AStar        r1) -> 1
+  | (ASkip        r1, ASkip        r2) -> compare_dnf_regexs r1 r2
   end
 
 and compare_clauses ((atoms1,_):clause) ((atoms2,_):clause) : comparison =
@@ -621,6 +642,7 @@ and atom_to_string (a:atom) : string =
   begin match a with
   | AStar dnf_rx -> (paren (dnf_regex_to_string dnf_rx)) ^ "*"
   | AClosed s -> Regex.show s
+  | ASkip s -> dnf_regex_to_string s
   end
 
 (***** }}} *****)

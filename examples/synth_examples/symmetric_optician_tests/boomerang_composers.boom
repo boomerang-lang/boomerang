@@ -4,7 +4,7 @@ let ALPHA : regexp = [A-Za-z ]+
 let YEARS : regexp = [0-9]{4} . "-" . [0-9]{4}
 let years_to_empty
   : (lens in YEARS <-> "")
-  = synth YEARS <=> ""
+  = synth YEARS <-> ""
 
 let SOURCE : regexp = ALPHA . ", " . YEARS . ", " . ALPHA
 let VIEW : regexp = ALPHA . ", " . ALPHA . ""
@@ -12,5 +12,5 @@ let VIEW : regexp = ALPHA . ", " . ALPHA . ""
 let SOURCES : regexp = "" | SOURCE . ("\n" . SOURCE)*
 let VIEWS : regexp = "" | VIEW . ("\n" . VIEW)*
 
-let comps : (lens in SOURCES <-> VIEWS) = synth SOURCES <=> VIEWS
+let comps : (lens in SOURCES <-> VIEWS) = synth SOURCES <-> VIEWS
 using { createrex ("Jean Sibelius, 1865-1957, Finnish" ,"Jean Sibelius, Finnish")}

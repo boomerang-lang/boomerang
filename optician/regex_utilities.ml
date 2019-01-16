@@ -114,6 +114,9 @@ let rec iteratively_deepen
     | Regex.RegExStar r' ->
       let r' = iteratively_deepen r' ss in
       Regex.make_closed (Regex.make_star r')
+    | Regex.RegExSkip r' ->
+      let r' = iteratively_deepen r' ss in
+      Regex.make_closed (Regex.make_skip r')
     | Regex.RegExClosed _ ->
       failwith "shouldn't happen"
   end
@@ -139,6 +142,8 @@ let get_dnf_size
         let (size,_) = get_dnf_size_internal r' in
         (size+1,1)
       | Regex.RegExClosed _ ->
+        (1,1)
+      | Regex.RegExSkip _ ->
         (1,1)
     end
   in

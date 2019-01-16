@@ -16,6 +16,7 @@ let rec to_empty_exampled_regex (r:StochasticRegex.t) : ExampledRegex.t =
         p
   | Star (r',p) -> ExampledRegex.mk_star (to_empty_exampled_regex r') empty_parsing_example_data p
   | Closed r' -> ExampledRegex.mk_closed r' empty_string_example_data empty_parsing_example_data
+  | Skip r' -> ExampledRegex.mk_skip (to_empty_exampled_regex r')
   end
 
 type data = run_mode * string * ExampledRegex.t *
@@ -61,6 +62,36 @@ let rec regex_to_dfa
             else
               [(final,(m,str',er,recombiners,is,so))]
         end)), final)
+  | Skip r ->
+      let (r_start_ref,r_end_ref) = regex_to_dfa r inside_var in
+      let new_start_fun = (fun (m,s,er,rc,is,so) ->
+        if not inside_var then
+          begin match (ExampledRegex.node er) with
+          | ExampledRegex.ERegExSkip (er) ->
+              let rc_inner = 
+                (fun _ er' ->
+                  ExampledRegex.mk_skip er') in
+              [(r_start_ref, (m,s,er,rc_inner::rc,is,so))]
+          | _ -> failwith "bad programming error" 
+          end
+        else
+          [(r_start_ref, (m,s,er,rc,is,so))]
+        ) in
+      let new_start = State (new_start_fun) in
+      let new_end_ref = ref QAccept in
+      let new_inner_end =
+        if not inside_var then
+          State
+            (fun (m,s,er,rc,is,so) ->
+              begin match rc with
+              | h::t -> [(new_end_ref,(m,s,h s er, t, is,so))]
+              | _ -> failwith "bad coder1"
+              end)
+        else
+          State (fun x -> [(new_end_ref,x)])
+      in
+      r_end_ref := new_inner_end;
+      (ref new_start,new_end_ref)
   | Concat (r1,r2) ->
       let (r1_start_ref,r1_end_ref) = regex_to_dfa r1 inside_var in
       let (r2_start_ref,r2_end_ref) = regex_to_dfa r2 inside_var in

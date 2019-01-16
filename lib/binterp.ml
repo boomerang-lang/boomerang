@@ -361,7 +361,7 @@ and interp_exp wq cev e0 =
   | ECast(i,f,t,b,e) -> 
       (interp_cast wq cev b f t)
         (interp_exp wq cev e)
-  | ESynth(i,e1,e2,exs,f) ->
+  | ESynth(i,e1,e2,b,exs,f) ->
     let v1 = interp_exp wq cev e1 in 
     let v2 = interp_exp wq cev e2 in
     let exs = List.map (fun (t,e) -> (t,interp_exp wq cev e)) exs in
@@ -413,6 +413,7 @@ and interp_exp wq cev e0 =
          f
          r1
          r2
+         b
          creater_exs
          createl_exs
          putr_exs

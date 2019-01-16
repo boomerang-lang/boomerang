@@ -260,4 +260,3 @@ test matches_cex
 let apt_l0_dict
   : (lens in APT_L0_CONF <=> APT_L0_DICT) =
   synth APT_L0_CONF <=> APT_L0_DICT
-  with go_until_bij_if_no_cs

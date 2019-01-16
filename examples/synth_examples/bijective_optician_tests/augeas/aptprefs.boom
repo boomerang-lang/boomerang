@@ -226,4 +226,4 @@ let APTPREFS_DICT
 
 let x
   : (lens in APTPREFS_CONF <=> APTPREFS_DICT) =
-  synth APTPREFS_CONF <=> APTPREFS_DICT with go_until_bij_if_no_cs
+  synth APTPREFS_CONF <=> APTPREFS_DICT

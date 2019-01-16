@@ -286,7 +286,6 @@ let entry_entry_map
     createrex ("LINE_DATA_INTERFACE = 127.0.0.1","{\"LINE_DATA_INTERFACE\"=\"127.0.0.1\"}"),
     createrex ("LINE_RECEIVER_INTERFACE = 0.0.0.0 # comment","{\"LINE_RECEIVER_INTERFACE\"=\"0.0.0.0 \"{\"#comment\"=\"comment\"}}")
   }
-  with go_until_bij_if_no_cs
 
 let CARBON_ENTRY_DICT
   : regexp =

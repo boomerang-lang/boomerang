@@ -185,14 +185,11 @@ let XML_THIRDLEVEL_ELEMENT
 let map_inner
   : (lens in XML_INNER_ELEMENT <=> INNER_XML_DICT) =
   synth XML_INNER_ELEMENT <=> INNER_XML_DICT 
-  with keep_going 100.0
 
 let map_outer
   : (lens in XML_SECONDLEVEL_ELEMENT <=> SECONDLEVEL_XML_DICT) =
   synth XML_SECONDLEVEL_ELEMENT <=> SECONDLEVEL_XML_DICT 
-  with keep_going 100.0
 
 let map_third
   : (lens in XML_THIRDLEVEL_ELEMENT <=> THIRDLEVEL_XML_DICT) =
   synth XML_THIRDLEVEL_ELEMENT <=> THIRDLEVEL_XML_DICT 
-  with keep_going 100.0

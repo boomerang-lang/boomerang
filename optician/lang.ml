@@ -39,6 +39,7 @@ struct
     | RegExOr of t * t
     | RegExStar of t
     | RegExClosed of t
+    | RegExSkip of t
   [@@deriving ord, show, hash]
 
   let table = HashConsTable.create 100000
@@ -55,6 +56,7 @@ struct
       | RegExConcat (r1,r2) -> show_with_closed r1 ^ "." ^ show_with_closed r2
       | RegExOr (r1,r2) -> show_with_closed r1 ^ "|" ^ show_with_closed r2
       | RegExStar (r1) -> show_with_closed r1 ^ "*"
+      | RegExSkip r1 -> "skip(" ^ show_with_closed r1 ^ ")"
       | RegExClosed _ -> "closed"
     end
 
@@ -109,6 +111,11 @@ struct
     : t =
     hashcons (RegExStar r)
 
+  let make_skip
+      (r:t)
+    : t =
+    hashcons (RegExSkip r)
+
   let make_closed
       (r:t)
     : t =
@@ -135,10 +142,12 @@ struct
       ~upward_or:(upward_or:'b -> 'a -> 'a -> 'a)
       ~upward_star:(upward_star:'b -> 'a -> 'a)
       ~upward_closed:(upward_closed:'b -> 'a -> 'a)
+      ~upward_skip:(upward_skip:'b -> 'a -> 'a)
       ?downward_concat:(downward_concat:'b -> 'b = ident)
       ?downward_or:(downward_or:'b -> 'b = ident)
       ?downward_star:(downward_star:'b -> 'b = ident)
       ?downward_closed:(downward_closed:'b -> 'b = ident)
+      ?downward_skip:(downward_skip:'b -> 'b = ident)
     : t -> 'a =
     let rec fold_downward_upward_internal
         (downward_acc:'b)
@@ -169,6 +178,11 @@ struct
           upward_closed
             downward_acc
             (fold_downward_upward_internal downward_acc' r')
+        | RegExSkip r' ->
+          let downward_acc' = downward_skip downward_acc in
+          upward_skip
+            downward_acc
+            (fold_downward_upward_internal downward_acc' r')
       end
     in
     fold_downward_upward_internal init
@@ -180,6 +194,7 @@ struct
       ~or_f:(or_f:'a -> 'a -> 'a)
       ~star_f:(star_f:'a -> 'a)
       ~closed_f:(closed_f:'a -> 'a)
+      ~skip_f:(skip_f:'a -> 'a)
       (r:t)
     : 'a =
     fold_downward_upward
@@ -190,6 +205,7 @@ struct
       ~upward_or:(thunk_of or_f)
       ~upward_star:(thunk_of star_f)
       ~upward_closed:(thunk_of closed_f)
+      ~upward_skip:(thunk_of skip_f)
       r
 
   let fold_with_subcomponents
@@ -199,6 +215,7 @@ struct
       ~or_f:(or_f:t -> t -> 'a -> 'a -> 'a)
       ~star_f:(star_f:t -> 'a -> 'a)
       ~closed_f:(closed_f:t -> 'a -> 'a)
+      ~skip_f:(skip_f:t -> 'a -> 'a)
       (r:t)
     : 'a =
     snd
@@ -213,6 +230,8 @@ struct
              (make_star r', star_f r' x'))
          ~closed_f:(fun (r',x') ->
              (make_closed r', closed_f r' x'))
+         ~skip_f:(fun (r',x') ->
+             (make_skip r', skip_f r' x'))
          r)
 
 
@@ -227,6 +246,7 @@ struct
       ~or_f:(fun r1 r2 -> f (make_or r1 r2))
       ~star_f:(fun r' -> f (make_star r'))
       ~closed_f:(fun r' -> f (make_closed r'))
+      ~skip_f:(fun r' -> f (make_skip r'))
       r
 
   let rec applies_for_every_applicable_level
@@ -289,6 +309,15 @@ struct
               r's
           in
           (closed_r, level_contribution@recursed_inner))
+      ~skip_f:(fun (r',r's) ->
+          let skip_r = make_skip r' in
+          let level_contribution = option_to_empty_or_singleton (f skip_r) in
+          let recursed_inner =
+            List.map
+              ~f:(fun r'' -> make_skip r'')
+              r's
+          in
+          (skip_r, level_contribution@recursed_inner))
 
   let rec size
     : t -> int =
@@ -299,6 +328,18 @@ struct
       ~or_f:(fun n1 n2 -> 1+n1+n2)
       ~star_f:(fun n -> 1+n)
       ~closed_f:(fun n -> n+1)
+      ~skip_f:(fun n -> n+1)
+
+  let contains_skip
+    : t -> bool =
+    fold
+      ~empty_f:false
+      ~base_f:(fun _ -> false)
+      ~concat_f:(||)
+      ~or_f:(||)
+      ~star_f:ident
+      ~closed_f:ident
+      ~skip_f:(fun _ -> true)
 
 
   let from_char_set (l : (int * int) list) : t =
@@ -340,6 +381,8 @@ struct
         true
       | RegExClosed r ->
         is_empty r
+      | RegExSkip r ->
+        is_empty r
       | RegExStar r ->
         false
       | RegExBase _ ->
@@ -355,6 +398,8 @@ struct
       | RegExStar r ->
         is_empty r
       | RegExClosed r ->
+        is_singleton r
+      | RegExSkip r ->
         is_singleton r
       | RegExEmpty ->
         false
@@ -383,6 +428,7 @@ struct
         end
       | RegExEmpty -> None
       | RegExClosed r -> representative r
+      | RegExSkip r -> representative r
       | RegExBase s -> Some s
       | RegExStar r -> Some ""
     end
@@ -424,6 +470,7 @@ struct
         | RegExBase _ -> (0.,1)
         | RegExEmpty -> (0.,0)
         | RegExClosed r -> information_content_internal r
+        | RegExSkip r -> information_content_internal r
         | RegExStar r ->
           let base = include_choice_info (information_content_internal r) in
           ((info_content_star_multiplier *. base) +. info_content_star_const,1)
@@ -649,8 +696,8 @@ struct
             downward_acc
             (fold_downward_upward_internal downward_acc' r')
         | Skip r' ->
-          let downward_acc' = downward_closed downward_acc in
-          upward_closed
+          let downward_acc' = downward_skip downward_acc in
+          upward_skip
             downward_acc
             (fold_downward_upward_internal downward_acc' r')
       end
@@ -677,6 +724,17 @@ struct
       ~upward_closed:(thunk_of closed_f)
       ~upward_skip:(thunk_of skip_f)
       r
+
+  let contains_skip
+    : t -> bool =
+    fold
+      ~empty_f:false
+      ~base_f:(fun _ -> false)
+      ~concat_f:(||)
+      ~or_f:(fun _ -> (||))
+      ~star_f:(fun _ -> ident)
+      ~closed_f:ident
+      ~skip_f:(fun _ -> true)
 
   let fold_with_subcomponents
       ~empty_f:(empty_f:'a)
@@ -848,6 +906,7 @@ struct
              (i1 +. i2,make_or r1 r2 prob))
          ~star_f:(fun (_,r) -> (1.,make_star r 0.8))
          ~closed_f:(fun (i,r) -> (i,make_closed r))
+         ~skip_f:(fun (i,r) -> (i,make_skip r))
          r)
 
   let rec to_regex

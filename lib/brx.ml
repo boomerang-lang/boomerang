@@ -1353,6 +1353,7 @@ and d =
   | Inter of t * t
   | Reverse of t
   | Expand of t * int * t
+  | Skip of t
   | Empty
 
 let rec get_brz_form r =
@@ -1398,6 +1399,7 @@ let rec get_brz_form r =
               (get_brz_form r1)
               i
               (get_brz_form r2)
+          | Skip r -> get_brz_form r
           | Empty ->
             Impl.empty
         end
@@ -1460,6 +1462,9 @@ let mk_reverse r =
 
 let mk_expand r1 i r2 =
   mk_t (Expand (r1,i,r2))
+
+let mk_skip r =
+  mk_t (Skip r)
 
 let rec from_brz_form (b:Impl.t) : t =
   begin match b.desc with
@@ -1640,6 +1645,8 @@ let rec subregexp_list
      | Expand (r1,_,r2) ->
        (subregexp_list r1)
        @ (subregexp_list r2)
+     | Skip r ->
+       subregexp_list r
      | Empty -> []
    end)
 
@@ -1673,6 +1680,7 @@ let rec to_optician_regexp r =
           i2
           r
     | Empty -> Regex.empty
+    | Skip r' -> Regex.make_skip (to_optician_regexp r')
     | Diff _ 
     | Complement _
     | Inter _

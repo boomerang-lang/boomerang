@@ -214,6 +214,9 @@ expression. The overloaded symbols @*@, @+@, and @?@, as well as iterations
 type @regexp@. If the second argument is negative, then the iteration is 
 unbounded. For example,  @R*@ desugars into @regexp_iter R 0 (-1)@.
 
+#* let skip : regexp -> regexp 
+## = Native.Prelude.skip
+
 #* let regexp_iter : regexp -> int -> int -> regexp 
 ## = Native.Prelude.regexp_iter
 
