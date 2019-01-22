@@ -28,6 +28,7 @@ sig
   val hash_fold_t : t hash_folder
   val get_alignment : LensContext.t -> t -> t -> Alignment.t option
   val requires_mapping : t -> bool
+  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
   val information_content : t -> float
@@ -43,6 +44,7 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end
@@ -57,6 +59,7 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end
@@ -71,6 +74,7 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
+  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end

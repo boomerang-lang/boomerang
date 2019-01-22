@@ -677,7 +677,7 @@ let gen_symmetric_lens
     print_endline "Synthesis End";
   if !simplify_generated_lens then
     Option.map
-      ~f:(simplify_lens)
+      ~f:simplify_lens
       lens_option
   else
     lens_option

@@ -23,6 +23,7 @@ let stochastic_star_depth_regex_fold
     ~star_f:(star_f:int -> Probability.t -> a -> a)
     ~closed_f:(closed_f:int -> StochasticRegex.t -> a -> a)
     ~skip_f:(skip_f:int -> a -> a)
+    ~require_f:(require_f:int -> a -> a)
     (r:StochasticRegex.t)
   : a =
   fst
@@ -45,6 +46,9 @@ let stochastic_star_depth_regex_fold
        ~upward_skip:(fun i (x',r') ->
            (skip_f i x'
            ,StochasticRegex.make_skip r'))
+       ~upward_require:(fun i (x',r') ->
+           (require_f i x'
+           ,StochasticRegex.make_require r'))
        ~downward_star:(fun d -> d+1)
        r)
 
@@ -57,6 +61,7 @@ let star_depth_regex_fold
     ~star_f:(star_f:int -> a -> a)
     ~closed_f:(closed_f:int -> Regex.t -> a -> a)
     ~skip_f:(skip_f:int -> Regex.t -> a -> a)
+    ~require_f:(require_f:int -> Regex.t -> a -> a)
     (r:Regex.t)
   : a =
   fst
@@ -79,6 +84,9 @@ let star_depth_regex_fold
        ~upward_skip:(fun i (x',r') ->
            (skip_f i r' x'
            ,Regex.make_skip r'))
+       ~upward_require:(fun i (x',r') ->
+           (require_f i r' x'
+           ,Regex.make_require r'))
        ~downward_star:(fun d -> d+1)
        r)
 
@@ -102,6 +110,7 @@ let get_current_set
         Expand.RegexIntSet.union
           s1
           s2)
+    ~require_f:(fun _ _ s -> s)
     ~or_f:(fun _ s1 s2 ->
         Expand.RegexIntSet.union
           s1
@@ -130,6 +139,7 @@ let rec get_transitive_set
           s1
           s2)
     ~star_f:(fun _ -> ident)
+    ~require_f:(fun _ _ -> ident)
     ~closed_f:(fun star_depth r s ->
         Expand.RegexToIntSetDict.insert_or_combine
           ~combiner:Expand.IntSet.union
@@ -221,6 +231,7 @@ let force_expand
     ~base_f:(fun _ s -> (StochasticRegex.make_base s,0))
     ~concat_f:(fun _ (lr,le) (rr,re) ->
         (StochasticRegex.make_concat lr rr, le+re))
+    ~require_f:(fun _ (r,e) -> (StochasticRegex.make_require r,e))
     ~or_f:(fun _ p (lr,le) (rr,re) ->
         (StochasticRegex.make_or lr rr p, le+re))
     ~star_f:(fun _ p (r,e) ->
@@ -281,6 +292,11 @@ let rec reveal
       (List.map
          ~f:(fun (r2e,exp) -> (StochasticRegex.make_or r1 r2e p,exp))
          r2_exposes)
+    | StochasticRegex.Require (r) ->
+      let r_exposes = reveal lc reveal_ident star_depth r in
+      List.map
+        ~f:(fun (re,exp) -> (StochasticRegex.make_require re,exp))
+        r_exposes
     | StochasticRegex.Star (r',p) ->
       let r'_exposes_with_unfold =
         reveal

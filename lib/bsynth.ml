@@ -55,6 +55,7 @@ let rec to_boomerang_regex
     ~star_f:Brx.mk_star
     ~skip_f:Brx.mk_skip
     ~closed_f:ident
+    ~require_f:Brx.mk_require
 
 let rec to_boomerang_lens
     (i:Info.t)

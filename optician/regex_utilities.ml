@@ -119,6 +119,9 @@ let rec iteratively_deepen
       Regex.make_closed (Regex.make_skip r')
     | Regex.RegExClosed _ ->
       failwith "shouldn't happen"
+    | Regex.RegExRequire r' ->
+      let r' = iteratively_deepen r' ss in
+      Regex.make_closed (Regex.make_require r')
   end
 
 let get_dnf_size
@@ -145,6 +148,8 @@ let get_dnf_size
         (1,1)
       | Regex.RegExSkip _ ->
         (1,1)
+      | Regex.RegExRequire r ->
+        get_dnf_size_internal r
     end
   in
   fst (get_dnf_size_internal r)

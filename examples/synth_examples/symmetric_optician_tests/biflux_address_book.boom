@@ -9,9 +9,9 @@ let OTHER_EMAIL : regexp = LOWER_OR_NUMBER . ("@" | "") . NON_NII_DOMAIN . ("." 
 
 let NII_EMAIL_XML = ("\n\t\t<email>" . NII_EMAIL . "</email>")
 
-let NON_NII_EMAIL_XML = ("\n\t\t<email>" . OTHER_EMAIL . "</email>")
+let NON_NII_EMAIL_XML = skip ("\n\t\t<email>" . OTHER_EMAIL . "</email>")
 
-let delete_non_nii_email = synth NON_NII_EMAIL_XML* <-> "" with keep_going -500.0
+let delete_non_nii_email = synth NON_NII_EMAIL_XML* <-> ""
 
 let NII_EMAILS : regexp =
 (NII_EMAIL_XML . NON_NII_EMAIL_XML* )*
@@ -32,4 +32,4 @@ using
 		<email>hpacheco@gmail.com</email>",
 "
 		<email>hpacheco@nii.ac.jp</email>")
-} with keep_going -300.0
+}

@@ -217,6 +217,9 @@ unbounded. For example,  @R*@ desugars into @regexp_iter R 0 (-1)@.
 #* let skip : regexp -> regexp 
 ## = Native.Prelude.skip
 
+#* let require : regexp -> regexp 
+## = Native.Prelude.require
+
 #* let regexp_iter : regexp -> int -> int -> regexp 
 ## = Native.Prelude.regexp_iter
 

@@ -47,7 +47,7 @@ let rec clean_exampledness_atom
   end
 and clean_exampledness_clause
     (above_choices:int list list example_data)
-    (((atoms,strings,current_choices),p):ExampledDNFRegex.exampled_clause * Probability.t)
+    (((atoms,strings,current_choices,b),p):ExampledDNFRegex.exampled_clause * Probability.t)
   : ExampledDNFRegex.exampled_clause * Probability.t =
   let actual_strings_choices =
     merge_example_data
@@ -65,13 +65,14 @@ and clean_exampledness_clause
   in
   ((List.map ~f:(clean_exampledness_atom actual_choices) atoms,
     strings,
-    actual_strings_choices)
+    actual_strings_choices,
+    b)
   ,p)
 
 
 and clean_exampledness_dnf_regex
     (above_choices:int list list example_data)
-    ((clauses,current_choices):ExampledDNFRegex.t)
+    ((clauses,current_choices,b):ExampledDNFRegex.t)
   : ExampledDNFRegex.t =
   let rec is_suplist (lowerc:int list) (upperc:int list) : bool =
     begin match (lowerc,upperc) with
@@ -100,15 +101,15 @@ and clean_exampledness_dnf_regex
       current_choices
   in
   let viable_choices_parsing = map_example_data (List.map ~f:fst) viable_choices in
-  (List.map ~f:(clean_exampledness_clause viable_choices_parsing) clauses,viable_choices)
+  (List.map ~f:(clean_exampledness_clause viable_choices_parsing) clauses,viable_choices,b)
   
 let concat_exampled_dnf_regexs
-    ((r1,sill1):ExampledDNFRegex.t)
-    ((r2,sill2):ExampledDNFRegex.t)
+    ((r1,sill1,b1):ExampledDNFRegex.t)
+    ((r2,sill2,b2):ExampledDNFRegex.t)
   : ExampledDNFRegex.t =
   let cs_ps =
     cartesian_map
-      ~f:(fun ((a1s,s1s,ilss1),p1) ((a2s,s2s,ilss2),p2) ->
+      ~f:(fun ((a1s,s1s,ilss1,b1),p1) ((a2s,s2s,ilss2,b2),p2) ->
           let parsings_strings =
             merge_example_data
               (intersect_map_lose_order_no_dupes
@@ -252,6 +253,9 @@ let rec exampled_regex_to_regex
     | ERegExSkip er ->
       StochasticRegex.make_skip
         (exampled_regex_to_regex er)
+    | ERegExRequire er ->
+      StochasticRegex.make_require
+        (exampled_regex_to_regex er)
     | ERegExClosed (r,_,_) ->
       StochasticRegex.make_closed
         r
@@ -278,6 +282,9 @@ let rec exampled_regex_to_stochastic_regex
         p
     | ERegExSkip er ->
       StochasticRegex.make_skip
+        (exampled_regex_to_stochastic_regex er)
+    | ERegExRequire er ->
+      StochasticRegex.make_require
         (exampled_regex_to_stochastic_regex er)
     | ERegExClosed (r,_,_) ->
       StochasticRegex.make_closed
@@ -320,7 +327,7 @@ struct
           (exampled_regex_to_regex r)
       | ERegExSkip (r') ->
         exampled_atom_to_exampled_dnf_regex
-          (ExampledDNFRegex.EASkip (recursive_f r', exampled_regex_to_regex r))
+          (ExampledDNFRegex.EASkip (recursive_f r', exampled_regex_to_regex r, false))
       | ERegExClosed (s,ss,ill) ->
         let ilss =
           merge_example_data
@@ -329,7 +336,10 @@ struct
             ss
         in
         exampled_atom_to_exampled_dnf_regex
-          (EAClosed (s,ilss))
+          (EAClosed (s,ilss,false))
+      | ERegExRequire r' ->
+        exampled_atom_to_exampled_dnf_regex
+          (ExampledDNFRegex.EASkip (recursive_f r', exampled_regex_to_regex r, false))
     end
     (*in
       let endi = ExampledDNFRegex.extract_example_data ans in

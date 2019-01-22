@@ -588,6 +588,7 @@ let prelude_spec =
   ; pmk_rs     "representative"       wrap_rep
   ; pmk_rr     "reverse"              (fun _ -> Brx.mk_reverse)
   ; pmk_rr     "skip"                 (fun _ -> Brx.mk_skip)
+  ; pmk_rr     "require"                 (fun _ -> Brx.mk_require)
   ; pmk_rsi    "count"                (fun _ r s -> 
                                          Safelist.length (Brx.star_split r s))
   ; pmk_rsb    "matches"              (fun _ r s -> Brx.match_string r s)

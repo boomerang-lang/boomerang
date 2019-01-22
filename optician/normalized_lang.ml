@@ -92,6 +92,7 @@ struct
     | ERegExEmpty
     | ERegExBase of string * (int list list) example_data
     | ERegExSkip of t
+    | ERegExRequire of t
     | ERegExConcat of t * t * (int list list) example_data
     | ERegExOr of t * t * (int list list) example_data * Probability.t
     | ERegExStar of t * (int list list) example_data * Probability.t
@@ -144,6 +145,11 @@ struct
     : t =
     make_t (ERegExSkip er)
 
+  let mk_require
+      (er:t)
+    : t =
+    make_t (ERegExRequire er)
+
   let uid
       (er:t)
     : int =
@@ -163,6 +169,7 @@ struct
       | ERegExStar (_,pd,_) -> pd
       | ERegExClosed (_,_,pd) -> pd
       | ERegExSkip (er) -> extract_example_data er
+      | ERegExRequire (er) -> extract_example_data er
     end
 
   let extract_iterations_consumed
@@ -221,6 +228,8 @@ let rec extract_string
            valid_iterations)
     | ERegExSkip er ->
       extract_string m er iteration
+    | ERegExRequire er ->
+      extract_string m er iteration
     | ERegExClosed (_,sl,ill) ->
       let dat_opt = List.findi
           ~f:(fun _ il -> il = iteration)
@@ -266,29 +275,49 @@ struct
   type exampled_atom =
     | EAClosed of
         StochasticRegex.t *
-        ((int list * string) list) example_data
-    | EASkip of t * StochasticRegex.t
-    | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t
+        ((int list * string) list) example_data *
+        bool
+    | EASkip of t * StochasticRegex.t * bool
+    | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t * bool
 
   and exampled_clause =
-    exampled_atom list
+    (exampled_atom * bool) list
     * string list
     * ((int list) * string) list example_data
 
   and t =
-    (exampled_clause * Probability.t) list * (int list * string) list example_data
+    (exampled_clause * Probability.t) list * (int list * string) list example_data * bool
   [@@deriving ord, show, hash]
+
+  let rec make_required
+      ((cps,ils,_):t)
+    : t =
+    (cps,ils,true)
+
+  and make_required_clause
+      ((atoms,ss,eds):exampled_clause)
+    : exampled_clause =
+    (List.map ~f:(fun (a,_) -> (make_required_atom a, true)) atoms,ss,eds)
+
+  and make_required_atom
+      (ea:exampled_atom)
+    : exampled_atom =
+    begin match ea with
+      | EAClosed (sr,ed,_) -> EAClosed (sr,ed,true)
+      | EASkip (d,sr,_) -> EASkip (make_required d, sr, true)
+      | EAStar (d,p,ed,sr,_) -> EAStar (make_required d,p,ed,sr,true)
+    end
 
   let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
     begin match ea with
-      | EAClosed (r,_) ->
+      | EAClosed (r,_,_) ->
         StochasticRegex.make_closed r
-      | EAStar (_,_,_,r) -> r
-      | EASkip (_,r) -> r
+      | EAStar (_,_,_,r,_) -> r
+      | EASkip (_,r,_) -> r
     end
 
   let extract_example_data
-      ((_,ed):t)
+      ((_,ed,_):t)
     : (int list * string) list example_data =
     ed
 
@@ -296,9 +325,9 @@ struct
       (ea:exampled_atom)
     : parsings_strings_example_data =
     begin match ea with
-      | EAClosed (_,ilss) -> ilss
-      | EAStar (_,_,ilss,_) -> ilss
-      | EASkip ((_,ilss),_) -> ilss
+      | EAClosed (_,ilss,_) -> ilss
+      | EAStar (_,_,ilss,_,_) -> ilss
+      | EASkip ((_,ilss,_),_,_) -> ilss
     end
 end
 
@@ -435,9 +464,9 @@ let rec to_ordered_exampled_atom
     (lc:LensContext.t)
     (a:ExampledDNFRegex.exampled_atom) : ordered_exampled_atom =
   begin match a with
-  | EAStar (r,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
-  | EASkip (r,_) -> OEASkip (to_ordered_exampled_dnf_regex lc r)
-  | EAClosed (sorig,ilel) ->
+  | EAStar (r,_,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
+  | EASkip (r,_,_) -> OEASkip (to_ordered_exampled_dnf_regex lc r)
+  | EAClosed (sorig,ilel,_) ->
     let (_,el) = unzip_example_data @$ map_example_data List.unzip ilel in
     if !use_lens_context then
       let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc (StochasticRegex.to_regex sorig) in
@@ -451,9 +480,9 @@ let rec to_ordered_exampled_atom
 
 and to_ordered_exampled_clause
     (lc:LensContext.t)
-    ((atoms,strings,exnums):ExampledDNFRegex.exampled_clause)
+    ((atoms_choices,strings,exnums):ExampledDNFRegex.exampled_clause)
   : ordered_exampled_clause =
-  let ordered_atoms = List.map ~f:(to_ordered_exampled_atom lc) atoms in
+  let ordered_atoms = List.map ~f:(to_ordered_exampled_atom lc % fst) atoms_choices in
   let ordered_ordered_atoms =
     sort_and_partition_with_indices
       compare_ordered_exampled_atoms
@@ -473,7 +502,7 @@ and to_ordered_exampled_clause
 
 and to_ordered_exampled_dnf_regex
     (lc:LensContext.t)
-    ((r,_):ExampledDNFRegex.t)
+    ((r,_,_):ExampledDNFRegex.t)
   : ordered_exampled_dnf_regex =
   let ordered_clauses = List.map ~f:((to_ordered_exampled_clause lc) % fst) r in
   sort_and_partition_with_indices

@@ -58,7 +58,7 @@ let LOCALFOLDER
 
 test matches_cex LOCALFOLDER "extract-filename.txt" = true
 
-let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*
+let DIRECTORY : regexp = skip (("/" | "") . (LOCALFOLDER . "/")* )
 
 let directory_projection
   : (lens in DIRECTORY <-> "directory given") =
@@ -67,7 +67,6 @@ let directory_projection
     createrex ("/hello/newfolder/","directory given"),
     createrex ("","directory given"),
     createrex ("","directory given")}
-    with keep_going -100.0
 
 let FILE : regexp = DIRECTORY . LOCALFOLDER
 
@@ -90,7 +89,6 @@ let with_folder_directory_projection
   synth FILE <-> LOCALFOLDER using {
     createrex ("a.txt","a.txt"),
     createrex ("/hello/newfolder/a.txt","a.txt")}
-    with keep_going -400.0
 
 let FILENAME_OR_ERR
   : regexp =
@@ -109,4 +107,3 @@ let extract_file
     createrex ("a.txt","a.txt"),
     createrex ("b.txt","b.txt")
     }
-    with keep_going -400.0

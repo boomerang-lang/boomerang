@@ -45,11 +45,12 @@ let ODD : regexp = "(" . NUMBER . "/" . NUMBER . ")"
 
 let NONODD_WORD : regexp = "()" | NUMBER
 
-let UNCLEANED_DATA : regexp = NONODD_WORD* . (ODD . NONODD_WORD* )*
+let NONODD_WORDS : regexp = skip (NONODD_WORD* )
+
+let UNCLEANED_DATA : regexp = NONODD_WORDS . (ODD . NONODD_WORDS )*
 
 let CLEANED_ODDS : regexp = (ODD . "#")*
 
 let clean_odds
   : (lens in UNCLEANED_DATA <-> CLEANED_ODDS) =
   synth UNCLEANED_DATA <-> CLEANED_ODDS
-  with keep_going -400.0

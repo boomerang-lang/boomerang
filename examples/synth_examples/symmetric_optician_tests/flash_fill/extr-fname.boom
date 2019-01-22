@@ -58,11 +58,11 @@ let LOCALFOLDER
 
 test matches_cex LOCALFOLDER "extract-filename.txt" = true
 
-let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*  
+let DIRECTORY : regexp = ("/" | "") . (LOCALFOLDER . "/")*
 
 let NONEMPTYDIRECTORY
   : regexp =
-  (LOCALFOLDER . "/")* . LOCALFOLDER
+  (skip (LOCALFOLDER . "/")* ) . LOCALFOLDER
 
 let extract_file
   : (lens in NONEMPTYDIRECTORY <-> LOCALFOLDER) =
@@ -71,4 +71,3 @@ let extract_file
     createrex ("extract-file.txt","extract-file.txt"),
     createrex ("folder/extract-folder.txt","extract-folder.txt")
   }
-  with keep_going -185.0

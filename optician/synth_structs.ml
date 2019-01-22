@@ -207,8 +207,11 @@ struct
     type t =
       {
         parsings_strings : (int list * string) list example_data ;
+        requires_no_information_loss : bool
       }
     [@@deriving ord, show, hash, make]
+
+    let requires_no_information_loss (v:t) : bool = v.requires_no_information_loss
 
     let are_compatible
         (v1:t)
@@ -279,8 +282,11 @@ struct
         parsings_strings : (int list * string) list example_data ;
         strings          : string list                           ;
         atoms            : StochasticRegex.t list                ;
+        requires_no_information_loss : bool ;
       }
     [@@deriving hash]
+
+    let requires_no_information_loss (td:t) : bool = td.requires_no_information_loss
 
     let compare
         (td1:t)
@@ -316,11 +322,13 @@ struct
         (parsings_strings:(int list * string) list example_data)
         (strings:string list)
         (atoms:StochasticRegex.t list)
+        (info_loss:bool)
       : t =
       {
         parsings_strings = parsings_strings ;
         strings          = strings          ;
         atoms            = atoms            ;
+        requires_no_information_loss = info_loss;
       }
 
     let get_strings
@@ -405,8 +413,11 @@ struct
     type t =
       {
         parsings_strings : (int list * string) list example_data ;
+        requires_no_information_loss : bool ;
       }
     [@@deriving ord, show, hash, make]
+
+    let requires_no_information_loss (v:t) : bool = v.requires_no_information_loss
 
     let are_compatible
         (v1:t)
@@ -474,19 +485,22 @@ struct
       (int list * string) list example_data
     [@@deriving ord, show, hash]
 
-    type hashable_t = parsings_strings_example_data * StochasticRegex.t
+    type hashable_t = parsings_strings_example_data * StochasticRegex.t * bool
     [@@deriving hash,show]
 
     type t =
       {
         parsings_strings : parsings_strings_example_data ;
         stochastic_regex : StochasticRegex.t             ;
+        requires_no_information_loss : bool              ;
       }
+
+    let requires_no_information_loss (v:t) : bool = v.requires_no_information_loss
 
     let to_hashable_t
         (v:t)
       : hashable_t =
-      (v.parsings_strings,v.stochastic_regex)
+      (v.parsings_strings,v.stochastic_regex,v.requires_no_information_loss)
 
     let hash_fold_t
         (s:Base__Hash.state)
@@ -523,10 +537,12 @@ struct
     let make
         (stochastic_regex:StochasticRegex.t)
         (ilsl:((int list * string) list example_data))
+        (info_loss:bool)
       : t =
       {
         parsings_strings = ilsl             ;
         stochastic_regex = stochastic_regex ;
+        requires_no_information_loss = info_loss ;
       }
 
     module Alignment =
@@ -711,37 +727,37 @@ struct
       (ed:ExampledDNFRegex.t)
     : Tree.t =
     let rec exampled_dnf_regex_to_nonempty_tree
-        ((cs,ill):ExampledDNFRegex.t)
+        ((cs,ill,b):ExampledDNFRegex.t)
       : Tree.nonempty_t =
       let children =
         List.map
           ~f:(fun (c,p) -> (exampled_clause_to_nonempty_tree c,p))
           cs
       in
-      Tree.mk_plus (PD.make ill) children
+      Tree.mk_plus (PD.make ill b) children
     and exampled_clause_to_nonempty_tree
-        ((ats,ss,ill):ExampledDNFRegex.exampled_clause)
+        ((acts,ss,ill):ExampledDNFRegex.exampled_clause)
       : Tree.nonempty_t =
       let (children,regexps) =
         List.unzip
           (List.map
-             ~f:(fun ec ->
-                 (exampled_atom_to_nonempty_tree ec
+             ~f:(fun (ec,b) ->
+                 ((exampled_atom_to_nonempty_tree ec,b)
                  ,ExampledDNFRegex.get_atom_regex ec))
-             ats)
+             acts)
       in
       Tree.mk_times (TD.make ill ss regexps) children
     and exampled_atom_to_nonempty_tree
         (a:ExampledDNFRegex.exampled_atom)
       : Tree.nonempty_t =
       begin match a with
-        | EAClosed (rs,ilss) ->
-          Tree.mk_base (BD.make rs ilss)
-        | EASkip (_,rs) ->
-          Tree.mk_base (BD.make rs (ExampledDNFRegex.extract_atom_parsing_data a))
-        | EAStar (d,p,ill,_) ->
+        | EAClosed (rs,ilss,b) ->
+          Tree.mk_base (BD.make rs ilss b)
+        | EASkip (_,rs,b) ->
+          Tree.mk_base (BD.make rs (ExampledDNFRegex.extract_atom_parsing_data a) b)
+        | EAStar (d,p,ill,_,b) ->
           let child = exampled_dnf_regex_to_nonempty_tree d in
-          Tree.mk_star (SD.make ill) p child
+          Tree.mk_star (SD.make ill b) p child
       end
     in
     Tree.mk_nonempty (exampled_dnf_regex_to_nonempty_tree ed)

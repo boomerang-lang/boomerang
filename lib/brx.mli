@@ -42,6 +42,7 @@ val mk_inter : t -> t -> t
 val mk_reverse : t -> t
 val mk_expand : t -> int -> t -> t
 val mk_skip : t -> t
+val mk_require : t -> t
 
 (* pretty printing *)
 (* ranks *)

@@ -194,7 +194,7 @@ struct
   type nonempty_t =
     | Base of BD.t
     | Plus of PD.t * (nonempty_t * Probability.t) list
-    | Times of TD.t * nonempty_t list
+    | Times of TD.t * (nonempty_t * bool) list
     | Star of SD.t * Probability.t * nonempty_t
   [@@deriving ord, show, hash]
 
@@ -216,7 +216,7 @@ struct
 
   let mk_times
       (t:TD.t)
-      (ts:nonempty_t list)
+      (ts:(nonempty_t * bool) list)
     : nonempty_t =
     Times (t,ts)
 
@@ -271,7 +271,7 @@ struct
             downward_acc
             td
             (List.map
-               ~f:(fold_downward_upward_nonempty_internal downward_acc')
+               ~f:(fold_downward_upward_nonempty_internal downward_acc' % fst)
                ts)
         | Star (sd,p,t) ->
           let downward_acc' = downward_star downward_acc sd p in
@@ -436,7 +436,7 @@ struct
               ~perm:perm
           in
           (Nonempty.mk_times t nvs
-          ,NormalizationScript.Times (norm_label,nss)))
+          ,NormalizationScript.Times (norm_label,(List.map ~f:(fun ns -> (ns,true)) nss))))
       ~star_f:(fun s p (t,ns) ->
           (Nonempty.mk_star s (t,1) p
           ,NormalizationScript.Star (s,p,ns)))
