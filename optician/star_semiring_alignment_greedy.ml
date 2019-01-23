@@ -107,10 +107,10 @@ struct
     begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
-        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_,_) -> requires_mapping nt) nts)
       | Times (td,nts) ->
         TD.requires_mapping td
-        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
       | Star (sd,(nt,_),_) ->
         SD.requires_mapping sd
         || requires_mapping nt
@@ -732,18 +732,18 @@ struct
 
     module PlusMappingState =
     struct
-      module TreePair = PairOf(NormalizedTree.Nonempty)(Probability)
+      module TreeTrip = TripleOf(NormalizedTree.Nonempty)(Probability)(IntModule)
 
       module Mappings =
       struct
         include DictOf
-            (PairOf(TreePair)(TreePair))
+            (PairOf(TreeTrip)(TreeTrip))
             (PairOf(NonemptyNormalizedPlusStarTreeAlignment)(IntModule))
 
         let insert
             (m:t)
-            (nt1:TreePair.t)
-            (nt2:TreePair.t)
+            (nt1:TreeTrip.t)
+            (nt2:TreeTrip.t)
             (al:normalized_alignment)
             (count:int)
           : t =
@@ -755,8 +755,8 @@ struct
 
         let remove
             (m:t)
-            (nt1:TreePair.t)
-            (nt2:TreePair.t)
+            (nt1:TreeTrip.t)
+            (nt2:TreeTrip.t)
             (count:int)
           : t =
           update
@@ -768,8 +768,8 @@ struct
 
         let lookup_count
             (m:t)
-            (nt1:TreePair.t)
-            (nt2:TreePair.t)
+            (nt1:TreeTrip.t)
+            (nt2:TreeTrip.t)
           : int =
           begin match lookup m (nt1,nt2) with
             | Some (_,count) -> count
@@ -781,7 +781,7 @@ struct
       struct
         type t =
           {
-            tree_pair       : TreePair.t ;
+            tree_trip       : TreeTrip.t ;
             index           : int        ;
             processed_count : int        ;
             total_count     : int        ;
@@ -789,13 +789,13 @@ struct
         [@@deriving ord, show, hash, make]
 
         let init
-            ~tree_pair:(tree_pair:TreePair.t)
+            ~tree_trip:(tree_trip:TreeTrip.t)
             ~index:(index:int)
             ~total_count:(total_count:int)
           : t =
           make
             ~index:index
-            ~tree_pair:tree_pair
+            ~tree_trip:tree_trip
             ~processed_count:0
             ~total_count:total_count
 
@@ -816,18 +816,18 @@ struct
 
       module TreeInfoDict =
       struct
-        include DictOf(TreePair)(ProcessedTreeInfo)
+        include DictOf(TreeTrip)(ProcessedTreeInfo)
 
         let multimap_penalty
             (d:t)
-            (t:TreePair.t)
+            (t:TreeTrip.t)
           : float =
           let info = lookup_exn d t in
           Math.log (Float.of_int (ProcessedTreeInfo.mapped_loop info + 1))
 
         let add_alignments
             (d:t)
-            (t:TreePair.t)
+            (t:TreeTrip.t)
             (count:int)
           : t =
           update
@@ -838,14 +838,14 @@ struct
 
         let add_productive
             (d:t)
-            (t:TreePair.t)
+            (t:TreeTrip.t)
           : bool =
           let info = lookup_exn d t in
           ProcessedTreeInfo.mapped_loop info = 0
 
         let available_count
             (d:t)
-            (t:TreePair.t)
+            (t:TreeTrip.t)
           : int =
           let info = lookup_exn d t in
           info.total_count - (info.processed_count mod info.total_count)
@@ -867,8 +867,8 @@ struct
       module PrioritiedRemainingElements =
       struct
         include QuadrupleOf
-            (TreePair)
-            (TreePair)
+            (TreeTrip)
+            (TreeTrip)
             (NonemptyNormalizedPlusStarTreeAlignment)
             (FloatModule)
         module Priority = FloatModule
@@ -891,8 +891,8 @@ struct
 
       let add_productive
           (s:t)
-          (t_l:TreePair.t)
-          (t_r:TreePair.t)
+          (t_l:TreeTrip.t)
+          (t_r:TreeTrip.t)
         : bool =
         let productive_l = TreeInfoDict.add_productive s.info_dict_l t_l in
         let productive_r = TreeInfoDict.add_productive s.info_dict_r t_r in
@@ -900,20 +900,20 @@ struct
 
       let available_count_left
           (s:t)
-          (t:TreePair.t)
+          (t:TreeTrip.t)
         : int =
         TreeInfoDict.available_count s.info_dict_l t
 
       let available_count_right
           (s:t)
-          (t:TreePair.t)
+          (t:TreeTrip.t)
         : int =
         TreeInfoDict.available_count s.info_dict_r t
 
       let add_alignments
           (s:t)
-          (t_l:TreePair.t)
-          (t_r:TreePair.t)
+          (t_l:TreeTrip.t)
+          (t_r:TreeTrip.t)
           (al:normalized_alignment)
           (count:int)
         : t =
@@ -927,8 +927,8 @@ struct
 
       let pop
           (s:t)
-        : (TreePair.t
-           * TreePair.t
+        : (TreeTrip.t
+           * TreeTrip.t
            * normalized_alignment
            * float
            * t) option =
@@ -945,8 +945,8 @@ struct
 
       let push
           (s:t)
-          (t1:TreePair.t)
-          (t2:TreePair.t)
+          (t1:TreeTrip.t)
+          (t2:TreeTrip.t)
           (al:normalized_alignment)
           (c:float)
         : t =
@@ -958,8 +958,8 @@ struct
 
       let cost
           (s:t)
-          (t_l:TreePair.t)
-          (t_r:TreePair.t)
+          (t_l:TreeTrip.t)
+          (t_r:TreeTrip.t)
           (na:normalized_alignment)
         : float =
         let multimap_penalty_l =
@@ -976,19 +976,19 @@ struct
 
       let init
           (recursive_f:GetMinimalAlignmentArg.t -> normalized_alignment option)
-          ~subtrees_l:(subtrees_l:(NormalizedTree.Nonempty.l * Probability.t) list)
-          ~subtrees_r:(subtrees_r:(NormalizedTree.Nonempty.l * Probability.t) list)
+          ~subtrees_l:(subtrees_l:(NormalizedTree.Nonempty.l * Probability.t * int) list)
+          ~subtrees_r:(subtrees_r:(NormalizedTree.Nonempty.l * Probability.t * int) list)
         : t =
         let list_to_dict
-            (ts:(NormalizedTree.Nonempty.l * Probability.t) list)
+            (ts:(NormalizedTree.Nonempty.l * Probability.t * int) list)
           : TreeInfoDict.t =
           List.foldi
-            ~f:(fun i d ((t,c),p) ->
+            ~f:(fun i d ((t,c),p,num) ->
                 TreeInfoDict.insert_or_combine
                   ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
-                  (t,p)
-                  (ProcessedTreeInfo.init ~tree_pair:(t,p) ~index:i ~total_count:c))
+                  (t,p,num)
+                  (ProcessedTreeInfo.init ~tree_trip:(t,p,num) ~index:i ~total_count:c))
             ~init:TreeInfoDict.empty
             ts
         in
@@ -998,9 +998,9 @@ struct
         let t2_keys = TreeInfoDict.key_list info_dict_r in
         let relevant_trees =
           (cartesian_filter_map
-             ~f:(fun (t1,p1) (t2,p2) ->
+             ~f:(fun (t1,p1,i1) (t2,p2,i2) ->
                  let ans_o = recursive_f (GetMinimalAlignmentArg.create t1 t2) in
-                 Option.map ~f:(fun ans -> ((t1,p1),(t2,p2),ans,pure_cost ans)) ans_o)
+                 Option.map ~f:(fun ans -> ((t1,p1,i1),(t2,p2,i2),ans,pure_cost ans)) ans_o)
              t1_keys
              t2_keys)
         in
@@ -1059,11 +1059,11 @@ struct
             in
             (ijs,data)
         end
-        include DictOf(TreePair)(PositionData)
+        include DictOf(TreeTrip)(PositionData)
 
         let pop_positions
             (d:t)
-            (t:TreePair.t)
+            (t:TreeTrip.t)
             (count:int)
           : (position list) * t =
           let data = lookup_exn d t in
@@ -1292,18 +1292,20 @@ struct
 
         module MappedInfoPQueue = PriorityQueueOf(MappedInfoPQueueElement)
 
+        module TreePair = PairOf(NormalizedTree.Nonempty)(BoolModule)
+
         type t =
           {
-            tree            : NormalizedTree.Nonempty.t ;
-            index           : int                       ;
-            processed_count : int                       ;
-            total_count     : int                       ;
-            mapped_values   : MappedInfoPQueue.t        ;
+            tree            : TreePair.t         ;
+            index           : int                ;
+            processed_count : int                ;
+            total_count     : int                ;
+            mapped_values   : MappedInfoPQueue.t ;
           }
         [@@deriving ord, show, hash, make]
 
         let init
-            ~tree:(tree:NormalizedTree.Nonempty.t)
+            ~tree:(tree:TreePair.t)
             ~index:(index:int)
             ~total_count:(total_count:int)
           : t =
@@ -1327,7 +1329,7 @@ struct
                 info.mapped_values
                 (target
                 ,al
-                ,net_loss_pure al info.tree target)
+                ,net_loss_pure al (fst info.tree) target)
             else
               info.mapped_values
           in
@@ -1483,12 +1485,12 @@ struct
             List.map
               ~f:(fun v ->
                   if v.processed_count <> v.total_count
-                  && requires_mapping v.tree then
+                  && requires_mapping (fst v.tree) then
                     None
                   else
                     let cost =
                       NormalizedTree.Nonempty.information_content
-                        v.tree
+                        (fst v.tree)
                     in
                     Some (List.map
                             ~f:(fun j -> ((v.index,j),cost))
@@ -1556,19 +1558,19 @@ struct
 
       let init
           (recursive_f:GetMinimalAlignmentArg.t -> normalized_alignment option)
-          ~left_subtrees:(left_subtrees:NormalizedTree.Nonempty.l list)
-          ~right_subtrees:(right_subtrees:NormalizedTree.Nonempty.l list)
+          ~left_subtrees:(left_subtrees:(NormalizedTree.Nonempty.l * bool) list)
+          ~right_subtrees:(right_subtrees:(NormalizedTree.Nonempty.l * bool) list)
         : t =
         let list_to_dict
-            (ts:NormalizedTree.Nonempty.l list)
+            (ts:(NormalizedTree.Nonempty.l * bool) list)
           : TreeInfoDict.t =
           List.foldi
-            ~f:(fun i d (t,c) ->
+            ~f:(fun i d ((t,c),b) ->
                 TreeInfoDict.insert_or_combine
                   ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
                   t
-                  (ProcessedTreeInfo.init t i c))
+                  (ProcessedTreeInfo.init (t,b) i c))
             ~init:TreeInfoDict.empty
             ts
         in
@@ -1896,8 +1898,8 @@ struct
         (recursive_f:GetMinimalAlignmentArg.t -> t option)
         (pl1:PD.t)
         (pl2:PD.t)
-        (tts1:(NormalizedTree.Nonempty.l * Probability.t) list)
-        (tts2:(NormalizedTree.Nonempty.l * Probability.t) list)
+        (tts1:(NormalizedTree.Nonempty.l * Probability.t * int) list)
+        (tts2:(NormalizedTree.Nonempty.l * Probability.t * int) list)
       : t option =
       if not (PD.are_compatible pl1 pl2) then
         None
@@ -1971,8 +1973,8 @@ struct
         (recursive_f:GetMinimalAlignmentArg.t -> t option)
         (tl1:TD.t)
         (tl2:TD.t)
-        (tts1:NormalizedTree.Nonempty.l list)
-        (tts2:NormalizedTree.Nonempty.l list)
+        (tts1:(NormalizedTree.Nonempty.l * bool) list)
+        (tts2:(NormalizedTree.Nonempty.l * bool) list)
       : t option =
       if not (TD.are_compatible tl1 tl2) then
         None
@@ -2224,13 +2226,13 @@ struct
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
                       let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
-                        fst @$
+                        fst3 @$
                         List.nth_exn
                           nsl1
                           i1
                       in
                       let ns2 =
-                        fst @$
+                        fst3 @$
                         List.nth_exn
                           nsl2
                           i2
@@ -2287,14 +2289,14 @@ struct
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
                       let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
-                        List.nth_exn
-                          nsl1
-                          i1
+                        fst (List.nth_exn
+                               nsl1
+                               i1)
                       in
                       let ns2 =
-                        List.nth_exn
+                        fst (List.nth_exn
                           nsl2
-                          i2
+                          i2)
                       in
                       (i1,i2,fst (to_nonempty_and_cost al ns1 ns2)))
                   als

@@ -28,7 +28,6 @@ sig
   val hash_fold_t : t hash_folder
   val get_alignment : LensContext.t -> t -> t -> Alignment.t option
   val requires_mapping : t -> bool
-  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
   val information_content : t -> float
@@ -44,7 +43,6 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
-  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end
@@ -59,7 +57,6 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
-  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end
@@ -74,7 +71,6 @@ sig
   val hash_fold_t : t hash_folder
   val are_compatible : t -> t -> bool
   val requires_mapping : t -> bool
-  val requires_no_information_loss : t -> bool
   module Default : DefaultData
   val extract_default : t -> Default.t option
 end
@@ -110,10 +106,10 @@ struct
     begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
-        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_,_) -> requires_mapping nt) nts)
       | Times (td,nts) ->
         TD.requires_mapping td
-        || (List.exists ~f:(fun (nt,_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
       | Star (sd,(nt,_),_) ->
         SD.requires_mapping sd
         || requires_mapping nt
@@ -1002,11 +998,13 @@ struct
       begin match (t1.node,t2.node) with
         | (NormalizedTree.Nonempty.Plus (pl1,pts1),
            NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
-          let pts1 = List.map ~f:fst pts1 in
-          let pts2 = List.map ~f:fst pts2 in
+          let pts1 = List.map ~f:fst3 pts1 in
+          let pts2 = List.map ~f:fst3 pts2 in
           get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
         | (NormalizedTree.Nonempty.Times (tl1,tts1),
            NormalizedTree.Nonempty.Times (tl2,tts2)) ->
+          let tts1 = List.map ~f:fst tts1 in
+          let tts2 = List.map ~f:fst tts2 in
           get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
         | (NormalizedTree.Nonempty.Star (sl1,(sts1,_),_),
            NormalizedTree.Nonempty.Star (sl2,(sts2,_),_)) ->
@@ -1033,11 +1031,13 @@ struct
         begin match (t1.node,t2.node) with
           | (NormalizedTree.Nonempty.Plus (pl1,pts1),
              NormalizedTree.Nonempty.Plus (pl2,pts2)) ->
-            let pts1 = List.map ~f:fst pts1 in
-            let pts2 = List.map ~f:fst pts2 in
+            let pts1 = List.map ~f:fst3 pts1 in
+            let pts2 = List.map ~f:fst3 pts2 in
             get_minimal_alignment_plus recursive_f pl1 pl2 pts1 pts2
           | (NormalizedTree.Nonempty.Times (tl1,tts1),
              NormalizedTree.Nonempty.Times (tl2,tts2)) ->
+            let tts1 = List.map ~f:fst tts1 in
+            let tts2 = List.map ~f:fst tts2 in
             get_minimal_alignment_times recursive_f tl1 tl2 tts1 tts2
           | (NormalizedTree.Nonempty.Star (sl1,(sts1,_),_),
              NormalizedTree.Nonempty.Star (sl2,(sts2,_),_)) ->
@@ -1120,13 +1120,13 @@ struct
                       let i1 = CountedPermutation.apply_inverse_exn perm1 p1 in
                       let i2 = CountedPermutation.apply_inverse_exn perm2 p2 in
                       let ns1 =
-                        fst @$
+                        fst3 @$
                         List.nth_exn
                           nsl1
                           i1
                       in
                       let ns2 =
-                        fst @$
+                        fst3 @$
                         List.nth_exn
                           nsl2
                           i2
@@ -1192,7 +1192,7 @@ struct
                           nsl2
                           i2
                       in
-                      (i1,i2,fst (to_nonempty_and_cost al ns1 ns2)))
+                      (i1,i2,fst (to_nonempty_and_cost al (fst ns1) (fst ns2))))
                   als
               in
               Times (tl1',tl2',aligns,projs1,projs2)

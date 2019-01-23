@@ -275,10 +275,9 @@ struct
   type exampled_atom =
     | EAClosed of
         StochasticRegex.t *
-        ((int list * string) list) example_data *
-        bool
-    | EASkip of t * StochasticRegex.t * bool
-    | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t * bool
+        ((int list * string) list) example_data
+    | EASkip of t * StochasticRegex.t
+    | EAStar of t * Probability.t * ((int list * string) list) example_data * StochasticRegex.t
 
   and exampled_clause =
     (exampled_atom * bool) list
@@ -286,34 +285,42 @@ struct
     * ((int list) * string) list example_data
 
   and t =
-    (exampled_clause * Probability.t) list * (int list * string) list example_data * bool
+    (exampled_clause * Probability.t * int) list
+    * (int list * string) list example_data
+    * int
   [@@deriving ord, show, hash]
 
   let rec make_required
       ((cps,ils,_):t)
     : t =
-    (cps,ils,true)
+    (List.map
+       ~f:(fun (c,p,i) -> (make_required_clause c,p,i))
+       cps
+    ,ils
+    ,1)
 
   and make_required_clause
       ((atoms,ss,eds):exampled_clause)
     : exampled_clause =
-    (List.map ~f:(fun (a,_) -> (make_required_atom a, true)) atoms,ss,eds)
+    (List.map ~f:(fun (a,_) -> (make_required_atom a,true)) atoms
+    ,ss
+    ,eds)
 
   and make_required_atom
       (ea:exampled_atom)
     : exampled_atom =
     begin match ea with
-      | EAClosed (sr,ed,_) -> EAClosed (sr,ed,true)
-      | EASkip (d,sr,_) -> EASkip (make_required d, sr, true)
-      | EAStar (d,p,ed,sr,_) -> EAStar (make_required d,p,ed,sr,true)
+      | EAClosed (sr,ed) -> EAClosed (sr,ed)
+      | EASkip (d,sr) -> EASkip (make_required d, sr)
+      | EAStar (d,p,ed,sr) -> EAStar (make_required d,p,ed,sr)
     end
 
   let get_atom_regex (ea:exampled_atom) : StochasticRegex.t =
     begin match ea with
-      | EAClosed (r,_,_) ->
+      | EAClosed (r,_) ->
         StochasticRegex.make_closed r
-      | EAStar (_,_,_,r,_) -> r
-      | EASkip (_,r,_) -> r
+      | EAStar (_,_,_,r) -> r
+      | EASkip (_,r) -> r
     end
 
   let extract_example_data
@@ -325,9 +332,9 @@ struct
       (ea:exampled_atom)
     : parsings_strings_example_data =
     begin match ea with
-      | EAClosed (_,ilss,_) -> ilss
-      | EAStar (_,_,ilss,_,_) -> ilss
-      | EASkip ((_,ilss,_),_,_) -> ilss
+      | EAClosed (_,ilss) -> ilss
+      | EAStar (_,_,ilss,_) -> ilss
+      | EASkip ((_,ilss,_),_) -> ilss
     end
 end
 
@@ -464,9 +471,9 @@ let rec to_ordered_exampled_atom
     (lc:LensContext.t)
     (a:ExampledDNFRegex.exampled_atom) : ordered_exampled_atom =
   begin match a with
-  | EAStar (r,_,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
-  | EASkip (r,_,_) -> OEASkip (to_ordered_exampled_dnf_regex lc r)
-  | EAClosed (sorig,ilel,_) ->
+  | EAStar (r,_,_,_) -> OEAStar (to_ordered_exampled_dnf_regex lc r)
+  | EASkip (r,_) -> OEASkip (to_ordered_exampled_dnf_regex lc r)
+  | EAClosed (sorig,ilel) ->
     let (_,el) = unzip_example_data @$ map_example_data List.unzip ilel in
     if !use_lens_context then
       let (rep_type,converter) = LensContext.shortest_path_to_rep_elt lc (StochasticRegex.to_regex sorig) in
@@ -504,7 +511,7 @@ and to_ordered_exampled_dnf_regex
     (lc:LensContext.t)
     ((r,_,_):ExampledDNFRegex.t)
   : ordered_exampled_dnf_regex =
-  let ordered_clauses = List.map ~f:((to_ordered_exampled_clause lc) % fst) r in
+  let ordered_clauses = List.map ~f:((to_ordered_exampled_clause lc) % fst3) r in
   sort_and_partition_with_indices
     compare_ordered_exampled_clauses
     ordered_clauses
