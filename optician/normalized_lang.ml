@@ -294,10 +294,10 @@ struct
       ((cps,ils,_):t)
     : t =
     (List.map
-       ~f:(fun (c,p,i) -> (make_required_clause c,p,i))
+       ~f:(fun (c,p,_) -> (make_required_clause c,p,0))
        cps
     ,ils
-    ,0)
+    ,1)
 
   and make_required_clause
       ((atoms,ss,eds):exampled_clause)

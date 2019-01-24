@@ -315,7 +315,8 @@ struct
       | ERegExConcat (r1,r2,_) ->
         let ans = concat_exampled_dnf_regexs
           (recursive_f r1)
-          (recursive_f r2) in
+          (recursive_f r2)
+        in
         ans
       | ERegExOr (r1,r2,_,p) ->
         let ans = (or_exampled_dnf_regexs

@@ -788,12 +788,15 @@ struct
 
       module ProcessedTreeInfo =
       struct
+        module MGDict = DictOf(IntModule)(IntModule)
+
         type t =
           {
             tree_trip       : TreeTrip.t ;
             index           : int        ;
             processed_count : int        ;
             total_count     : int        ;
+            mg_dict         : MGDict.t   ;
           }
         [@@deriving ord, show, hash, make]
 
@@ -807,15 +810,27 @@ struct
             ~tree_trip:tree_trip
             ~processed_count:0
             ~total_count:total_count
+            ~mg_dict:(MGDict.empty)
 
         let add_alignments
             (info:t)
             (count:int)
+            (group:int)
           : t =
           let processed_count = info.processed_count + count in
+          let old_count = MGDict.lookup_default ~default:0 info.mg_dict group in
+          let mg_dict = MGDict.insert info.mg_dict group (old_count + count) in
           { info with
             processed_count = processed_count ;
+            mg_dict = mg_dict ;
           }
+
+        let can_take
+            (info:t)
+            (group:int)
+          : bool =
+          let count = MGDict.lookup_default ~default:0 info.mg_dict group in
+          count < info.total_count
 
         let mapped_loop
             (info:t)
@@ -832,16 +847,20 @@ struct
             (t:TreeTrip.t)
           : float =
           let info = lookup_exn d t in
-          Math.log (Float.of_int (ProcessedTreeInfo.mapped_loop info + 1))
+          if ProcessedTreeInfo.can_take info (trd3 t) then
+            Math.log (Float.of_int (ProcessedTreeInfo.mapped_loop info + 1))
+          else
+            Float.infinity
 
         let add_alignments
             (d:t)
             (t:TreeTrip.t)
             (count:int)
+            (group:int)
           : t =
           update
             ~updater:(fun info ->
-                ProcessedTreeInfo.add_alignments info count)
+                ProcessedTreeInfo.add_alignments info count group)
             d
             t
 
@@ -855,9 +874,21 @@ struct
         let available_count
             (d:t)
             (t:TreeTrip.t)
+            (group:int)
           : int =
           let info = lookup_exn d t in
-          info.total_count - (info.processed_count mod info.total_count)
+          let loop_availability =
+            info.total_count
+            - (info.processed_count mod info.total_count)
+          in
+          let group_availability =
+            info.total_count -
+            (ProcessedTreeInfo.MGDict.lookup_default
+               ~default:0
+               info.mg_dict
+               group)
+          in
+          min loop_availability group_availability
 
         let all_count
             (d:t)
@@ -910,14 +941,16 @@ struct
       let available_count_left
           (s:t)
           (t:TreeTrip.t)
+          (group:int)
         : int =
-        TreeInfoDict.available_count s.info_dict_l t
+        TreeInfoDict.available_count s.info_dict_l t group
 
       let available_count_right
           (s:t)
           (t:TreeTrip.t)
+          (group:int)
         : int =
-        TreeInfoDict.available_count s.info_dict_r t
+        TreeInfoDict.available_count s.info_dict_r t group
 
       let add_alignments
           (s:t)
@@ -926,8 +959,8 @@ struct
           (al:normalized_alignment)
           (count:int)
         : t =
-        let info_dict_l = TreeInfoDict.add_alignments s.info_dict_l t_l count in
-        let info_dict_r = TreeInfoDict.add_alignments s.info_dict_r t_r count in
+        let info_dict_l = TreeInfoDict.add_alignments s.info_dict_l t_l count (trd3 t_r) in
+        let info_dict_r = TreeInfoDict.add_alignments s.info_dict_r t_r count (trd3 t_l) in
         let mappings = Mappings.insert s.mappings t_l t_r al count in
         { s with
           info_dict_l = info_dict_l ;
@@ -988,6 +1021,8 @@ struct
           ~subtrees_l:(subtrees_l:(NormalizedTree.Nonempty.l * Probability.t * int) list)
           ~subtrees_r:(subtrees_r:(NormalizedTree.Nonempty.l * Probability.t * int) list)
         : t =
+        (*print_endline @$ (string_of_list Int.to_string (List.map ~f:(fun ((_,c),_,_) -> c) subtrees_l));
+          print_endline @$ (string_of_list Int.to_string (List.map ~f:(fun ((_,c),_,_) -> c) subtrees_r));*)
         let list_to_dict
             (ts:(NormalizedTree.Nonempty.l * Probability.t * int) list)
           : TreeInfoDict.t =
@@ -1947,8 +1982,8 @@ struct
                     else
                       let count =
                         min
-                          (PlusMappingState.available_count_left s nt_l)
-                          (PlusMappingState.available_count_right s nt_r)
+                          (PlusMappingState.available_count_left s nt_l (trd3 nt_r))
+                          (PlusMappingState.available_count_right s nt_r (trd3 nt_l))
                       in
                       let s =
                         PlusMappingState.add_alignments
