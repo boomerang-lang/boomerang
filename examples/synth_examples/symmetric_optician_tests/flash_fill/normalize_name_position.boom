@@ -49,7 +49,7 @@ let TITLED_NAME : regexp =
 
 let combine_name_title
   : (lens in ROW <-> TITLED_NAME) =
-  synth ROW <-> TITLED_NAME
+  synth ROW <=> TITLED_NAME
   using
   {
   createrex ("NAME: Alex TITLE: Asst","Alex(Asst)"),

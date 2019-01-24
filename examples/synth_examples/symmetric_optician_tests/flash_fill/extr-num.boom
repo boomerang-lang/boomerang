@@ -74,4 +74,4 @@ test matches_cex
 
 let extract_number
   : (lens in PHONENUMBERHIDDEN <-> PHONENUMBER) =
-  synth PHONENUMBERHIDDEN <-> PHONENUMBER using {createrex ("asdfscxv as df415-342-3622 asdfasdf v a","415-342-3622")} 
+  synth PHONENUMBERHIDDEN <=> PHONENUMBER using {createrex ("asdfscxv as df415-342-3622 asdfasdf v a","415-342-3622")} 

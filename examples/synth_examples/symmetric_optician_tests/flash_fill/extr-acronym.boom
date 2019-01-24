@@ -59,7 +59,7 @@ let CONFERENCE_ACRONYM : regexp = UPPERCASE . UPPERCASE*
 
 let extract_acronym
   : (lens in CONFERENCE_NAME <-> CONFERENCE_ACRONYM) =
-  synth CONFERENCE_NAME <-> CONFERENCE_ACRONYM using
+  synth CONFERENCE_NAME <=> CONFERENCE_ACRONYM using
   {
     createrex ("Principals Of Programming Languages", "POPL")
   }

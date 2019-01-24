@@ -221,7 +221,7 @@ let ANACRON_DICT
 
 let afs_cellalias 
   : (lens in ANACRON_CONF <=> ANACRON_DICT) =
-  synth ANACRON_CONF <=> ANACRON_DICT using
+  synth (require ANACRON_CONF) <=> (require ANACRON_DICT) using
   {createrex ("# comment\nPATH=/path to/fOlder\n\n@monthly\t15\tcron.monthly\tnice run-parts --report /etc/cron.monthly\n","{\"#comment\"=\"comment\"}{\"PATH\"=\"/path to/fOlder\"}{}{\"entry\"=\"nice run-parts --report /etc/cron.monthly\"{\"period_name\"=\"monthly\"}{\"delay\"=\"15\"}{\"job-identifier\"=\"cron.monthly\"}}")
   ,createrex ("# comm\nPATH=/pth to/fOlder\n\n1000\t1\tcron.onthly\tnice run-parts --repor /etc/cron.onthly\n","{\"#comment\"=\"comm\"}{\"PATH\"=\"/pth to/fOlder\"}{}{\"entry\"=\"nice run-parts --repor /etc/cron.onthly\"{\"period\"=\"1000\"}{\"delay\"=\"1\"}{\"job-identifier\"=\"cron.onthly\"}}")
   }

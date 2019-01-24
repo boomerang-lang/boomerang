@@ -53,4 +53,4 @@ let CLEANED_ODDS : regexp = (ODD . "#")*
 
 let clean_odds
   : (lens in UNCLEANED_DATA <-> CLEANED_ODDS) =
-  synth UNCLEANED_DATA <-> CLEANED_ODDS
+  synth UNCLEANED_DATA <=> CLEANED_ODDS

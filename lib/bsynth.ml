@@ -171,19 +171,11 @@ let synth
     (keep_going:float)
     (r1:Brx.t)
     (r2:Brx.t)
-    (enforce_costless:bool)
     (creater_exs:create_examples)
     (createl_exs:create_examples)
     (putr_exs:put_examples)
     (putl_exs:put_examples)
   : Blenses.MLens.t =
-  let (r1,r2) =
-    if enforce_costless then
-      (Brx.mk_require r1, Brx.mk_require r2)
-    else
-      (r1,r2)
-  in
-  let enforce_costless = false in
   let dumb_cost = Prefs.read Prefs.dumbCostPref in
   let dumb_cost_correct_pair = Prefs.read Prefs.dumbCostCorrectPairPref in
   let constants_cost = Prefs.read Prefs.constantsCostPref in
@@ -211,7 +203,6 @@ let synth
             lss
             r1
             r2
-            enforce_costless
             creater_exs
             createl_exs
             putr_exs
@@ -229,7 +220,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -250,7 +240,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -270,7 +259,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -289,7 +277,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -308,7 +295,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs
@@ -328,7 +314,6 @@ let synth
                lss
                r1
                r2
-               enforce_costless
                creater_exs
                createl_exs
                putr_exs

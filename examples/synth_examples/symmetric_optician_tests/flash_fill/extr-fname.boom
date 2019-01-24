@@ -66,7 +66,7 @@ let NONEMPTYDIRECTORY
 
 let extract_file
   : (lens in NONEMPTYDIRECTORY <-> LOCALFOLDER) =
-  synth NONEMPTYDIRECTORY <-> LOCALFOLDER
+  synth NONEMPTYDIRECTORY <=> LOCALFOLDER
   using {
     createrex ("extract-file.txt","extract-file.txt"),
     createrex ("folder/extract-folder.txt","extract-folder.txt")

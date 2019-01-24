@@ -369,4 +369,4 @@ let PAGE_DICT
 
 let DICT : regexp = ("{ }" | COMMENT_DICT)*  . PAGE_DICT*  
 
-let map : (lens in CONF <=> DICT) = synth CONF <=> DICT 
+let map : (lens in CONF <=> DICT) = synth (require CONF) <=> (require DICT)

@@ -62,7 +62,7 @@ let DIRECTORY : regexp = skip (("/" | "") . (LOCALFOLDER . "/")* )
 
 let directory_projection
   : (lens in DIRECTORY <-> "directory given") =
-  synth DIRECTORY <-> "directory given" using {
+  synth DIRECTORY <=> "directory given" using {
     createrex ("/hello/folder/","directory given"),
     createrex ("/hello/newfolder/","directory given"),
     createrex ("","directory given"),
@@ -86,7 +86,7 @@ test matches_cex
 
 let with_folder_directory_projection
   : (lens in FILE <-> LOCALFOLDER) =
-  synth FILE <-> LOCALFOLDER using {
+  synth FILE <=> LOCALFOLDER using {
     createrex ("a.txt","a.txt"),
     createrex ("/hello/newfolder/a.txt","a.txt")}
 
@@ -101,7 +101,7 @@ test matches_cex
 
 let extract_file
   : (lens in FILE_OR_FOLDER <-> FILENAME_OR_ERR) =
-  synth FILE_OR_FOLDER <-> FILENAME_OR_ERR using {
+  synth FILE_OR_FOLDER <=> FILENAME_OR_ERR using {
     createrex ("/hello/folder/","directory given"),
     createrex ("/hello/folder/a.txt","a.txt"),
     createrex ("a.txt","a.txt"),

@@ -53,7 +53,7 @@ let NORMALIZED_TEXT : regexp = WORD . (" " . WORD)*
 
 let normalize_text
   : (lens in NON_NORMALIZED_TEXT <-> NORMALIZED_TEXT) =
-  synth NON_NORMALIZED_TEXT <-> NORMALIZED_TEXT
+  synth NON_NORMALIZED_TEXT <=> NORMALIZED_TEXT
   using
   {
   createrex ("Fix     spaces","Fix spaces")

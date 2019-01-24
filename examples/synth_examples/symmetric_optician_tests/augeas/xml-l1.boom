@@ -187,4 +187,4 @@ let THIRDLEVEL_XML_DICT
 
 let map_inner
   : (lens in XML_INNER_ELEMENT <=> INNER_XML_DICT) =
-  synth XML_INNER_ELEMENT <=> INNER_XML_DICT
+  synth (require XML_INNER_ELEMENT) <=> (require INNER_XML_DICT)
