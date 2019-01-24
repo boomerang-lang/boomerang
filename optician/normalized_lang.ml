@@ -297,7 +297,7 @@ struct
        ~f:(fun (c,p,i) -> (make_required_clause c,p,i))
        cps
     ,ils
-    ,1)
+    ,0)
 
   and make_required_clause
       ((atoms,ss,eds):exampled_clause)

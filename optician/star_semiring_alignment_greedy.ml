@@ -103,20 +103,29 @@ struct
   module NormalizedTree = NormalizedPlusTimesStarTreeOf(PD)(TD)(SD)(BD)
   let rec requires_mapping
       (nt:NormalizedTree.Nonempty.t)
+      (requires_if_nonzero:bool)
     : bool =
-    begin match nt.node with
+    (begin match nt.node with
       | Plus (pd,nts) ->
         PD.requires_mapping pd
-        || (List.exists ~f:(fun ((nt,_),_,_) -> requires_mapping nt) nts)
+        || (List.length
+              (List.dedup_and_sort
+                 ~compare:Int.compare
+                 (List.map ~f:(fun (_,_,i) -> i) nts))
+            <> List.length nts)
+        || (List.exists ~f:(fun ((nt,_),_,i) -> requires_mapping nt false) nts)
       | Times (td,nts) ->
         TD.requires_mapping td
-        || (List.exists ~f:(fun ((nt,_),_) -> requires_mapping nt) nts)
+        || (List.exists ~f:(fun ((nt,_),b) -> requires_mapping nt b) nts)
       | Star (sd,(nt,_),_) ->
         SD.requires_mapping sd
-        || requires_mapping nt
+        || requires_mapping nt false
       | Base bd ->
         BD.requires_mapping bd
-    end
+     end
+    ||
+    requires_if_nonzero)
+    && (NormalizedTree.Nonempty.information_content nt) <> 0.
 
   module Nonempty =
   struct
@@ -1174,25 +1183,30 @@ struct
 
     module TimesMappingState =
     struct
+      module TreePair = PairOf(NormalizedTree.Nonempty)(BoolModule)
+
       let net_loss_pure
           (nt:normalized_alignment)
-          (tl:NormalizedTree.Nonempty.t)
-          (tr:NormalizedTree.Nonempty.t)
+          ((tl,bl):TreePair.t)
+          ((tr,br):TreePair.t)
         : float =
-        cost nt
-        -. NormalizedTree.Nonempty.information_content tl
-        -. NormalizedTree.Nonempty.information_content tl
+        if (cost nt) = 0. && requires_mapping tl bl && requires_mapping tr br then
+          Float.neg_infinity
+        else
+          cost nt
+          -. NormalizedTree.Nonempty.information_content tl
+          -. NormalizedTree.Nonempty.information_content tr
 
       module Mappings =
       struct
         include DictOf
-          (PairOf(NormalizedTree.Nonempty)(NormalizedTree.Nonempty))
+            (PairOf(TreePair)(TreePair))
           (PairOf(NonemptyNormalizedPlusStarTreeAlignment)(IntModule))
 
         let insert
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
             (al:normalized_alignment)
             (count:int)
           : t =
@@ -1204,8 +1218,8 @@ struct
 
         let remove
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
             (count:int)
           : t =
           update
@@ -1217,8 +1231,8 @@ struct
 
         let lookup_count
             (m:t)
-            (nt1:NormalizedTree.Nonempty.t)
-            (nt2:NormalizedTree.Nonempty.t)
+            (nt1:TreePair.t)
+            (nt2:TreePair.t)
           : int =
           begin match lookup m (nt1,nt2) with
             | Some (_,count) -> count
@@ -1226,11 +1240,11 @@ struct
           end
 
         module TreeLocationDict =
-          DictOf(NormalizedTree.Nonempty)(IntModule)
+          DictOf(TreePair)(IntModule)
         let to_aligns
             (m:t)
-            (left_indices:NormalizedTree.Nonempty.t -> int)
-            (right_indices:NormalizedTree.Nonempty.t -> int)
+            (left_indices:TreePair.t -> int)
+            (right_indices:TreePair.t -> int)
           : (position * position * normalized_alignment) list =
           let left_p = TreeLocationDict.empty in
           let right_p = TreeLocationDict.empty in
@@ -1283,7 +1297,7 @@ struct
         module MappedInfoPQueueElement =
         struct
           include TripleOf
-              (NormalizedTree.Nonempty)
+              (TreePair)
               (NonemptyNormalizedPlusStarTreeAlignment)
               (FloatModule)
           module Priority = FloatModule
@@ -1291,8 +1305,6 @@ struct
         end
 
         module MappedInfoPQueue = PriorityQueueOf(MappedInfoPQueueElement)
-
-        module TreePair = PairOf(NormalizedTree.Nonempty)(BoolModule)
 
         type t =
           {
@@ -1318,7 +1330,7 @@ struct
 
         let add_alignments
             (info:t)
-            (target:NormalizedTree.Nonempty.t)
+            (target:NormalizedTree.Nonempty.t * bool)
             (al:normalized_alignment)
             (count:int)
             (removable:bool)
@@ -1329,7 +1341,7 @@ struct
                 info.mapped_values
                 (target
                 ,al
-                ,net_loss_pure al (fst info.tree) target)
+                ,net_loss_pure al (info.tree) target)
             else
               info.mapped_values
           in
@@ -1339,10 +1351,10 @@ struct
           }
 
         let free_up_to
-            (mapping_counts:NormalizedTree.Nonempty.t -> int)
+            (mapping_counts:TreePair.t -> int)
             (info:t)
             (max:int)
-          : t * (NormalizedTree.Nonempty.t
+          : t * (TreePair.t
                  * float
                  * int) option =
           let (pq,popped_num_opt) =
@@ -1398,19 +1410,19 @@ struct
 
       module TreeInfoDict =
       struct
-        include DictOf(NormalizedTree.Nonempty)(ProcessedTreeInfo)
+        include DictOf(TreePair)(ProcessedTreeInfo)
 
         let remaining_count_exn
             (d:t)
-            (nt:NormalizedTree.Nonempty.t)
+            (nt:TreePair.t)
           : int =
           let info = lookup_exn d nt in
           info.total_count - info.processed_count
 
         let add_alignments
             (d:t)
-            ~key:(k:NormalizedTree.Nonempty.t)
-            ~target:(target:NormalizedTree.Nonempty.t)
+            ~key:(k:TreePair.t)
+            ~target:(target:TreePair.t)
             ~alignment:(alignment:normalized_alignment)
             ~count:(count:int)
             ~removable:(removable:bool)
@@ -1427,11 +1439,11 @@ struct
             k
 
         let free_up_to
-            (mapping_counts:NormalizedTree.Nonempty.t -> int)
+            (mapping_counts:TreePair.t -> int)
             (d:t)
-            (t:NormalizedTree.Nonempty.t)
+            (t:TreePair.t)
             (num:int)
-          : t * (NormalizedTree.Nonempty.t * float * int) option =
+          : t * (TreePair.t * float * int) option =
           let info =
             lookup_exn
               d
@@ -1453,7 +1465,7 @@ struct
 
         let increase_available
             (d:t)
-            (t:NormalizedTree.Nonempty.t)
+            (t:TreePair.t)
             (num:int)
           : t =
           let info =
@@ -1473,7 +1485,7 @@ struct
 
         let index_exn
             (d:t)
-            (t:NormalizedTree.Nonempty.t)
+            (t:TreePair.t)
           : int =
           let info = lookup_exn d t in
           info.index
@@ -1485,13 +1497,14 @@ struct
             List.map
               ~f:(fun v ->
                   if v.processed_count <> v.total_count
-                  && requires_mapping (fst v.tree) then
+                  && requires_mapping (fst v.tree) (snd v.tree) then
                     None
                   else
                     let cost =
                       NormalizedTree.Nonempty.information_content
                         (fst v.tree)
                     in
+                    (*print_endline @$ Bool.to_string @$ requires_mapping @$ fst @$ v.tree;*)
                     Some (List.map
                             ~f:(fun j -> ((v.index,j),cost))
                             (range v.processed_count v.total_count)))
@@ -1523,8 +1536,8 @@ struct
       module PrioritiedRemainingElements =
       struct
         include QuadrupleOf
-            (NormalizedTree.Nonempty)
-            (NormalizedTree.Nonempty)
+            (TreePair)
+            (TreePair)
             (NonemptyNormalizedPlusStarTreeAlignment)
             (FloatModule)
         module Priority = FloatModule
@@ -1545,8 +1558,8 @@ struct
 
         let index
             (s:t)
-            (tree_l:NormalizedTree.Nonempty.t)
-            (tree_r:NormalizedTree.Nonempty.t)
+            (tree_l:TreePair.t)
+            (tree_r:TreePair.t)
           : int * int =
           (TreeInfoDict.index_exn s.t1_dict tree_l
           ,TreeInfoDict.index_exn s.t2_dict tree_r)
@@ -1569,7 +1582,7 @@ struct
                 TreeInfoDict.insert_or_combine
                   ~combiner:(fun _ _ -> failwith "shouldnt merge")
                   d
-                  t
+                  (t,b)
                   (ProcessedTreeInfo.init (t,b) i c))
             ~init:TreeInfoDict.empty
             ts
@@ -1581,7 +1594,7 @@ struct
         let relevant_trees =
           (cartesian_filter_map
              ~f:(fun t1 t2 ->
-                 let ans_o = recursive_f (GetMinimalAlignmentArg.create t1 t2) in
+                 let ans_o = recursive_f (GetMinimalAlignmentArg.create (fst t1) (fst t2)) in
                  Option.map ~f:(fun ans -> (t1,t2,ans,net_loss_pure ans t1 t2)) ans_o)
              t1_keys
              t2_keys)
@@ -1596,8 +1609,8 @@ struct
 
       let push
           (s:t)
-          (t1:NormalizedTree.Nonempty.t)
-          (t2:NormalizedTree.Nonempty.t)
+          (t1:TreePair.t)
+          (t2:TreePair.t)
           (al:normalized_alignment)
           (c:float)
         : t =
@@ -1607,8 +1620,8 @@ struct
 
       let pop
           (s:t)
-        : (NormalizedTree.Nonempty.t
-           * NormalizedTree.Nonempty.t
+        : (TreePair.t
+           * TreePair.t
            * normalized_alignment
            * float
            * t) option =
@@ -1625,15 +1638,15 @@ struct
 
       let add_alignments
           (s:t)
-          (nt1:NormalizedTree.Nonempty.t)
-          (nt2:NormalizedTree.Nonempty.t)
+          (nt1:TreePair.t)
+          (nt2:TreePair.t)
           (a:normalized_alignment)
           (count:int)
         : t =
         let mappings = Mappings.insert s.mappings nt1 nt2 a count in
         let removable =
-          not @$ requires_mapping nt1
-          && not @$ requires_mapping nt2
+          not @$ requires_mapping (fst nt1) (snd nt1)
+          && not @$ requires_mapping (fst nt2) (snd nt2)
         in
         let t1_dict =
           TreeInfoDict.add_alignments
@@ -1661,13 +1674,13 @@ struct
 
       let remaining_count_left
           (s:t)
-          (nt:NormalizedTree.Nonempty.t)
+          (nt:TreePair.t)
         : int =
         TreeInfoDict.remaining_count_exn s.t1_dict nt
 
       let remaining_count_right
           (s:t)
-          (nt:NormalizedTree.Nonempty.t)
+          (nt:TreePair.t)
         : int =
         TreeInfoDict.remaining_count_exn s.t2_dict nt
 
@@ -1693,7 +1706,7 @@ struct
 
       let remove_left_up_to
           (s:t)
-          (nt1:NormalizedTree.Nonempty.t)
+          (nt1:TreePair.t)
           (max_amount:int)
         : t * (int * float) option =
         let (t1_dict,free_left_info_opt) =
@@ -1737,7 +1750,7 @@ struct
 
       let remove_right_up_to
           (s:t)
-          (nt2:NormalizedTree.Nonempty.t)
+          (nt2:TreePair.t)
           (max_amount:int)
         : t * (int * float) option =
         let (t2_dict,free_right_info_opt) =
@@ -2004,8 +2017,8 @@ struct
                   | Some (nt1,nt2,na,net_loss,s) ->
                     let s_orig = s in
                     let requires_mapping =
-                      requires_mapping nt1
-                      || requires_mapping nt2
+                      requires_mapping (fst nt1) (snd nt1)
+                      || requires_mapping (fst nt2) (snd nt2)
                     in
                     if net_loss >=. 0.
                     && not requires_mapping then

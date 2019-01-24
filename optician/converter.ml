@@ -342,8 +342,7 @@ struct
         exampled_atom_to_exampled_dnf_regex
           (EAClosed (s,ilss))
       | ERegExRequire r' ->
-        exampled_atom_to_exampled_dnf_regex
-          (ExampledDNFRegex.EASkip (recursive_f r', exampled_regex_to_regex r))
+        ExampledDNFRegex.make_required (recursive_f r')
     end
     (*in
       let endi = ExampledDNFRegex.extract_example_data ans in

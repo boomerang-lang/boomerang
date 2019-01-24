@@ -37,7 +37,7 @@ let UPPERCASE
 
 let to_upper_or_lower
   : (lens in LOWERCASE <=> UPPERCASE) =
-  synth (LOWERCASE) <-> (UPPERCASE)
+  synth LOWERCASE <=> UPPERCASE
   using { createrex("a","A") , createrex("b","B") }
 
 let DIGIT

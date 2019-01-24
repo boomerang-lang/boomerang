@@ -506,8 +506,8 @@ struct
                 sorted_qes
             in
             if comparison_cost >=. best_cost || satisfies_from_no_termination best_cost then
-            (if !verbose then print_endline @$ string_of_float best_cost;
-             if !test_dumb_cost_at_correct_pair then
+              (if !verbose then print_endline @$ string_of_float best_cost;
+               if !test_dumb_cost_at_correct_pair then
                (no_intelligent_cost := true;
   StarSemiringTreeRep.clear_alignments ();
                 assert (Lens.is_eq
